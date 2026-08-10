@@ -289,6 +289,58 @@ returns when dispatch deviates from the authored balance (P6). `weather.json`
 **Next:** P2 — the frequency dynamics engine (PHYSICS §1–§2) + analytic
 validation.
 
+### P2 — Frequency dynamics engine + analytic validation (2026-08-10)
+
+**Built:** `dynamics/` package — integer-µs time base (10 ms quantum),
+`events.py` (heap queue, grid-quantized, FIFO tiebreak), `fleet.py`
+(struct-of-arrays: dispatch slew → droop with soft deadband + FCR/envelope
+clamps → T_g → T_CH/T_RH cascade with F_HP split, per-stage exact-exponential
+updates, coefficient cache per dt), `islands.py` (connected components),
+`integrator.py` (master loop: absolute-time boundaries only, per-island
+semi-implicit COI swing, ALERT/CALM hysteresis controller, PF hook, energy
+meters, state_dict); `telemetry.py` (fine ring + trajectory buffer with
+≤512-sample decimation, event instants kept); `snapshot.py` (repr-float JSON,
+bit-exact restore, model hash); `DynSimulator` (PF↔dynamics ledger coupling:
+PF at mode cadence writes fleet outputs → solves → refreshes `p_loss`; the
+slack residual is the loss-estimate error and self-corrects); standalone
+default `simulator="dyn"`; collector `freq` measurement + Grafana frequency
+panel + H_sys/RoCoF stat; README honesty section.
+
+**Tests:** 53 green (19 new) — all P2 gates: RoCoF first tick −1.3319
+(0.5 % of analytic, post-trip E_k), QSS −0.63291 (0.1 %), nadir 49.086 ±
+10 mHz regression pin, RoCoF ∝ 1/E_k (R² > 0.999), nadir/inertia sweep
+strictly monotone, exact-lag recursion pin 1e-9 + dt = 5T stability,
+slicing identity **bit-exact** (10×1 s ≡ 1×10 s ≡ 0.3/4.7/5.0 across a
+CALM→ALERT transition), snapshot bit-replay through JSON, early-return
+semantics + seamless continuation, energy balance ≤ 1e-9 (semi-implicit
+pairing makes the identity exact), case9 library pins, coupled europe_mini
+hour (|Δf| < 0.1 Hz, PF failures 0), loss-feedback settling (slack < 0.1 %
+of load).
+
+**Acceptance evidence:** all engine-design pins reproduced on first run —
+the numerically-validated planning design transferred cleanly. Live compose
+stack: real frequency in Grafana (50.029 Hz on the morning ramp, boundary
+transients to 49.92 Hz, H_sys 4.0 s, mode calm, `slack_mw: -0.0` — the
+frequency model now closes the balance; 1180 PF solves, 0 failures).
+
+**Discoveries:** (1) NumPy 2 `repr(np.float64)` prints the dtype wrapper —
+snapshot serialization must `repr(float(v))`. (2) Standalone step boundaries
+(sample-and-hold load jumps up to ~1 GW) excite |Δf| > 50 mHz transients →
+ALERT episodes → ~0.8 s compute per 900 s step in Docker; keeps up with the
+1 s tick but tight. P6's game-side per-wire-step demand updates smooth this;
+revisit `alert_df_mhz` if standalone cost matters earlier.
+
+**Deviations (deliberate, ledger-relevant):** `dt_done` is
+boundary-quantized and may exceed `dt_s` by up to one CALM tick when the
+request is shorter than the next boundary (min-one-boundary rule) — this is
+what buys bit-exact slicing invariance; fold into the contract text at the
+P4 freeze. Coarse 24 h ring and the rolling snapshot ring deferred (P4/P8).
+LFSM-U honesty note mirrored in README.
+
+**Next:** P3 — distinct per-kind plant models from the PARAMETERS catalog,
+start/stop sequences, trips, storage device dynamics; `data/catalogs/
+plant_types.json` with rationale strings; three-fleet comparative test.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a

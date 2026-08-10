@@ -51,10 +51,25 @@ executed phase-by-phase by a coding agent:
 | [docs/contract/v2-draft.md](docs/contract/v2-draft.md) | Gamebridge v2 wire contract (draft until frozen in P4) |
 | [CLAUDE.md](CLAUDE.md) | Handoff/context document: binding rules, decision ledger, open questions |
 
-## Quickstart (once P1 ships)
+## Quickstart
 
 ```bash
 docker compose up          # backend :8003, Grafana :3003
 # or
 ./install.sh && ./start_rttransportflow.sh
 ```
+
+## What the physics is (and honestly is not)
+
+The backend couples quasi-static AC power flow (pandapower Newton-Raphson —
+flows, voltages, reactive power, losses) with a **per-island
+center-of-inertia swing equation + per-plant governor/turbine ODEs**
+integrated at 10 ms (ALERT) / 250 ms (CALM). Frequency, RoCoF, nadir, and
+governor response are computed, never scripted, and validated against
+analytic closed forms (`tests/test_dynamics_analytic.py`).
+
+**Not modeled** (docs/PHYSICS.md §2.1 — do not fake it): inter-machine
+rotor-angle swings and inter-area oscillation modes (frequency is uniform
+per island by construction), transient/voltage stability, loss of
+synchronism, AVR/exciter dynamics (voltage is quasi-static between PF
+instants), LFSM-U, EMT phenomena.

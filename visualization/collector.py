@@ -63,6 +63,16 @@ def to_lines(state: dict, ts_ns: int) -> str:
         ]
         if parts:
             lines.append(f"bus,name={esc_tag(bus)} {','.join(parts)} {ts_ns}")
+
+    freq = state.get("freq")
+    if freq:
+        parts = [
+            f"{k}={float(v)}"
+            for k, v in freq.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)
+        ]
+        parts.append(f"alert={1 if freq.get('mode') == 'alert' else 0}i")
+        lines.append(f"freq {','.join(parts)} {ts_ns}")
     return "\n".join(lines)
 
 

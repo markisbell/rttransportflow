@@ -59,7 +59,17 @@ def build_container(settings: Settings | None = None) -> App:
     store = StateStore(history_size=settings.history_size)
 
     network_meta = None
-    if settings.simulator == "pf":
+    if settings.simulator == "dyn":
+        from ..data_loader import load_bundle
+        from ..simulator import build_dyn_simulator
+
+        simulator = build_dyn_simulator(
+            settings.data_dir, settings.steps_per_day,
+            d_load_pct_per_hz=settings.d_load_pct_per_hz,
+            warm_start=settings.warm_start,
+        )
+        network_meta = _network_meta(load_bundle(settings.data_dir))
+    elif settings.simulator == "pf":
         from ..data_loader import load_bundle
 
         simulator = build_pf_simulator(

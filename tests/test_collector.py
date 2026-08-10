@@ -24,6 +24,8 @@ def test_to_lines_line_protocol() -> None:
         "lines": {"lyon-milan": {"loading_percent": 69.9, "p_from_mw": 1500.0, "pl_mw": 12.0}},
         "buses": {"paris": {"vm_pu": 1.02, "va_degree": -3.5}},
     }
+    state["freq"] = {"f_hz": 49.982, "h_sys_s": 4.1, "mode": "alert",
+                     "balance_err": 1e-12}
     body = c.to_lines(state, 1234567890)
     lines = body.split("\n")
     assert lines[0].startswith("summary step=5i,day=1i,converged=1i,solve_ms=6.25")
@@ -31,6 +33,8 @@ def test_to_lines_line_protocol() -> None:
     assert lines[0].endswith(" 1234567890")
     assert any(ln.startswith("line,id=lyon-milan loading_percent=69.9") for ln in lines)
     assert any(ln.startswith("bus,name=paris vm_pu=1.02") for ln in lines)
+    freq_line = next(ln for ln in lines if ln.startswith("freq "))
+    assert "f_hz=49.982" in freq_line and "alert=1i" in freq_line
 
 
 def test_to_lines_degraded_frame_has_no_physics_fields() -> None:
