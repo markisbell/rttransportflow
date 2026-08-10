@@ -1,0 +1,222 @@
+# CLAUDE.md — project context & development state
+
+> Handoff/context document. What this project is, the binding rules, the
+> decision ledger from planning, and what a coding session must read first.
+> Format follows the family convention (rtheatflow): per-phase log entries
+> with Built / Tests / Acceptance evidence / Discoveries / Deviations.
+
+## 1. What this project is
+
+**rttransportflow** — a Europe-scale power **transmission** game: Godot 4 game
++ Python dynamics backend in one monorepo. The player builds plants, storage,
+a hydrogen chain, and the 220/400 kV grid serving 25 European load centers —
+and the grid has a *real frequency*: per-island center-of-inertia swing
+equation + distinct governor/turbine ODEs per plant type, coupled to
+pandapower AC power flow. Core pedagogical goal: **feel how frequency
+dynamics change when renewables + batteries replace synchronous plants**
+(RoCoF, nadir, FCR speed, grid-forming virtual inertia, UFLS cascades).
+
+Fourth backend of the family — after rtpowerflow (power distribution),
+rtheatflow (district heat), rtwaterflow (water) — alongside infrastruct (the
+city-builder consuming those three as co-sim sidecars). Same DNA: FastAPI
+backend, "the game owns time" puppet mode, gamebridge contract,
+divergence-is-data, Docker/Grafana stack.
+
+## 2. State
+
+**Planning complete (2026-08-10). No code yet.** The plan was produced by a
+multi-agent research+design pass over the sibling repos, then synthesized and
+cross-reviewed. Start with ROADMAP P0.
+
+Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
+docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2-draft.md →
+docs/GAME_DESIGN.md.
+
+## 3. Binding rules
+
+- **Document precedence**: SPEC §0.2. PARAMETERS wins on numbers, PHYSICS on
+  equations/engine behavior, contract draft on the wire, GAME_DESIGN on
+  gameplay, SPEC on architecture/process, ROADMAP on sequencing.
+- **Phase gates are hard** (ROADMAP rules). Every phase ends with a log entry
+  in §6 below.
+- **Verify library claims at runtime** (`scripts/validate_core.py`) before
+  trusting them; pin behaviors in `test_pandapower_pins.py`.
+- **No RNG in the engine** except the `protection_seed` PRNG; no wall-clock in
+  the sim path; slicing identity and snapshot bit-replay are non-negotiable.
+- **Wire hygiene**: `_r()` on every float (round 6, non-finite → null) —
+  sole exemption: the snapshot blob uses `repr` for bit-exact restore;
+  `_as_int` tolerance (Godot sends ints as floats); idempotent last-t cache
+  returns BEFORE any state application.
+- **Never crash the loop**: catch-all in the solve path, non-convergence is
+  data, never 500.
+- **Ports**: backend 8003 / InfluxDB 8089 / Grafana 3003 (no web UI in v1 —
+  ledger 25; 5176/8083 reserved-unused); game 8030 / smokes 8031 / contract
+  tests 8032. NEVER 8000–8002 (user dev instances), 8010–8016 (infrastruct
+  sidecars + smokes), or 8020–8029 (infrastruct contract tests).
+- **License**: no code from gridedit/gridgen (AGPL) — pattern reuse only.
+- **Commit/push only on explicit authorization.**
+- Lean solo agent work — ask before multi-agent fan-outs.
+
+## 4. Decision ledger (planning-phase reconciliations; re-opening requires a new entry)
+
+1. **New dedicated backend, not an rtpowerflow extension** — different engine
+   paradigm (electromechanical ODE layer at 10–250 ms inside variable puppet
+   steps vs quasi-static minute steps); rtpowerflow is a shipped tool with a
+   pinned surface; no external slack at transmission level (the frequency
+   model closes the balance). Family template inherited wholesale.
+2. **One monorepo** (backend + game) — exactly one backend, co-evolving
+   contract, atomic contract commits; backend stays standalone-runnable by
+   convention (own pyproject/Docker/clock, no imports from game/).
+3. **Stepping model**: variable `dt_s ∈ [0.05, 900]` float + early return on
+   event + trajectory buffers (the numerically validated engine design won
+   over a fixed-900 s-step sketch). Wire `t` is a sequence number; the game
+   clock advances by `dt_done_s`. Economy layer aggregates on 15-min sim
+   boundaries game-side.
+4. **Per-island frequency from day one** (COI per connected component;
+   emergent islanding/cascades). Normal operation = one synchronous area;
+   *deliberate* multi-area (separate AGC, HVDC-coupled f) deferred to stretch.
+5. **Integrator**: exact-exponential lag updates + semi-implicit COI swing,
+   ALERT 10 ms / CALM 250 ms with deterministic hysteresis; PF at 1 s / 30 s
+   + on every event. Validated in planning: RoCoF 0.11 % error, QSS < 0.01 %,
+   slicing bit-exact, 6.9 µs/tick for 100 devices.
+6. **UFLS table**: 6 stages 49.0→48.0 Hz × 7.5 % (cum 45 %), 150 ms pickup —
+   PARAMETERS §2.2 is authoritative (an earlier engine-doc variant with
+   5/7.5/10 % steps was superseded).
+7. **Load self-regulation**: game default **1 %/Hz** (ENTSO-E). The analytic
+   test fixture in PHYSICS §6 deliberately uses 2 %/Hz (D = 1.0 pu) because
+   its pinned numbers were validated with it — formulas are parametric.
+8. **Battery (GFL)**: T_b = 0.1 s, deadband ±10 mHz, full FFR at ±200 mHz,
+   η_ch = η_dis = 0.94 (PARAMETERS wins over earlier engine-doc values).
+   Grid-forming variant: H_v = 4 s default, counts into island inertia.
+9. **Nuclear primary response**: physically capable (droop 5 %, db ±20 mHz,
+   band ±2 % P_n) but **participation OFF by game default** (must-run
+   identity); player-enabled at a wear fee.
+10. **Ports/identity**: package `rttransportflow`, env prefix
+    `RTTRANSPORTFLOW_`, backend port **8003** (power 8000 / heat 8001 / water
+    8002 taken). An earlier engine-doc claim of 8002 was wrong.
+11. **Wire unit MW** (deviation from the kW siblings; transmission scale) —
+    contract `2.0`, `network_kind: "transmission"`, breaking successor to v1.2.
+12. **Counterfactual replays run in the backend** (`POST /gb/replay`,
+    read-only, off the step path) — physics implemented exactly once; the game
+    never re-implements the swing model.
+13. **Tile = 50 km**, map 96×80, hard cap ≤ 150 buses / ≤ 300 branches
+    (infrastruct's ≤300-node budget lesson made binding).
+14. **Weather/demand/dispatch/economics game-side; physics/protection/meters
+    backend-side** (family split). Wind/PV availability arrives as `avail_mw`.
+15. **Calendar**: 12 representative epoch-days per year + episode expansion
+    (load-bearing for campaign length and seasonal H2 via ×days-in-month).
+16. **Money model**: single company "GridCo Europa", regulated tariff on
+    DELIVERED MWh; wholesale shadow price is a teaching KPI only.
+17. **Lignite**: in as optional buildable (matters below ~60 €/t CO2).
+18. **H2 chain numbers**: electrolyzer 48–52 kWh/kg, H2-CCGT η 57 % →
+    ≈ 35 % power-to-power **efficiency** (≈ 65 % loss) incl. compression (an
+    earlier engine-doc 0.70/33 % shorthand was superseded by PARAMETERS
+    §1.13–1.14).
+19. **AGC bias** = textbook `B_a = Σ K_i + D·P_L0/f0` [MW/Hz] (an earlier
+    "0.5 × FCR gain" shorthand in the reserve table was superseded); aFRR
+    distribution: participation factors default ∝ contracted `afrr_band_mw`,
+    overridable via `agc_participation`.
+20. **Droop base = machine base S_n** (gain `K = S_n/(R·f0)` MW/Hz) — the
+    PHYSICS §6 QSS pin encodes it; the PARAMETERS §0 pipeline formula was
+    corrected to match (a P_n-base reading would be 11 % off and fail the
+    pin).
+21. **Lag discretization is per-stage exact-exponential**; the cascade's
+    global O(Δt) error (~4e-4 at dt = 10 ms vs the continuous TF) is
+    accepted; `test_exact_lag_pin` pins the discrete recursion (tol 1e-9),
+    not the continuous transfer function. All §6 pins were generated with
+    this scheme.
+22. **LFSM-U is not modeled in v1** (honesty sections); headroom release
+    beyond FCR is covered by aFRR/mFRR. Adding it later requires regenerating
+    the PARAMETERS §2.3 pins.
+23. **Counterfactual replay state source**: rolling engine-snapshot ring
+    (full snapshot every 5 s sim, retained for the 120 s fine-ring window);
+    `/gb/replay` takes `event_id`/`t_sim` and answers `window_expired` after
+    the window ages out; the game fetches its counterfactual set right after
+    each event and caches ghost traces with the event-log entry.
+24. **Sidecar ports moved to 8030/8031/8032** — the initially chosen
+    8020–8022 collide with infrastruct's contract-test range 8020–8029
+    (water = 8022).
+25. **No backend web UI in v1** — the game is the UI; Grafana serves the
+    standalone teaching mode; compose ships 4 services (backend, influxdb,
+    grafana, collector); 5176/8083 remain reserved in the family scheme.
+26. **HVDC ships in P7** (paired-P-injection devices + corridor tool +
+    dispatcher modes) — it must exist before the P9 campaign needs it; line
+    switching is a wire-level state change (`line_commands` /
+    `line_trip|line_close` scheduled events), never a topology reset; the
+    overload-duty protection numbers live in PARAMETERS §2.2; PARAMETERS §2.3
+    reference incident is an exogenous H = 0 infeed loss (surviving fleet
+    unchanged); the §6 analytic fixture runs with clamps disabled and
+    post-trip E_k = 37 500 MJ.
+27. **North Sea offshore-DC integration** (user request 2026-08-10): offshore
+    wind has two connection paths — AC near-shore (own submarine corridor
+    ≤ 150 km) and DC far-shore via **offshore converter platforms**
+    (`offshore_hub` wire kind: one aggregated injection at the onshore
+    converter bus; the offshore collector grid is NOT electrically modeled;
+    platforms/links are devices, not AC buses — no node-budget cost). Numbers
+    in PARAMETERS §1.16 (platform 450/800 M€ per 1/2 GW, DC cable 2.0 M€/km,
+    1 %/station + 0.30 %/100 km losses, Q ±0.4 at any P); LFSM-O applies at
+    the hub's onshore terminal. Ships in P7 with `north_sea_hub.gd`;
+    multi-terminal "energy island" DC grids are post-v1 stretch. (Contingency
+    semantics refined by 28.)
+28. **Embedded-HVDC physics correction** (verify pass, 2026-08-10): only
+    **offshore hubs** (and future cross-area import links) are infeed-loss
+    ΔP events and FCR reference incidents — an embedded onshore bipole's ±P
+    pair cancels in the COI ledger (net ≈ its losses), so its trip is a
+    **flow-redistribution/congestion contingency** (overload-duty, cascades,
+    redispatch), asserted as such by `hvdc_link.gd` (near-zero Δf); the
+    milestone-7 finale double contingency is re-anchored on hub + largest
+    unit. Same pass: farm capex is a single 2600 €/kW (both paths) with AC
+    export billed per-km and capped at 150 km — the ≈ 150 km AC/DC breakeven
+    sits at that cap; platform "marinized ≈ 2.3×"; converter no-load
+    auxiliary 0.15 % P_max; overland DC underground variant ×4; absolute DC
+    costs deliberately ~2/3 of 2026 actuals, consistent with the game's cost
+    level; milestone 3 requires hub capacity *committed*, not delivered
+    (42-month platform build lands ~2031).
+
+## 5. Key reference paths (sibling repos, same parent folder)
+
+| Path | Why |
+|---|---|
+| `../infrastruct/docs/contract/v1.md` + `schemas/` + `tests/contract/` | contract ground rules + golden-fixture suite to clone |
+| `../infrastruct/backends/rtpowerflow/src/netzsim/api/gamebridge.py` | reference gamebridge implementation (idempotency, SoC, violations, warmup) |
+| `../infrastruct/game/autoloads/orchestrator.gd` (+ autoloads generally) | the scheduler to port near-verbatim (one-step lag, skip-never-stall) |
+| `../infrastruct/ROADMAP.md`, `../infrastruct/docs/adr/` | phase-template + ADR style |
+| `../infrastruct/game/model/weather.gd`, `.../smokes/` | seeded weather + `force_*` windows; SmokeBase pattern |
+| `../rtpowerflow/src/netzsim/{engine,simulator,network_builder,config}.py` | family backend shape (accelerated tick, retry ladder, ProfileArrays, `_r`) |
+| `../rtheatflow/SPEC.md`, `../rtheatflow/CLAUDE.md` | spec discipline (runtime-verified claims, known answers) + log format |
+| `../gridedit/src/gridedit/osm.py` | Overpass power-overlay *pattern* for the P10 OSM seed (AGPL — reimplement, never copy) |
+
+Family gotchas already paid for (do not re-learn): JSON NaN kills browser
+parsers (`_r`); Godot ints arrive as floats; numba needs explicit install +
+warmup-at-reset; one slack per island; element indices are reused after
+deletes (key on platform ids); debounce topology resets; per-port sidecar
+logs; deterministic smokes assert windows not instants; `engine.reconfigure`
+must await the in-flight step; zero/degenerate operating points break solvers
+(floor them); Vite `strictPort` + 127.0.0.1 proxy targets on Windows.
+
+## 6. Development log
+
+*(empty — starts with the P0 entry)*
+
+## 7. Open questions for the project owner
+
+Recommended defaults are in force until overridden; each override gets a
+ledger entry:
+
+1. **License** — Apache-2.0 proposed (family preference not recorded in the
+   digests).
+2. **UI language** — family is German-first (de → en parity). Same here, or
+   English-first for this title?
+3. **CO2 policy** — campaign ratchet 30→250 €/t as scripted eras (chosen);
+   alternatively a free player-visible ETS slider in sandbox only.
+4. **Unit granularity** — fixed unit sizes per tech (1600/800/600/… MW,
+   chosen — the N-1/RoCoF sizing lesson needs discrete large units) vs
+   continuously sizable plants.
+5. **Calendar compression** — 12 representative days/year (chosen) vs
+   continuous years (much longer campaigns or much faster wall speeds).
+6. **infrastruct convergence** — assumed fully independent title with
+   envelope-compatible contract lineage; if the backend should ever serve
+   infrastruct, coordinate the v2 freeze (P4) with its CosimBridge.
+7. **Synthetic-inertia & PHS variants** — wind synthetic inertia ships as a
+   2035 unlock (chosen); ternary/var-speed PHS and PHS syncon mode are
+   backlog flags.

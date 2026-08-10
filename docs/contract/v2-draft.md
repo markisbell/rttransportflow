@@ -1,0 +1,189 @@
+# Gamebridge contract v2 — DRAFT
+
+Status: **draft until frozen at P4** (then renamed `v2.md`, with JSON Schemas
+in `schemas/` and golden fixtures in `tests/contract/`). Successor to
+infrastruct contract v1.2 (`../../../infrastruct/docs/contract/v1.md`) for
+`network_kind: "transmission"`. Breaking-change successor per the v1
+versioning rule (float `dt_s` below 60 s, `dt_done_s`, trajectory block) —
+hence MAJOR 2.
+
+`contract: "2.0"` · `network_kind: "transmission"` · wire power unit: **MW**
+(documented deviation from the kW distribution siblings).
+
+## Ground rules (consolidated from contract v1 and the reference gamebridge implementation — binding)
+
+- **The game owns time.** Backend runs `RTTRANSPORTFLOW_EXTERNAL_CLOCK=true`;
+  no internal tick.
+- HTTP control plane `/gb/*` + WebSocket `/gb/ws` step channel: **one text
+  frame in → one frame out, strictly sequential**; `POST /gb/step` is the
+  identical debugging fallback.
+- **Divergence is data**: `status: converged|degraded|failed` at HTTP 200 —
+  never an HTTP error for physics.
+- **Idempotency**: re-send of last `t` returns the cached result *before any
+  state is applied* (never double-integrates SoC/meters); any `t` other than
+  `last_t`/`last_t+1` → HTTP 409 / WS `out_of_order` frame with
+  `expected: [last_t, last_t+1]`.
+- **Sample-and-hold** on missing zones/commands/fields.
+- **Warmup at every reset**: one throwaway PF solve (numba JIT) →
+  `warmup_solve_ms` in the reset response.
+- `GET /gb/result/latest` — crash recovery.
+- `POST /gb/net/patch` — tolerant per-entry op list (add/remove/set device);
+  node/edge changes require full reset.
+- **`_as_int` tolerance** everywhere (Godot serializes 96 as 96.0); all result
+  floats through `_r()` (round 6, non-finite → null).
+- Native bundle passed VERBATIM inside the topology document.
+
+## Handshake
+
+`GET /gb/version` →
+
+```json
+{"contract": "2.0", "backend": "rttransportflow", "api": "...",
+ "solver": {"pf": "pandapower <pin>", "dyn": "rttf-dyn/1"},
+ "external_clock": true, "units": {"power": "MW"}}
+```
+
+Game requires same MAJOR; game-minor ≤ backend-minor.
+
+## `POST /gb/net/reset`
+
+```jsonc
+{
+  "contract": "2.0", "network_kind": "transmission", "name": "...",
+  "steps_per_day": 96,                  // economy-layer cadence (informational)
+  "native": { /* grid.json, lines.json, … — backend-native bundle VERBATIM */ },
+  "zones": [{"id": "london", "node": "bus_12"}],
+  "devices": [{"id": "...", "kind": "...", "node": "...", "params": {…}}],
+  "protection_seed": 12345,             // deterministic pole-slip draws
+  "snapshot": { /* optional: exact-state restore blob from GET /gb/snapshot */ }
+}
+```
+
+Device kinds and params (defaults from `data/catalogs/plant_types.json`;
+`params` may override any catalog constant — see PARAMETERS §5):
+
+| kind | params (beyond catalog overrides) |
+|---|---|
+| `sync_plant` | `type: gas_ocgt\|gas_ccgt\|coal\|lignite\|nuclear\|hydro_ps\|syncon`, `sn_mva`, `p_min_mw`, `fuel: ng\|h2\|coal\|lignite\|uranium`, `x_h2`, `h2_store_id?`, `vm_setpoint`, `initial:{online, p_mw}` |
+| `wind` / `pv` | `p_rated_mw` (availability arrives per step as `avail_mw`) |
+| `battery` | `p_max_mw`, `e_mwh`, `soc?`, `ffr:{enabled, full_at_hz: 0.2, deadband_hz: 0.01}` |
+| `grid_forming` | battery params + `h_v_s` (virtual inertia; island-slack semantics per v1.2, advisory violations) |
+| `electrolyzer` | `p_max_mw`, `h2_store_id` |
+| `h2_store` | `capacity_kg`, `level_kg?`, injection/withdrawal limits |
+| `hvdc` | paired converter devices: `p_max_mw`, `link_id`, `length_km` (P command on one end, negated on the other, minus losses per PARAMETERS §1.16); Q ±0.4·`p_max_mw` at any P per terminal; an embedded-link trip is frequency-neutral within one island — flows redistribute, the ledger changes ≈ losses only |
+| `offshore_hub` | single injection at the onshore converter bus: `p_max_mw` (link rating), `platform_mw`, `cable_km`. Per step the game sends the aggregated bound-farm availability as `avail_mw`; the backend applies curtail commands + LFSM-O at the onshore terminal, subtracts losses, clamps to rating. Q ±0.4·`p_max_mw` at any P. Trip = full-delivery infeed-loss ΔP event. **Bound farms are game-side entities only** — never also registered as `wind` devices (switching a farm AC↔hub is a `/gb/net/patch` device add/remove) |
+| `slack` | optional external interconnection (scenario/teaching use) |
+
+Response: `{status: "ok"|"refused_snapshot", warmup_solve_ms, islands: {…},
+model_hash}`.
+
+Reset semantics (v1 rule carried over): **reset clears `last_t` and the
+idempotency cache** — the next step may carry any `t`; the game clock
+continues across resets. If a supplied `snapshot` fails the
+model-hash/version check, the reset is applied **without** it and the
+response carries `status: "refused_snapshot"` — the game cold-starts from
+replay params (legal under the quiesce rule, SPEC §4.2).
+
+## Step request (WS frame / `POST /gb/step`)
+
+```jsonc
+{
+  "t": 1234,                       // integer sequence number (idempotency), NOT sim time
+  "dt_s": 30.0,                    // float ∈ [0.05, 900] — "advance by UP TO dt_s"
+  "interrupt_on_event": true,      // default; early return on significant events
+  "zone_demand": {"london": {"value_mw": 12100.0}},
+  "avail_mw": {"windfarm_7": 312.0, "pv_3": 88.5},
+  "device_commands": {
+    "plant_9": {"dispatch_mw": 480.0, "breaker": "close", "vm_setpoint": 1.02,
+                 "curtail_to_mw": null, "q_mvar": null,
+                 "agc_participation": 0.1, "mode": "auto"}
+  },
+  "line_commands": {               // in-service toggle — a STATE change, not topology:
+    "L4": {"breaker": "open"}      // lines stay registered; close between live islands
+  },                               // runs the resync check (PHYSICS §2.7), may be rejected
+  "zone_commands": {
+    "london": {"restore_load": 0.1}
+  },
+  "scheduled_events": [            // scenario/teaching injection → engine event queue
+    {"at_s_rel": 120.0, "kind": "trip", "element": "plant_3"}
+    // kinds: "trip" (device) | "line_trip" | "line_close" | "load_step_mw"
+    //        (load_step_mw carries {"element": "<zone>", "delta_mw": …})
+  ],
+  "watch": ["plant_9", "bat_1"]    // bounds per-device trajectory payload
+}
+```
+
+Commands respect physics: dispatch changes go through ramp limits and
+start/stop sequences (`devices{id}.state` reports
+`offline|starting|online|tripped:<reason>|starved` with progress); clamps are
+reported as `clamped` info violations, never errors.
+
+## Step result
+
+```jsonc
+{
+  "t": 1234, "status": "converged|degraded|failed", "solve_ms": 12.4,
+  "dt_done_s": 30.0,               // < dt_s ⇒ early return; game clock advances by THIS
+  "t_sim_end": 86523.4, "mode": "alert|calm",
+  "islands": {"0": {"f_hz": 49.982, "rocof_hz_s": -0.012, "f_min": 49.90,
+                     "f_max": 50.01, "rocof_max": 0.08, "e_k_mj": 619100.0,
+                     "h_sys_s": 4.1, "s_online_mva": 151000.0, "blackout": false,
+                     "fcr_used_mw": 120.0, "afrr_used_mw": 40.0}},
+                     // h_sys_s is derived: h_sys_s = e_k_mj / s_online_mva
+                     // (fixtures assert the identity)
+  "trajectory": {"sample_dt_s": 1.0, "t0_rel": 0.0,
+                  "islands": {"0": {"f": [...], "rocof": [...]}},
+                  "watched": {"bat_1": {"p": [...]}}},   // ≤512 samples, stride-decimated,
+                                                          // event instants always included;
+                                                          // per-STEP decimation — not
+                                                          // slicing-invariant (PHYSICS §0)
+  "pf": {"latest": {"buses": {...}, "lines": {"L4": {"loading": 87.2, "p_from_mw": 812.0}},
+          "losses_mw": 342.0}, "window_extremes": {"L4": 91.0}},
+  "devices": {"plant_9": {"p_mw": 478.9, "q_mvar": 120.2, "soc": null,
+               "h2_kg": null, "energy_mwh_step": 3.99, "fuel_kg_step": null,
+               "state": "online", "headroom_mw": 121.1}},
+  "zones": {"london": {"supplied": 1.0, "detail": {"v_pu": 1.01}}},
+  "events": [{"t_sim": 86510.2, "kind": "ufls_stage", "element": "island:0",
+               "data": {"stage": 1, "shed_frac": 0.075}}],
+  "violations": [{"element": "L4", "kind": "loading", "severity": "warning", "value": 104.2}],
+  "summary": {"balance_err": 0.002}
+}
+```
+
+Payload ≈ 20–60 kB JSON worst case — fine on localhost WS; no binary framing.
+
+Event kinds: `trip` (device, with reason), `line_trip`, `ufls_stage`,
+`island_split`, `island_merge`, `blackout`, `start_complete`, `fuel_switch`,
+`fuel_starved`, `mode_change` (not significant). Violation kinds: PARAMETERS
+§5.
+
+## Control plane additions (off the step path)
+
+- `GET /gb/snapshot` → `{t, t_sim, model_hash, version, blob}` — full
+  versioned engine state (floats via `repr`, bit-exact restore).
+- `GET /gb/telemetry/ring?window_s=120` — fine-ring readback (10 ms samples)
+  for the post-event replay UI. Read-only.
+- `POST /gb/replay` — counterfactual re-run of an event window. Request:
+  `{"event_id": "..."` *or* `"t_sim": 86510.2, "window_s": 65.0,
+  "overrides": {"remove_devices": [...], "add_devices": [...],
+  "set_params": {...}}}`. The state source is the **rolling engine-snapshot
+  ring** (full snapshot every `snapshot_ring_interval_s = 5` sim-seconds,
+  retained for the 120 s fine-ring window — PHYSICS §4 telemetry.py): the
+  engine restores the newest ring snapshot at or before the window start,
+  applies overrides, and integrates forward, returning a trajectory block.
+  If the window has left the ring: HTTP 200 `{"status": "window_expired"}` —
+  the game then falls back to the cached original trace (GAME_DESIGN §4.5).
+  **Read-only**: never touches live state; same engine code — physics is
+  implemented exactly once. A contract fixture pins replay isolation.
+
+## Testing & versioning
+
+- `tests/contract/` spawns the real backend on port 8032; golden fixtures via
+  `scripts/gen_contract_fixtures.py` (must emit every hand-added probe key);
+  `_floatify` pins Godot's int-as-float coercion. Fixtures: reset+warmup,
+  idempotent re-send (no double SoC), out_of_order, degraded frame,
+  early-return, trajectory/event ordering, snapshot round-trip, replay
+  isolation (replay does not perturb the live run — pinned).
+- Additive change = MINOR bump in place; breaking = v3.
+- Coordinate with infrastruct before freezing if envelope compatibility with
+  its CosimBridge is ever wanted (decision ledger, CLAUDE.md §4).
