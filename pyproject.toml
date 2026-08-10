@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rttransportflow"
+version = "0.0.1"
+description = "Realtime transmission-grid simulator: AC power flow + per-island frequency dynamics (backend of the rttransportflow game)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "fastapi>=0.141",
+    "uvicorn[standard]>=0.52",
+    "pydantic>=2.13",
+    "pydantic-settings>=2.6",
+    "numpy>=2.4",
+    # Solver libs are PINNED (SPEC §5.3: verify at runtime, pin, regression-test).
+    "pandapower==3.5.4",
+    # numba must be declared EXPLICITLY (family gotcha: silent slow path otherwise).
+    "numba==0.66.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+rttransportflow = "rttransportflow.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -196,7 +196,48 @@ must await the in-flight step; zero/degenerate operating points break solvers
 
 ## 6. Development log
 
-*(empty — starts with the P0 entry)*
+### P0 — Scaffold, feasibility spikes, ADRs, CI (2026-08-10)
+
+**Built:** family-shaped backend scaffold — `pyproject.toml` (src layout,
+console script, pandapower==3.5.4 + numba==0.66.0 pinned, numba explicit),
+`config.py` (RTTRANSPORTFLOW_, port 8003), `simulator.py` (StepResult single
+wire format + `_r()`/`_as_int` + NullSimulator), `state.py` (latest/history/WS
+fan-out, slow consumers drop frames), `engine.py` (RealtimeEngine:
+accelerated tick + `external_step()` with the two-clock guard, shared
+`_advance_once`), `api/` (runtime App container, core `/ /health /status
+/state /history /ws`, control start/pause/resume), launchers
+(start/stop `.sh`, `.run/` PIDs+logs, /health identity check, kill by
+cwd+cmdline), `install.sh` (uv venv 3.12), Dockerfile, CI (pytest-gated),
+`scripts/validate_core.py` spike harness, ADR-001…004.
+
+**Tests:** 14 green — route-inventory pin, health identity, control flow,
+WS streaming, engine wrap/pause, external-step refusal while internal clock
+runs, internal-vs-puppet clock equivalence, `_r`/`_as_int` wire hygiene,
+env-override settings.
+
+**Acceptance evidence:** `curl :8003/health` →
+`{"app":"rttransportflow","version":"0.0.1"}`; live `/status`+`/state` while
+ticking; ADR-004 tables measured on this machine (300-bus warm NR 5.16 ms
+median, 150-device tick 11.3 µs, JIT warmup 1.46 s → warmup-at-reset
+confirmed load-bearing; both inside the ROADMAP budget).
+
+**Discoveries:** (1) FastAPI ≥0.141 wraps `include_router` results in
+`_IncludedRouter` containers — the surface-pin test walks
+`.original_router.routes` (works for flat layouts too). (2) The spike net
+initially diverged twice: 19 GW over ~1.3 GVA corridors, then segment
+deficits dragged across a 36 000 km ring — "realistic operating points or the
+solver refuses" applies to authored scenarios; the fixed topology
+(self-balanced 20-bus regional meshes + short ties) is the shape the game's
+topology builder should produce. (3) System Python here is 3.10; the venv is
+uv-managed CPython 3.12.13.
+
+**Deviations (deliberate):** Windows `.bat` launcher twins deferred to P10
+packaging (Linux dev machine; `.sh` twins are the executable spec).
+docker-compose ships in P1 with the viz stack rather than as an empty P0
+skeleton.
+
+**Next:** P1 — data contract, europe_mini bundle, PF simulator with retry
+ladder, recorder/exporter, collector→InfluxDB→Grafana.
 
 ## 7. Open questions for the project owner
 
