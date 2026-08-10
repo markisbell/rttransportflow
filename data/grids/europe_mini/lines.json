@@ -1,0 +1,100 @@
+{
+ "lines": [
+  {
+   "id": "madrid-lyon",
+   "from_bus": "madrid",
+   "to_bus": "lyon",
+   "length_km": 550.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "lyon-paris",
+   "from_bus": "lyon",
+   "to_bus": "paris",
+   "length_km": 400.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "lyon-milan",
+   "from_bus": "lyon",
+   "to_bus": "milan",
+   "length_km": 320.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "paris-london",
+   "from_bus": "paris",
+   "to_bus": "london",
+   "length_km": 340.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "paris-brussels",
+   "from_bus": "paris",
+   "to_bus": "brussels",
+   "length_km": 260.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "paris-frankfurt",
+   "from_bus": "paris",
+   "to_bus": "frankfurt",
+   "length_km": 480.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "brussels-frankfurt",
+   "from_bus": "brussels",
+   "to_bus": "frankfurt",
+   "length_km": 320.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "frankfurt-berlin",
+   "from_bus": "frankfurt",
+   "to_bus": "berlin",
+   "length_km": 420.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "frankfurt-vienna",
+   "from_bus": "frankfurt",
+   "to_bus": "vienna",
+   "length_km": 550.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "berlin-warsaw",
+   "from_bus": "berlin",
+   "to_bus": "warsaw",
+   "length_km": 520.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "berlin-copenhagen",
+   "from_bus": "berlin",
+   "to_bus": "copenhagen",
+   "length_km": 360.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  },
+  {
+   "id": "vienna-milan",
+   "from_bus": "vienna",
+   "to_bus": "milan",
+   "length_km": 550.0,
+   "std_type": "490-AL1/64-ST1A 380.0",
+   "parallel": 2
+  }
+ ]
+}

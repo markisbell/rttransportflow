@@ -8,6 +8,8 @@ EXPECTED_ROUTES = {
     ("GET", "/status"),
     ("GET", "/state"),
     ("GET", "/history"),
+    ("GET", "/network"),
+    ("GET", "/export.jsonl"),
     ("WS", "/ws"),
     ("POST", "/control/start"),
     ("POST", "/control/pause"),

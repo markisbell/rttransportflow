@@ -1,5 +1,7 @@
 """Settings via pydantic-settings, env prefix RTTRANSPORTFLOW_ (family pattern)."""
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,10 +14,13 @@ class Settings(BaseSettings):
 
     # --- service ---
     data_dir: str = "data/grids/europe_mini"
+    simulator: Literal["pf", "null"] = "pf"
     host: str = "127.0.0.1"  # loopback by default: the API has no auth
     port: int = 8003
     log_level: str = "info"
     cors_origins: list[str] = []
+    record: bool = False
+    record_dir: str = ".run/recordings"
 
     # --- clock (standalone accelerated tick; puppet mode disables the loop) ---
     step_interval_seconds: float = 1.0

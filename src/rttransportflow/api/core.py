@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import APP_NAME, __version__
 
@@ -58,6 +59,23 @@ def state(request: Request) -> dict:
 def history(request: Request, limit: int = 100) -> list[dict]:
     c = _container(request)
     return [r.to_wire() for r in c.store.history(limit)]
+
+
+@router.get("/network")
+def network(request: Request) -> dict:
+    c = _container(request)
+    if c.network_meta is None:
+        raise HTTPException(status_code=404, detail="no network loaded (null simulator)")
+    return c.network_meta
+
+
+@router.get("/export.jsonl", response_class=PlainTextResponse)
+def export_jsonl(request: Request) -> str:
+    """Exporter: the in-memory history as JSONL (one wire frame per line)."""
+    c = _container(request)
+    return "".join(
+        json.dumps(r.to_wire(), separators=(",", ":")) + "\n" for r in c.store.history()
+    )
 
 
 @router.websocket("/ws")

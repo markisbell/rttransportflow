@@ -1,0 +1,5 @@
+{
+ "name": "europe_mini",
+ "steps_per_day": 96,
+ "description": "11-bus, 8-country 380 kV teaching grid; one winter workday."
+}

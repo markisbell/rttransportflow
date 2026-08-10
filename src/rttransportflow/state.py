@@ -14,6 +14,7 @@ class StateStore:
         self._latest: StepResult | None = None
         self._history: deque[StepResult] = deque(maxlen=history_size)
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self.sink = None  # optional callable(wire_dict) — the recorder hook
 
     @property
     def latest(self) -> StepResult | None:
@@ -29,6 +30,8 @@ class StateStore:
         self._latest = result
         self._history.append(result)
         wire = result.to_wire()
+        if self.sink is not None:
+            self.sink(wire)
         for queue in list(self._subscribers):
             # Slow consumers drop frames, they never stall the loop.
             try:

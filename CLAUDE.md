@@ -239,6 +239,56 @@ skeleton.
 **Next:** P1 — data contract, europe_mini bundle, PF simulator with retry
 ladder, recorder/exporter, collector→InfluxDB→Grafana.
 
+### P1 — Steady-state PF on the europe_mini grid, standalone + Grafana (2026-08-10)
+
+**Built:** `models.py` + `data_loader.py` (pydantic scenario bundle:
+grid/lines/plants/load_centers/scenario with full cross-validation;
+`input_data_from_dicts` for the later gamebridge path);
+`scripts/gen_europe_mini.py` (authored 11-bus / 8-country 380 kV grid, one
+winter workday, dispatch by a per-bus balancing pass); `network_builder.py`
+(build-once pandapower net, element-index maps, dense profile arrays; sync
+kinds → PV gens with ±0.40·p_max Q bands, converter kinds → sgens with
+static pf-0.97 Q support); `PFSimulator` (apply columns → retry ladder
+warm-NR → cold-NR → iwamoto, catch-all, degraded frames, `warmup()`);
+`recorder.py` (JSONL sink) + `/export.jsonl` + `/network` endpoints; runtime
+wiring (config `simulator: pf|null`, warmup in lifespan); visualization stack
+(stdlib-only collector → InfluxDB 2.7 on :8089 → Grafana 11 on :3003 with
+provisioned datasource + dashboard) and full docker-compose.
+
+**Tests:** 34 green — bundle cross-validation matrix, known-answer pins
+(step 0 + step 74 exact summary numbers, full-day envelope: |slack| < 800 MW,
+loading < 75 %), nonconvergence (forced divergence → degraded frame, retry
+tiers exercised, self-heal next step; REST serves converged:false at 200),
+collector line-protocol unit tests, updated surface pin.
+
+**Acceptance evidence:** `docker compose up` → backend solves europe_mini in
+the container (verified live: step 27 converged, 38.6 GW), collector data
+confirmed in InfluxDB via Flux query, Grafana healthy with dashboard
+`rttf-main` provisioned and datasource OK. Full day: 96/96 steps converge,
+slack −0.3…−0.7 GW, losses 12–203 MW, max loading ≤ 70 %, solve ~6.3 ms
+median.
+
+**Discoveries (each cost a debugging round):** (1) First authoring attempt
+diverged: night dispatch under-produced ~12 GW (all dragged from one slack)
+and a 1050 km uncompensated AC corridor is infeasible — corridors now ≤ 550 km
+with an intermediate Lyon bus, and dispatch is *authored balanced* per bus.
+(2) Second attempt collapsed at the evening peak: fleet 43 GW available vs
+54 GW peak — dispatchables now sized 50 GW. (3) Copenhagen showed textbook
+voltage collapse (vm 0.74): 0.9 GW import over one corridor with only a
+unity-pf wind sgen locally — fixed physically via converter Q support
+(SGEN_Q_FACTOR 0.25, stand-in for the ±0.33·P_n grid-code capability) + a
+local CCGT. The engine's honesty held: every divergence was a real
+infeasibility.
+
+**Deviations (deliberate):** europe_mini has 11 buses, not 10 (the Lyon bus
+splits the Iberia corridor — physically necessary). Voltages sit pinned at
+1.02 everywhere (every bus hosts a PV machine); the interesting voltage story
+returns when dispatch deviates from the authored balance (P6). `weather.json`
+/ `storage.json` / `links.json` not yet consumed (P6/P7 per SPEC §4.1).
+
+**Next:** P2 — the frequency dynamics engine (PHYSICS §1–§2) + analytic
+validation.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a

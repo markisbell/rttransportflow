@@ -1,0 +1,63 @@
+# rttransportflow standalone stack: backend + InfluxDB + collector + Grafana.
+# Host ports follow the family scheme: backend 8003, InfluxDB 8089, Grafana 3003
+# (override via ${VAR:-default}).
+services:
+  backend:
+    build: .
+    ports:
+      - "${RTTF_BACKEND_PORT:-8003}:8003"
+    environment:
+      RTTRANSPORTFLOW_HOST: 0.0.0.0
+      RTTRANSPORTFLOW_STEP_INTERVAL_SECONDS: "1.0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "${RTTF_INFLUX_PORT:-8089}:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: rttf
+      DOCKER_INFLUXDB_INIT_PASSWORD: rttf-dev-password
+      DOCKER_INFLUXDB_INIT_ORG: rttf
+      DOCKER_INFLUXDB_INIT_BUCKET: rttf
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: rttf-dev-token
+    volumes:
+      - influx_data:/var/lib/influxdb2
+
+  collector:
+    build: visualization
+    depends_on:
+      backend:
+        condition: service_healthy
+      influxdb:
+        condition: service_started
+    environment:
+      RTTF_API: http://backend:8003
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: rttf-dev-token
+      INFLUX_ORG: rttf
+      INFLUX_BUCKET: rttf
+      COLLECT_INTERVAL: "0.5"
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "${RTTF_GRAFANA_PORT:-3003}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./visualization/grafana/provisioning:/etc/grafana/provisioning
+      - ./visualization/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - influxdb
+
+volumes:
+  influx_data:

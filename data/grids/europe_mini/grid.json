@@ -1,0 +1,150 @@
+{
+ "buses": [
+  {
+   "name": "london",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 51.5,
+    "lon": -0.1
+   },
+   "area": "CE"
+  },
+  {
+   "name": "paris",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 48.9,
+    "lon": 2.3
+   },
+   "area": "CE"
+  },
+  {
+   "name": "lyon",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 45.8,
+    "lon": 4.8
+   },
+   "area": "CE"
+  },
+  {
+   "name": "madrid",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 40.4,
+    "lon": -3.7
+   },
+   "area": "CE"
+  },
+  {
+   "name": "brussels",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 50.8,
+    "lon": 4.4
+   },
+   "area": "CE"
+  },
+  {
+   "name": "frankfurt",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 50.1,
+    "lon": 8.7
+   },
+   "area": "CE"
+  },
+  {
+   "name": "berlin",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 52.5,
+    "lon": 13.4
+   },
+   "area": "CE"
+  },
+  {
+   "name": "milan",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 45.5,
+    "lon": 9.2
+   },
+   "area": "CE"
+  },
+  {
+   "name": "vienna",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 48.2,
+    "lon": 16.4
+   },
+   "area": "CE"
+  },
+  {
+   "name": "warsaw",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 52.2,
+    "lon": 21.0
+   },
+   "area": "CE"
+  },
+  {
+   "name": "copenhagen",
+   "vn_kv": 380.0,
+   "geo": {
+    "lat": 55.7,
+    "lon": 12.6
+   },
+   "area": "CE"
+  }
+ ],
+ "reference_bus": "frankfurt",
+ "zones": [
+  {
+   "id": "london",
+   "bus": "london"
+  },
+  {
+   "id": "paris",
+   "bus": "paris"
+  },
+  {
+   "id": "lyon",
+   "bus": "lyon"
+  },
+  {
+   "id": "madrid",
+   "bus": "madrid"
+  },
+  {
+   "id": "brussels",
+   "bus": "brussels"
+  },
+  {
+   "id": "frankfurt",
+   "bus": "frankfurt"
+  },
+  {
+   "id": "berlin",
+   "bus": "berlin"
+  },
+  {
+   "id": "milan",
+   "bus": "milan"
+  },
+  {
+   "id": "vienna",
+   "bus": "vienna"
+  },
+  {
+   "id": "warsaw",
+   "bus": "warsaw"
+  },
+  {
+   "id": "copenhagen",
+   "bus": "copenhagen"
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: rttf-influx
+    uid: rttf-influx
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: rttf
+      defaultBucket: rttf
+      tlsSkipVerify: true
+    secureJsonData:
+      token: rttf-dev-token
