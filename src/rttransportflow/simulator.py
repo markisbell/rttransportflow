@@ -231,12 +231,14 @@ class DynSimulator:
     """
 
     def __init__(self, data, built, *, steps_per_day: int, d_load_pct_per_hz: float = 1.0,
-                 warm_start: bool = True) -> None:
+                 warm_start: bool = True,
+                 catalog_path: str = "data/catalogs/plant_types.json") -> None:
         import numpy as np
 
         from .dynamics import F0
         from .dynamics.fleet import make_fleet
         from .dynamics.integrator import Integrator, IslandState
+        from .dynamics.plant_types import inverter_spec, load_catalog, sync_spec
         from .models import CONVERTER_KINDS, SYNC_KINDS
 
         self.built = built
@@ -248,20 +250,23 @@ class DynSimulator:
         self._np = np
         self._f0 = F0
 
+        catalog = load_catalog(catalog_path)["kinds"]
         sync_specs, inv_specs = [], []
         for plant in data.plants.plants:
+            params = catalog[plant.kind]
             if plant.kind in SYNC_KINDS:
-                sync_specs.append({
-                    "id": plant.id,
-                    "island": 0,
-                    "s_n": plant.p_max_mw / 0.9,
-                    "p_max": plant.p_max_mw,
-                    "p_min": plant.p_min_mw,
-                    "p_set": plant.profile_p_mw[0],
-                })
+                # Envelope p_min comes from the SCENARIO (device-level); the
+                # catalog p_min_pct informs the dispatcher (P6), not the clamp.
+                sync_specs.append(sync_spec(
+                    plant.kind, params, device_id=plant.id, island=0,
+                    p_max_mw=plant.p_max_mw, p_min_mw=plant.p_min_mw,
+                    p_set_mw=plant.profile_p_mw[0],
+                ))
             elif plant.kind in CONVERTER_KINDS:
-                inv_specs.append({"id": plant.id, "island": 0,
-                                  "p_target": plant.profile_p_mw[0]})
+                inv_specs.append(inverter_spec(
+                    plant.kind, params, device_id=plant.id, island=0,
+                    p_rated_mw=plant.p_max_mw, avail_mw=plant.profile_p_mw[0],
+                ))
 
         self.fleet = make_fleet(sync_specs, inv_specs)
         d_pu = d_load_pct_per_hz * F0 / 100.0
@@ -352,7 +357,7 @@ class DynSimulator:
         # so the profile arrays align by row.
         b = self.built
         self.fleet.p_set[:] = b.gen_p[:, step]
-        self.fleet.inv_target[:] = b.sgen_p[:, step]
+        self.fleet.inv_avail[:] = b.sgen_p[:, step]
         self._load_p_col = b.load_p[:, step].copy()
         self._load_q_col = b.load_q[:, step].copy()
         self.integrator.islands.p_l0[0] = float(self._load_p_col.sum())
@@ -424,7 +429,8 @@ class DynSimulator:
 
 def build_dyn_simulator(data_dir: str, steps_per_day: int, *,
                         d_load_pct_per_hz: float = 1.0,
-                        warm_start: bool = True) -> DynSimulator:
+                        warm_start: bool = True,
+                        catalog_path: str = "data/catalogs/plant_types.json") -> DynSimulator:
     from .data_loader import load_bundle
     from .network_builder import build_network
 
@@ -434,4 +440,5 @@ def build_dyn_simulator(data_dir: str, steps_per_day: int, *,
             f"scenario steps_per_day ({data.scenario.steps_per_day}) != configured ({steps_per_day})"
         )
     return DynSimulator(data, build_network(data), steps_per_day=steps_per_day,
-                        d_load_pct_per_hz=d_load_pct_per_hz, warm_start=warm_start)
+                        d_load_pct_per_hz=d_load_pct_per_hz, warm_start=warm_start,
+                        catalog_path=catalog_path)

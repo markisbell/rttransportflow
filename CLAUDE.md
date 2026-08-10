@@ -341,6 +341,59 @@ LFSM-U honesty note mirrored in README.
 start/stop sequences, trips, storage device dynamics; `data/catalogs/
 plant_types.json` with rationale strings; three-fleet comparative test.
 
+### P3 — Distinct plant models, trips, storage dynamics (2026-08-10)
+
+**Built:** `data/catalogs/plant_types.json` (12 kinds + f-protection block,
+every entry with a rationale — PARAMETERS §1 authority);
+`dynamics/plant_types.py` (validated loader → fleet specs; catalog p_min_pct
+informs the dispatcher, the ENGINE envelope is device-level);
+fleet rewrite: unified 3-stage chain covers steam/CCGT/OCGT via coefficients
+(c_in 2/3 + c_2 0.5 give the CCGT gas-path + steam-tail topology), hydro
+block (lead-lag transient droop → rate-limited servo → NMP water column,
+y = 3x_h − 2g), battery block (FFR through converter lag, SoC with η and
+band clamps, GFM virtual inertia into E_k + inertial SoC debit),
+electrolyzer UF-shed block, wind/PV asymmetric lags + LFSM-O;
+unit commitment (hot/warm/cold lead times from off-duration, nuclear xenon
+lockout, sync-at-P_min) with `start_complete` events; energy + fuel meters
+through the part-load η line; `dynamics/protection.py` f-window relays
+(±[47.5, 51.5] Hz, 100 ms) generating engine trip events; DynSimulator is
+catalog-driven per kind.
+
+**Tests:** 77 green (24 new) — per-kind step-response character (OCGT t90
+< 3 s; CCGT "fast then breathes"; coal reheat > 5× OCGT t90; hydro
+wrong-way kick + 60 s transient-droop lag pinned to theory), battery FFR
+(nadir +0.05 Hz min, 50 % of response < 300 ms, SoC drains), GFM lowers
+RoCoF ≥ 15 % vs GFL, SoC floor clamp, electrolyzer shed curve, LFSM-O
+steady state = avail/1.08 at 50.4 Hz, cold nuclear start (48 h, zero power,
+zero inertia until sync-at-P_min), xenon lockout, OCGT 15-min cycle, fuel
+meter = E/η, **PARAMETERS §2.3 worked example: all 5 rows within the ±2 %
+pins** (independent cross-validation of the planning reference), lesson
+orderings (RoCoF ×2.5, battery fixes nadir not RoCoF), three-fleet
+comparative with regression pins.
+
+**Acceptance evidence:** comparative table (same 1 GW infeed loss, 40 GW
+island): gas RoCoF −0.123 nadir 49.87 @ 1.7 s; nuclear −0.094 / 49.45 @
+28 s (most inertia, but the ±2 % band saturates and reheat crawls — mass
+alone doesn't save you); renewables+battery −0.623 / 49.88 @ 0.36 s with
+13 MWh SoC drained. Live stack: H_sys 4.65 s (capacity-weighted per-kind
+mixture).
+
+**Discoveries:** dispatching a fleet at ~97 % of P_max leaves no FCR
+headroom — the envelope clamp silently eats primary response and the "fast"
+gas fleet sagged below nuclear (found by the comparative test; fixed by
+sizing dispatch ≥ one FCR band under P_max). This is a real adequacy lesson
+the advisor (P8/GAME_DESIGN §4.6) must surface to the player.
+
+**Deviations (deliberate):** GFM current limit (1.2 pu ≤ 2 s →
+`gfm_overload`) deferred to P8 with the violation vocabulary; electrolyzer
+downward reserve (over-frequency uptake) deferred to P7; H2 fuel-chain
+draw (PHYSICS §2.8) is P7 — fuel meters only for now.
+
+**Next:** P4 — gamebridge v2 (freeze the contract), contract golden suite,
+Godot shell with the live frequency dial. NEEDS: Godot 4 binary on this
+machine (infrastruct keeps one under `.tools/godot/`) — confirm location
+before starting.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a

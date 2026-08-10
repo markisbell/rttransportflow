@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # --- service ---
     data_dir: str = "data/grids/europe_mini"
+    catalog_path: str = "data/catalogs/plant_types.json"
     simulator: Literal["dyn", "pf", "null"] = "dyn"
     host: str = "127.0.0.1"  # loopback by default: the API has no auth
     port: int = 8003

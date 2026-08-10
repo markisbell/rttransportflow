@@ -100,11 +100,14 @@ class Integrator:
         pf_hook: Callable[[str], None] | None = None,
         trajectory_max_samples: int = 512,
     ) -> None:
+        from .protection import FrequencyWindowRelays
+
         self.fleet = fleet
         self.islands = islands
         self.cfg = cfg or ModeConfig()
         self.pf_hook = pf_hook  # called with reason "scheduled"|"event"; updates p_loss
         self.trajectory_max_samples = trajectory_max_samples
+        self.relays = FrequencyWindowRelays(fleet)
 
         self.t_us = 0
         self.mode = "calm"
@@ -162,8 +165,10 @@ class Integrator:
     # ------------------------------------------------------------------
 
     def _tick(self, dt_us: int) -> None:
-        """Tick order per PHYSICS §2.6 (P2 subset: no H2, no protection)."""
-        p_mech, p_inv = self.fleet.tick(dt_us, self.islands.f, self.islands.n)
+        """Tick order per PHYSICS §2.6 (H2 chain arrives in P7)."""
+        p_mech, p_inv = self.fleet.tick(
+            dt_us, self.islands.f, self.islands.n, self._rocof_inst
+        )
         p_inj = p_mech + p_inv
         f_prev = self.islands.f
         f_new = self.islands.swing_update(dt_us, p_inj)
@@ -177,11 +182,13 @@ class Integrator:
     def _apply_events(self, events: list[Event]) -> None:
         for event in events:
             if event.kind == "trip":
-                self.fleet.trip(event.element)
+                self.fleet.trip(event.element, self.t_us)
                 self.refresh_e_k()
             elif event.kind == "load_step":
                 island = int(event.data.get("island", 0))
                 self.islands.p_l0[island] += float(event.data["delta_mw"])
+            elif event.kind == "start_complete":
+                pass  # informational (commitment already applied)
             else:
                 raise ValueError(f"unknown event kind {event.kind!r}")
 
@@ -229,6 +236,18 @@ class Integrator:
 
             np.minimum(f_min, self.islands.f, out=f_min)
             np.maximum(f_max, self.islands.f, out=f_max)
+
+            # commitment completions (informational events)
+            for device_id in self.fleet.poll_commitment(self.t_us):
+                self.refresh_e_k()
+                completed = Event(self.t_us, "start_complete", device_id,
+                                  significant=False)
+                fired.append(completed)
+
+            # f-window self-protection: relay pickups become trip events NOW
+            for device_id in self.relays.check(self.fleet, self.islands.f, dt):
+                self.queue.schedule(Event(self.t_us, "trip", device_id,
+                                          {"cause": "f_window"}))
 
             due = self.queue.pop_due(self.t_us)
             if due:
@@ -304,6 +323,7 @@ class Integrator:
             "energy_load_mj": repr(self.energy_load_mj),
             "f_start": [repr(float(v)) for v in self.f_start],
             "fleet": self.fleet.state_dict(),
+            "relays": self.relays.state_dict(),
             "events": self.queue.snapshot(),
         }
 
@@ -322,6 +342,7 @@ class Integrator:
         self.energy_load_mj = float(state["energy_load_mj"])
         self.f_start = np.array([float(v) for v in state["f_start"]])
         self.fleet.restore_state(state["fleet"])
+        self.relays.restore_state(state["relays"])
         self.queue.restore(state["events"])
         self.refresh_e_k()
         self.rings = {i: FineRing() for i in range(self.islands.n)}

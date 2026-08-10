@@ -67,6 +67,7 @@ def build_container(settings: Settings | None = None) -> App:
             settings.data_dir, settings.steps_per_day,
             d_load_pct_per_hz=settings.d_load_pct_per_hz,
             warm_start=settings.warm_start,
+            catalog_path=settings.catalog_path,
         )
         network_meta = _network_meta(load_bundle(settings.data_dir))
     elif settings.simulator == "pf":
