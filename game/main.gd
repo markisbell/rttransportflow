@@ -7,6 +7,7 @@ const SMOKES := {
 	"boot_and_day": "res://smokes/boot_and_day.gd",
 	"trip_reaction": "res://smokes/trip_reaction.gd",
 	"sidecar_crash": "res://smokes/sidecar_crash.gd",
+	"trip_key": "res://smokes/trip_key.gd",
 }
 
 

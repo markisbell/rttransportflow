@@ -60,7 +60,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			best_p = float(device["p_mw"])
 			best_id = id
 	if best_id != "":
-		Orchestrator.inject_events([{"at_s_rel": 1.0, "kind": "trip", "element": best_id}])
+		Orchestrator.inject([{"at_s_rel": 1.0, "kind": "trip", "element": best_id}])
 		_push("[debug] tripping %s (%.0f MW) in 1 s" % [best_id, best_p])
 
 
