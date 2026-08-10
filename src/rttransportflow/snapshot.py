@@ -33,7 +33,15 @@ def model_hash(fleet) -> str:
     h = hashlib.sha256()
     h.update(",".join(fleet.ids).encode())
     h.update(",".join(fleet.inv_ids).encode())
-    for arr in (fleet.s_n, fleet.p_max, fleet.h, fleet.k_droop, fleet.db,
-                fleet.fcr_band, fleet.t_g, fleet.t_ch, fleet.t_rh, fleet.f_hp):
+    h.update(",".join(fleet.bat_ids).encode())
+    h.update(",".join(fleet.ely_ids).encode())
+    for arr in (fleet.s_n, fleet.p_max, fleet.p_min, fleet.h, fleet.k_droop,
+                fleet.db, fleet.fcr_band, fleet.ramp_mw_s,
+                fleet.t_a, fleet.t_b, fleet.t_c, fleet.c_in, fleet.c_2,
+                fleet.w_a, fleet.w_b, fleet.w_c,
+                fleet.hy_t_lag, fleet.hy_k_lead, fleet.hy_t_srv, fleet.hy_t_w2,
+                fleet.inv_t_up, fleet.inv_t_down, fleet.inv_p_rated,
+                fleet.bat_p_max, fleet.bat_e_mwh, fleet.bat_h_v,
+                fleet.ely_p_max):
         h.update(arr.tobytes())
     return h.hexdigest()[:16]

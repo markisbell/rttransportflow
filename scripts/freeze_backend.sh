@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Freeze the backend into a standalone onedir bundle (PyInstaller) and smoke it.
+# Family lesson: the freeze smoke lives in P4 CI, not P10 — and PyInstaller
+# only WARNS when numba is missing, so the smoke greps the build log for it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+PY=".venv/bin/python"
+OUT="build/freeze"
+LOG="$OUT/build.log"
+mkdir -p "$OUT"
+
+"$PY" -m PyInstaller \
+    --distpath "$OUT/dist" --workpath "$OUT/work" --specpath "$OUT" \
+    --name rttransportflow-backend --onedir --noconfirm --clean \
+    --collect-all pandapower \
+    --collect-all numba \
+    --collect-all llvmlite \
+    --hidden-import rttransportflow.main \
+    --add-data "$(pwd)/data:data" \
+    scripts/freeze_entry.py > "$LOG" 2>&1 || { tail -30 "$LOG" >&2; exit 1; }
+
+# Fail on numba warnings EXCEPT the known-benign optional TBB threading layer
+# (numba falls back to its default workqueue layer; only numba being absent
+# would be the silent-slow-path family gotcha).
+if grep "WARNING" "$LOG" | grep -i "numba" | grep -qv "libtbb"; then
+    echo "freeze log WARNS about numba — inspect $LOG" >&2
+    exit 1
+fi
+
+# Smoke: boot the frozen binary on a scratch port, expect the identity payload.
+PORT=8033
+RTTRANSPORTFLOW_PORT=$PORT RTTRANSPORTFLOW_AUTOSTART=false \
+RTTRANSPORTFLOW_EXTERNAL_CLOCK=true \
+    "$OUT/dist/rttransportflow-backend/rttransportflow-backend" &
+PID=$!
+trap 'kill $PID 2>/dev/null || true' EXIT
+
+for _ in $(seq 1 60); do
+    if curl -sf --noproxy '*' "http://127.0.0.1:$PORT/health" | grep -q '"app":"rttransportflow"'; then
+        echo "freeze smoke OK"
+        exit 0
+    fi
+    sleep 0.5
+done
+echo "frozen backend did not become healthy" >&2
+exit 1

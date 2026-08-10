@@ -17,3 +17,19 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Test
         run: pytest -q
+
+  freeze-smoke:
+    # Family lesson: the PyInstaller freeze smoke lives in P4 CI, not P10.
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          pip install -e ".[dev]" pyinstaller
+          python -m venv .venv --system-site-packages
+      - name: Freeze and smoke
+        run: ./scripts/freeze_backend.sh

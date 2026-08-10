@@ -14,6 +14,14 @@ EXPECTED_ROUTES = {
     ("POST", "/control/start"),
     ("POST", "/control/pause"),
     ("POST", "/control/resume"),
+    ("GET", "/gb/version"),
+    ("POST", "/gb/net/reset"),
+    ("POST", "/gb/net/patch"),
+    ("POST", "/gb/step"),
+    ("WS", "/gb/ws"),
+    ("GET", "/gb/result/latest"),
+    ("GET", "/gb/snapshot"),
+    ("GET", "/gb/telemetry/ring"),
 }
 
 DOC_PATHS = ("/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc")

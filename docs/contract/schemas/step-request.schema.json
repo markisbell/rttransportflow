@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gamebridge v2 — step request (WS /gb/ws frame or POST /gb/step)",
+  "type": "object",
+  "required": ["t", "dt_s"],
+  "properties": {
+    "t": { "type": "number", "description": "integer sequence number (integer-valued floats tolerated — Godot)" },
+    "dt_s": { "type": "number", "minimum": 0.05, "maximum": 900, "description": "advance by UP TO dt_s; quantized to the 10 ms wire quantum" },
+    "interrupt_on_event": { "type": "boolean", "default": true },
+    "zone_demand": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["value_mw"],
+        "properties": { "value_mw": { "type": "number" } }
+      }
+    },
+    "avail_mw": { "type": "object", "additionalProperties": { "type": "number" } },
+    "device_commands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "dispatch_mw": { "type": ["number", "null"] },
+          "breaker": { "enum": ["open", "close"] },
+          "curtail_to_mw": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "line_commands": { "type": "object" },
+    "zone_commands": { "type": "object" },
+    "scheduled_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at_s_rel", "kind"],
+        "properties": {
+          "at_s_rel": { "type": "number", "minimum": 0 },
+          "kind": { "enum": ["trip", "line_trip", "line_close", "load_step"] },
+          "element": { "type": "string" },
+          "delta_mw": { "type": "number" }
+        }
+      }
+    },
+    "watch": { "type": "array", "items": { "type": "string" } }
+  }
+}

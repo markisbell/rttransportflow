@@ -605,7 +605,7 @@ intended campaign policy lever, not a bug. Storage bids at opportunity cost
 
 ---
 
-## 5. Wire-level notes (details: docs/contract/v2-draft.md)
+## 5. Wire-level notes (details: docs/contract/v2.md)
 
 - Device params at `/gb/net/reset` (names match the contract draft, the wire
   authority): `h_s` (override), `droop`, `deadband_hz`, `fcr_band_mw`,

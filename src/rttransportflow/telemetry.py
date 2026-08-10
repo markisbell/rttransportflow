@@ -57,12 +57,17 @@ class TrajectoryBuffer:
     def __init__(self) -> None:
         self.t_us: list[int] = []
         self.f: dict[int, list[float]] = {}
+        self.watched: dict[str, list[float]] = {}
         self.event_t_us: set[int] = set()
 
-    def sample(self, t_us: int, f_by_island: np.ndarray) -> None:
+    def sample(self, t_us: int, f_by_island: np.ndarray,
+               watched: dict[str, float] | None = None) -> None:
         self.t_us.append(t_us)
         for island, value in enumerate(f_by_island):
             self.f.setdefault(island, []).append(float(value))
+        if watched:
+            for label, value in watched.items():
+                self.watched.setdefault(label, []).append(float(value))
 
     def mark_event(self, t_us: int) -> None:
         self.event_t_us.add(t_us)
@@ -70,7 +75,7 @@ class TrajectoryBuffer:
     def emit(self, t0_us: int, max_samples: int) -> dict:
         n = len(self.t_us)
         if n == 0:
-            return {"t_rel_s": [], "islands": {}}
+            return {"t_rel_s": [], "islands": {}, "watched": {}}
         keep = list(range(n))
         if n > max_samples:
             stride = -(-n // max_samples)
@@ -83,7 +88,11 @@ class TrajectoryBuffer:
         return {
             "t_rel_s": [(self.t_us[i] - t0_us) / US for i in keep],
             "islands": {
-                str(island): [values[i] for i in keep]
+                str(island): {"f": [values[i] for i in keep]}
                 for island, values in self.f.items()
+            },
+            "watched": {
+                label: {"p": [values[i] for i in keep]}
+                for label, values in self.watched.items()
             },
         }

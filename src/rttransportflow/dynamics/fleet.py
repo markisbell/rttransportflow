@@ -318,6 +318,8 @@ class Fleet:
         # --- synchronous governor pipeline -----------------------------
         df = f_island[self.island_of] - F0
         prim = np.clip(-self.k_droop * _soft_db(df, self.db), -self.fcr_band, self.fcr_band)
+        self.fcr_used = np.zeros(n_islands)
+        np.add.at(self.fcr_used, self.island_of[online], np.abs(prim[online]))
         self.p_disp += np.clip(self.p_set - self.p_disp,
                                -self.ramp_mw_s * dt_s, self.ramp_mw_s * dt_s)
         u = np.clip(self.p_disp + prim, self.p_min, self.p_max)
@@ -380,6 +382,8 @@ class Fleet:
             recharge = np.clip((self.bat_soc - self.bat_soc_target)
                                / np.maximum(self.bat_e_mwh, 1e-9) * 5.0 * self.bat_p_max,
                                -self.bat_recharge_p, self.bat_recharge_p)
+            np.add.at(self.fcr_used, self.bat_island[self.bat_online],
+                      np.abs(ffr[self.bat_online]))
             p_cmd = self.bat_p_set + ffr + np.where(quiet, recharge, 0.0)
             p_cmd = np.clip(p_cmd, -self.bat_p_max, self.bat_p_max)
             self.bat_p += (1.0 - cf["bt"]) * (p_cmd - self.bat_p)

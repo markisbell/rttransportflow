@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gamebridge v2 — step result",
+  "type": "object",
+  "required": ["t", "status", "dt_done_s", "t_sim_end", "mode", "islands",
+               "trajectory", "devices", "zones", "events", "violations"],
+  "properties": {
+    "t": { "type": "integer" },
+    "status": { "enum": ["converged", "degraded", "failed"] },
+    "solve_ms": { "type": "number" },
+    "dt_done_s": { "type": "number", "description": "boundary-quantized; may exceed dt_s by up to 0.25 s — the game clock follows THIS" },
+    "t_sim_end": { "type": "number" },
+    "mode": { "enum": ["alert", "calm"] },
+    "islands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["f_hz", "f_min", "f_max", "e_k_mj", "h_sys_s", "s_online_mva", "blackout"],
+        "properties": {
+          "f_hz": { "type": "number" },
+          "rocof_hz_s": { "type": "number" },
+          "f_min": { "type": "number" },
+          "f_max": { "type": "number" },
+          "rocof_max": { "type": "number" },
+          "e_k_mj": { "type": "number" },
+          "s_online_mva": { "type": "number" },
+          "h_sys_s": { "type": "number" },
+          "blackout": { "type": "boolean" },
+          "fcr_used_mw": { "type": "number" },
+          "afrr_used_mw": { "type": "number" }
+        }
+      }
+    },
+    "trajectory": {
+      "type": "object",
+      "required": ["t_rel_s", "islands"],
+      "properties": {
+        "t_rel_s": { "type": "array", "items": { "type": "number" }, "maxItems": 515 },
+        "islands": { "type": "object", "additionalProperties": { "type": "object", "properties": { "f": { "type": "array" } } } },
+        "watched": { "type": "object", "additionalProperties": { "type": "object", "properties": { "p": { "type": "array" } } } }
+      }
+    },
+    "pf": { "type": "object", "properties": { "latest": { "type": "object" }, "window_extremes": { "type": "object" } } },
+    "devices": { "type": "object" },
+    "zones": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["supplied"],
+        "properties": { "supplied": { "type": "number", "minimum": 0, "maximum": 1 } }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["t_sim", "kind", "element"],
+        "properties": { "t_sim": { "type": "number" }, "kind": { "type": "string" }, "element": { "type": "string" }, "data": { "type": "object" } }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["element", "kind", "severity"],
+        "properties": { "severity": { "enum": ["info", "warning", "critical"] } }
+      }
+    },
+    "summary": { "type": "object" }
+  }
+}

@@ -22,7 +22,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27", "websockets>=12"]
+freeze = ["pyinstaller>=6"]
 
 [project.scripts]
 rttransportflow = "rttransportflow.main:main"

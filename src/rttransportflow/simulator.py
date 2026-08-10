@@ -286,7 +286,16 @@ class DynSimulator:
         self._pf_ok = False
         self._pf_fail_count = 0
         self._pf_count = 0
+        self._pf_window_max: dict[str, float] = {}
         self._initialized = False
+
+        # wire lookup maps (gamebridge boundary application)
+        self._zone_rows: dict[str, list[int]] = {}
+        for row, item in enumerate(data.load_centers.items):
+            self._zone_rows.setdefault(item.zone, []).append(row)
+        self._zone_bus = {z.id: z.bus for z in data.grid.zones}
+        self._sync_row = {pid: i for i, pid in enumerate(self.fleet.ids)}
+        self._inv_row = {pid: i for i, pid in enumerate(self.fleet.inv_ids)}
 
     # -- PF hook (called by the integrator at mode cadence + on events) ---
 
@@ -330,6 +339,10 @@ class DynSimulator:
         self._last_converged = True
         self._pf_ok = True
         self._pf_count += 1
+        for line_id, idx in zip(b.line_ids, b.line_idx):
+            loading = float(net.res_line.loading_percent.at[idx])
+            if loading > self._pf_window_max.get(line_id, 0.0):
+                self._pf_window_max[line_id] = loading
         island.p_loss[0] = float(net.res_line.pl_mw.sum())
         self._latest_pf = {
             "buses": {
@@ -372,6 +385,74 @@ class DynSimulator:
         self._run_pf("warmup")
         self._initialized = True
         return (_time.perf_counter() - t0) * 1e3
+
+    # -- gamebridge wire boundary (sample-and-hold per field) -------------
+
+    def apply_wire_boundary(self, zone_demand: dict | None, avail_mw: dict | None,
+                            device_commands: dict | None) -> list[str]:
+        """Apply a step request's boundary; returns per-entry problem notes
+        (tolerant: unknown ids are reported, never fatal)."""
+        from .network_builder import DEFAULT_Q_FACTOR
+
+        notes: list[str] = []
+        for zone_id, payload in (zone_demand or {}).items():
+            rows = self._zone_rows.get(zone_id)
+            if rows is None:
+                notes.append(f"zone_demand: unknown zone {zone_id!r}")
+                continue
+            value = float(payload["value_mw"]) if isinstance(payload, dict) else float(payload)
+            share = value / len(rows)
+            for row in rows:
+                self._load_p_col[row] = share
+                self._load_q_col[row] = share * DEFAULT_Q_FACTOR
+        self.integrator.islands.p_l0[0] = float(self._load_p_col.sum())
+
+        for plant_id, value in (avail_mw or {}).items():
+            row = self._inv_row.get(plant_id)
+            if row is None:
+                notes.append(f"avail_mw: unknown converter plant {plant_id!r}")
+                continue
+            self.fleet.inv_avail[row] = float(value)
+
+        for device_id, cmd in (device_commands or {}).items():
+            sync_row = self._sync_row.get(device_id)
+            inv_row = self._inv_row.get(device_id)
+            if sync_row is None and inv_row is None:
+                notes.append(f"device_commands: unknown device {device_id!r}")
+                continue
+            if "dispatch_mw" in cmd and cmd["dispatch_mw"] is not None:
+                if sync_row is not None:
+                    self.fleet.p_set[sync_row] = float(cmd["dispatch_mw"])
+                else:
+                    notes.append(f"{device_id}: dispatch_mw on a converter plant")
+            if "curtail_to_mw" in cmd and cmd["curtail_to_mw"] is not None:
+                if inv_row is not None:
+                    self.fleet.inv_curtail[inv_row] = float(cmd["curtail_to_mw"])
+                else:
+                    notes.append(f"{device_id}: curtail_to_mw on a synchronous plant")
+            breaker = cmd.get("breaker")
+            if breaker == "open" and sync_row is not None:
+                self.fleet.command_stop(device_id, self.integrator.t_us)
+                self.integrator.refresh_e_k()
+            elif breaker == "close" and sync_row is not None:
+                try:
+                    self.fleet.command_start(device_id, self.integrator.t_us)
+                except RuntimeError as exc:
+                    notes.append(str(exc))
+        return notes
+
+    def set_watch(self, watch: list[str]) -> list[str]:
+        specs: list[tuple[str, str, int]] = []
+        notes: list[str] = []
+        for device_id in watch:
+            if device_id in self._sync_row:
+                specs.append((device_id, "sync", self._sync_row[device_id]))
+            elif device_id in self._inv_row:
+                specs.append((device_id, "inv", self._inv_row[device_id]))
+            else:
+                notes.append(f"watch: unknown device {device_id!r}")
+        self.integrator.watch_specs = specs
+        return notes
 
     def run_step(self, step: int, day: int) -> StepResult:
         from .dynamics import s_to_us

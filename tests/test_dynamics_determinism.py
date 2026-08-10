@@ -83,6 +83,6 @@ def test_trajectory_decimation_bounds() -> None:
     res = integ.advance(s_to_us(120.0), interrupt_on_event=False)
     n = len(res.trajectory["t_rel_s"])
     assert 0 < n <= 512 + 2  # cap plus kept event/final samples
-    assert len(res.trajectory["islands"]["0"]) == n
+    assert len(res.trajectory["islands"]["0"]["f"]) == n
     assert res.f_min[0] < 49.2  # the dip is really in the buffer
     assert np.isclose(res.f_end[0], 50.0 - 0.63291, atol=2e-3)

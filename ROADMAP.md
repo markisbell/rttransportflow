@@ -132,7 +132,7 @@ known-answer §2.3.
 
 *Goal:* the game exists, owns time, and the player watches Europe's real
 frequency move.
-*Scope:* implement `docs/contract/v2-draft.md` in `api/gamebridge.py`
+*Scope:* implement `docs/contract/v2.md` in `api/gamebridge.py`
 (version/reset/patch/step/ws/result/snapshot/telemetry-ring;
 `RTTRANSPORTFLOW_EXTERNAL_CLOCK`); **freeze the contract → `v2.md` +
 schemas**; contract golden suite on port 8032; Godot project with autoloads

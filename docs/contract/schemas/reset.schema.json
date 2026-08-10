@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gamebridge v2 — POST /gb/net/reset request",
+  "type": "object",
+  "required": ["contract", "network_kind", "native"],
+  "properties": {
+    "contract": { "type": "string", "pattern": "^2\\." },
+    "network_kind": { "const": "transmission" },
+    "name": { "type": "string" },
+    "native": {
+      "type": "object",
+      "required": ["grid", "lines", "plants", "load_centers", "scenario"],
+      "description": "backend-native scenario bundle, VERBATIM (validated by the backend's own models.py)"
+    },
+    "zones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "node"],
+        "properties": { "id": { "type": "string" }, "node": { "type": "string" } }
+      }
+    },
+    "devices": { "type": "array" },
+    "protection_seed": { "type": "number" },
+    "snapshot": {
+      "type": "object",
+      "required": ["version", "model_hash", "blob"],
+      "description": "exact-state restore; hash/version mismatch => status refused_snapshot (applied WITHOUT it)"
+    }
+  }
+}

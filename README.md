@@ -38,8 +38,11 @@ rtheatflow, rtwaterflow, infrastruct):
 
 ## Status
 
-**Planning complete — implementation not started.** The plan is written to be
-executed phase-by-phase by a coding agent:
+**P0–P4 implemented**: backend scaffold, europe_mini PF time-series +
+Grafana stack, the frequency-dynamics engine (analytically validated),
+per-kind plant models, the frozen gamebridge v2 contract, and the first
+playable Godot shell (live frequency dial; press **T** to trip the largest
+unit). Per-phase log: [CLAUDE.md](CLAUDE.md) §6. Plan documents:
 
 | Document | Contents |
 |---|---|
@@ -48,7 +51,7 @@ executed phase-by-phase by a coding agent:
 | [docs/PHYSICS.md](docs/PHYSICS.md) | Simulation engine: equations, integrator, protection, performance budget, validation tests |
 | [docs/PARAMETERS.md](docs/PARAMETERS.md) | Per-technology dynamic models, parameter tables, economics, weather model |
 | [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) | Map, load centers, game loop, teaching UX, campaign |
-| [docs/contract/v2-draft.md](docs/contract/v2-draft.md) | Gamebridge v2 wire contract (draft until frozen in P4) |
+| [docs/contract/v2.md](docs/contract/v2.md) | Gamebridge v2 wire contract (draft until frozen in P4) |
 | [CLAUDE.md](CLAUDE.md) | Handoff/context document: binding rules, decision ledger, open questions |
 
 ## Quickstart

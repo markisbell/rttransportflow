@@ -29,7 +29,7 @@ multi-agent research+design pass over the sibling repos, then synthesized and
 cross-reviewed. Start with ROADMAP P0.
 
 Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
-docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2-draft.md →
+docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2.md →
 docs/GAME_DESIGN.md.
 
 ## 3. Binding rules
@@ -393,6 +393,60 @@ draw (PHYSICS §2.8) is P7 — fuel meters only for now.
 Godot shell with the live frequency dial. NEEDS: Godot 4 binary on this
 machine (infrastruct keeps one under `.tools/godot/`) — confirm location
 before starting.
+
+### P4 — Gamebridge v2 + contract suite + Godot shell (2026-08-10)
+
+**Built:** contract FROZEN (`docs/contract/v2.md` + 3 JSON schemas; new
+binding "Time quantization" section: dt_s 10 ms quantum, boundary-quantized
+`dt_done_s`, min-one-boundary rule; trajectory example corrected to explicit
+`t_rel_s`); `api/gamebridge.py` — version handshake, `net/reset` (native
+bundle → DynSimulator, warmup, snapshot restore with model-hash guard +
+`refused_snapshot`, clears the idempotency cache), `net/patch` (set_device;
+add/remove rejected loudly until P5/P7), `step` + WS `/gb/ws` (strictly
+sequential lock, idempotent cache BEFORE state application, flat
+out_of_order body identical on both channels, sample-and-hold boundary,
+scheduled events, watch sampling, per-step meters/violations/PF window
+extremes), `result/latest`, `snapshot`, `telemetry/ring`; puppet mode
+(`EXTERNAL_CLOCK=true` → null internal sim; gamebridge owns its own);
+PyInstaller freeze script + smoke (452 MB onedir, boots + `/health`) wired
+into CI. GAME (built by a context-fork agent, integrated + extended by the
+main session): `game/` Godot 4.7 project — autoloads ported from infrastruct
+(GameClock with `dt_done_s`-authoritative time, SidecarManager with
+shell-wrapper env spawn + backoff restart + per-port logs, CosimBridge
+`EXPECTED_CONTRACT "2.0"`, Orchestrator: 10 Hz wall ticks `dt_s = 0.1×speed`,
+one-in-flight/skip-never-stall, one-step lag, auto-slow on significant
+events + 3-step cooldown, crash recovery with fresh wire sequence), stub
+Boundary provider (europe_mini profile replay), map view (geo buses/lines,
+vm coloring), frequency panel (readout, 120 s trace, H_sys/E_k, mode), HUD
+(speed buttons, event log, **debug key T = trip the largest online unit**);
+smokes `boot_and_day`/`trip_reaction`/`sidecar_crash` on SmokeBase
+(`SMOKE_<NAME> {json}` verdict lines, exit 0/1); `orchestration/sidecars.json`.
+
+**Tests:** 95 green (18 new: 14 in-process gamebridge incl. bit-identical
+external-clock equivalence and any-t-after-reset; 4 real-socket contract on
+8032 incl. WS channel + no-NaN wire). Smokes verified end-to-end: boot_and_day
+80/80 converged, t_sim exactly 7200 s; trip_reaction early return at 30.0 s,
+auto-slow, nadir 49.562; sidecar_crash kill −9 → recover → stepping resumes.
+Freeze smoke green.
+
+**Discoveries:** (1) the game-shell integration found a real contract bug —
+after reset the backend demanded t=0, violating "the game clock continues
+across resets; any t is legal as the first step" (fixed + pinned by
+`test_any_t_accepted_after_reset`); also the HTTP 409 body was
+FastAPI-detail-nested vs the contract's flat frame (fixed: flat on both
+channels). (2) GDScript lambdas capture by value bit the crash smoke exactly
+as the family gotcha predicted (member-variable flags now). (3) PyInstaller's
+only numba warning is the optional libtbb threading layer — allowlisted with
+rationale in `freeze_backend.sh`.
+
+**Deviations (deliberate):** GdUnit4 arrives with the topology goldens (P5) —
+P4 game verification is smoke-based; coarse 24 h ring + rolling snapshot
+ring still deferred (P8); frequency trace appends samples against sim time
+rather than wall-replaying the previous buffer (visually equivalent at 10 Hz
+stepping).
+
+**Next:** P5 — tiles, building, topology builder (WorldModel, corridor
+drawing, golden-file pinned native bundles, debounced reset).
 
 ## 7. Open questions for the project owner
 

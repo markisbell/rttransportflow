@@ -112,6 +112,8 @@ class Integrator:
         self.t_us = 0
         self.mode = "calm"
         self.quiet_us = 0
+        # wire `watch` list: (label, block in {sync,inv,bat,ely}, row)
+        self.watch_specs: list[tuple[str, str, int]] = []
         self.queue = EventQueue()
         self.rings = {i: FineRing() for i in range(islands.n)}
         self._rocof_inst = np.zeros(islands.n)
@@ -302,7 +304,13 @@ class Integrator:
         )
 
     def _sample(self, buffer: TrajectoryBuffer) -> None:
-        buffer.sample(self.t_us, self.islands.f)
+        watched = None
+        if self.watch_specs:
+            arrays = {"sync": self.fleet.y, "inv": self.fleet.inv_p,
+                      "bat": self.fleet.bat_p, "ely": self.fleet.ely_p}
+            watched = {label: float(arrays[block][row])
+                       for label, block, row in self.watch_specs}
+        buffer.sample(self.t_us, self.islands.f, watched)
         for island in range(self.islands.n):
             self.rings[island].append(self.t_us, float(self.islands.f[island]))
 

@@ -1,0 +1,19 @@
+{
+  "_comment": "Sidecar config (family pattern). Game 8030, smokes override to 8031 via configure(port); contract tests own 8032. NEVER 8000-8002 (user dev), 8010-8016 (infrastruct sidecars+smokes), 8020-8029 (infrastruct contract tests).",
+  "sidecars": [
+    {
+      "id": "transmission",
+      "python": ".venv/bin/python",
+      "module": "rttransportflow.main",
+      "cwd": ".",
+      "port": 8030,
+      "env": {
+        "RTTRANSPORTFLOW_EXTERNAL_CLOCK": "true",
+        "RTTRANSPORTFLOW_HOST": "127.0.0.1",
+        "RTTRANSPORTFLOW_SIMULATOR": "null",
+        "RTTRANSPORTFLOW_AUTOSTART": "false",
+        "RTTRANSPORTFLOW_LOG_LEVEL": "warning"
+      }
+    }
+  ]
+}

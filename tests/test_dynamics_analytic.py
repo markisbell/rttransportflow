@@ -52,7 +52,7 @@ def run_trip(integ: Integrator, until_s: float = 60.0) -> dict:
         traj = res.trajectory
         base = (integ.t_us - res.dt_done_us) / US
         ts.extend(base + t for t in traj["t_rel_s"])
-        fs.extend(traj["islands"]["0"])
+        fs.extend(traj["islands"]["0"]["f"])
     return {"t": np.array(ts), "f": np.array(fs), "integ": integ}
 
 

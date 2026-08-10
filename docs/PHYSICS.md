@@ -486,7 +486,7 @@ step_interval_seconds, autostart, warm_start, …).
 
 ## 5. Wire contract
 
-Authority: [contract/v2-draft.md](contract/v2-draft.md). This engine exposes:
+Authority: [contract/v2.md](contract/v2.md). This engine exposes:
 `/gb/version` (contract "2.0", network_kind "transmission", units MW),
 `/gb/net/reset` (native bundle + zones + devices + optional snapshot),
 `/gb/net/patch`, `/gb/ws` + `/gb/step` (variable `dt_s`, early return,

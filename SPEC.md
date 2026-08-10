@@ -33,7 +33,7 @@ Before writing any code, read — in this order:
    integrator, tick order, protection, validation tests).
 4. [docs/PARAMETERS.md](docs/PARAMETERS.md) — every per-technology model and
    number.
-5. [docs/contract/v2-draft.md](docs/contract/v2-draft.md) — the wire contract.
+5. [docs/contract/v2.md](docs/contract/v2.md) — the wire contract.
 6. [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) — the game half.
 7. Reference implementations in the sibling repos (paths in CLAUDE.md §5):
    above all `infrastruct/docs/contract/v1.md` (contract ground rules),
@@ -49,7 +49,7 @@ Before writing any code, read — in this order:
 |---|---|
 | Equations, integration scheme, tick order, protection logic, engine module design, validation tests | docs/PHYSICS.md |
 | Any per-technology parameter (H, droop, time constants, ramps, efficiencies, costs), reserve/defense-plan tables, weather model | docs/PARAMETERS.md |
-| Wire protocol (messages, fields, semantics, versioning) | docs/contract/v2-draft.md (→ `docs/contract/v2.md` once frozen in P4) |
+| Wire protocol (messages, fields, semantics, versioning) | docs/contract/v2.md (→ `docs/contract/v2.md` once frozen in P4) |
 | Map, tiles, load centers, game loop, economy rules, campaign, UI | docs/GAME_DESIGN.md |
 | Architecture, repo layout, data files, testing strategy, process | SPEC.md (this file) |
 | Build order and acceptance criteria | ROADMAP.md |
@@ -127,7 +127,7 @@ internal accelerated clock, zero imports from `game/`).
 `RTTRANSPORTFLOW_EXTERNAL_CLOCK=true`, stepped over WS `/gb/ws` (HTTP control
 plane `/gb/*`), one frame in → one frame out, strictly sequential, idempotent
 last-`t` cache, out-of-order → 409, divergence is data, warmup solve at every
-reset. What v2 adds (authority: docs/contract/v2-draft.md):
+reset. What v2 adds (authority: docs/contract/v2.md):
 
 - **Variable step size**: `dt_s` is a float in **[0.05, 900]**. The game sizes
   it from its speed setting (recipe: step at ~10 Hz wall with
@@ -175,7 +175,7 @@ rttransportflow/
 │   └── gen_contract_fixtures.py  # golden-fixture generator (must emit every hand-added probe key)
 ├── docs/
 │   ├── adr/                      # 001 engine split · 002 monorepo · 003 MW wire units · 004 measured budgets · …
-│   ├── contract/v2-draft.md → v2.md (frozen at P4) + schemas/
+│   ├── contract/v2.md → v2.md (frozen at P4) + schemas/
 │   ├── PHYSICS.md  PARAMETERS.md  GAME_DESIGN.md
 │   └── API.md                    # generated
 ├── data/

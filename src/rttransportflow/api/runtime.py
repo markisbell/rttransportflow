@@ -59,7 +59,11 @@ def build_container(settings: Settings | None = None) -> App:
     store = StateStore(history_size=settings.history_size)
 
     network_meta = None
-    if settings.simulator == "dyn":
+    if settings.external_clock:
+        # Puppet mode: the gamebridge builds its simulator at /gb/net/reset;
+        # the internal engine idles on a null simulator and never autostarts.
+        simulator = NullSimulator(steps_per_day=settings.steps_per_day)
+    elif settings.simulator == "dyn":
         from ..data_loader import load_bundle
         from ..simulator import build_dyn_simulator
 
@@ -119,8 +123,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=["*"],
         )
 
-    from . import control, core
+    from . import control, core, gamebridge
 
     app.include_router(core.router)
     app.include_router(control.router)
+    app.include_router(gamebridge.router)
     return app
