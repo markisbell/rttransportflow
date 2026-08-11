@@ -34,6 +34,13 @@ from . import F0, US
 # commitment states
 OFFLINE, STARTING, ONLINE = 0, 1, 2
 
+# LFSM-O (RfG, PHYSICS §2.7): above 50.2 Hz ALL generation curtails at 5 %
+# droop — 40 % of current P per Hz over — BEFORE any 51.5 trip, so
+# over-frequency never becomes a mass-disconnection cliff. The inverter
+# block carries its own catalog-driven variant; this pair is the sync-side.
+LFSM_O_FROM_HZ = 50.2
+LFSM_O_GAIN_PER_HZ = 0.40
+
 
 @dataclass
 class SyncParams:
@@ -401,6 +408,11 @@ class Fleet:
 
         y = np.where(self.is_hydro, y_hydro, y_chain)
         y = np.where(online, y, 0.0)
+
+        # sync-side LFSM-O: continuous over-frequency curtailment (§2.7)
+        over = np.maximum(df - (LFSM_O_FROM_HZ - F0), 0.0)
+        if over.any():
+            y = y * np.clip(1.0 - LFSM_O_GAIN_PER_HZ * over, 0.0, 1.0)
 
         # H2 fuel gating (PHYSICS §2.8): a store at its cushion floor derates
         # its plants to the withdrawal limit, then starves them. Deviation

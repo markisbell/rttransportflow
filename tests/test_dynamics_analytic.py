@@ -38,7 +38,11 @@ def make_fixture(h: float = 5.0, n_machines: int = 4, s_n: float = 2500.0,
         f=np.array([F0]), e_k=np.zeros(1), p_l0=np.array([load_mw]),
         w=np.ones(1), p_loss=np.zeros(1), d_pu=d_pu,
     )
-    return Integrator(fleet, islands)
+    integrator = Integrator(fleet, islands)
+    # the §6 pins predate the P8 defense layer and run with it OFF (the
+    # fixture family's "clamps disabled" rule)
+    integrator.defense_enabled = False
+    return integrator
 
 
 def run_trip(integ: Integrator, until_s: float = 60.0) -> dict:

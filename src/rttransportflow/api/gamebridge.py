@@ -107,6 +107,7 @@ async def net_reset(request: Request) -> dict:
             warm_start=container.settings.warm_start,
             catalog_path=container.settings.catalog_path,
             wire_devices=wire_devices,
+            protection_seed=_as_int(body.get("protection_seed", 0.0)),
         )
         sim.warmup()
         return sim
@@ -185,6 +186,11 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
     t0 = time.perf_counter()
     notes = sim.apply_wire_boundary(
         body.get("zone_demand"), body.get("avail_mw"), body.get("device_commands"))
+    for zone_id, zcmd in (body.get("zone_commands") or {}).items():
+        restore = zcmd.get("restore_load")
+        if restore is not None:
+            # zones map onto island 0 until the split/merge layer lands
+            sim.integrator.defense.request_restore(0, float(restore))
     notes += sim.set_watch(body.get("watch", []))
     for ev in body.get("scheduled_events", []):
         kind = ev.get("kind")
@@ -274,11 +280,12 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
     pf = sim._latest_pf
     zones = {}
     island_black = bool(sim.integrator.islands.blackout()[0])
+    island_w = float(sim.integrator.islands.w[0])
     for zone_id, bus in sim._zone_bus.items():
         detail = {}
         if pf.get("buses", {}).get(bus):
             detail["v_pu"] = pf["buses"][bus]["vm_pu"]
-        zones[zone_id] = {"supplied": 0.0 if island_black else 1.0,
+        zones[zone_id] = {"supplied": 0.0 if island_black else island_w,
                           "detail": detail}
 
     violations: list[dict[str, Any]] = []

@@ -330,7 +330,8 @@ class DynSimulator:
     def __init__(self, data, built, *, steps_per_day: int, d_load_pct_per_hz: float = 1.0,
                  warm_start: bool = True,
                  catalog_path: str = "data/catalogs/plant_types.json",
-                 wire_devices: list[dict] | None = None) -> None:
+                 wire_devices: list[dict] | None = None,
+                 protection_seed: int = 0) -> None:
         import numpy as np
 
         from .dynamics import F0
@@ -446,7 +447,8 @@ class DynSimulator:
             p_loss=np.zeros(1),
             d_pu=d_pu,
         )
-        self.integrator = Integrator(self.fleet, islands, pf_hook=self._run_pf)
+        self.integrator = Integrator(self.fleet, islands, pf_hook=self._run_pf,
+                                     protection_seed=protection_seed)
 
         self._load_p_col = built.load_p[:, 0].copy()
         self._load_q_col = built.load_q[:, 0].copy()

@@ -46,7 +46,9 @@ def build_case(h_sys: float, fcr_mw: float, battery_gw: float = 0.0) -> Integrat
         w=np.ones(1), p_loss=np.zeros(1),
         d_pu=0.5,  # 1 %/Hz on 150 GW = 1500 MW/Hz
     )
-    return Integrator(fleet, islands)
+    integ = Integrator(fleet, islands)
+    integ.defense_enabled = False  # §2.3 pins are PRE-shed numbers (fixture rule)
+    return integ
 
 
 def run_case(h_sys: float, fcr_mw: float, battery_gw: float = 0.0) -> dict:

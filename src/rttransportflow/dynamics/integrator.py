@@ -54,9 +54,16 @@ class IslandState:
     f: np.ndarray  # Hz
     e_k: np.ndarray  # MJ (recomputed on fleet changes)
     p_l0: np.ndarray  # zone-demand ledger sum [MW], sample-and-hold
-    w: np.ndarray  # surviving load fraction (UFLS, P8) — 1.0 in P2
+    w: np.ndarray  # surviving load fraction (UFLS sheds it, restoration raises)
     p_loss: np.ndarray  # network losses [MW], sample-and-hold from PF
     d_pu: float  # load damping, per-unit
+    # extra f-insensitive net load [MW]: tripped embedded DG (PARAMETERS §2.2
+    # RoCoF rows) raises island net load; restored with load restoration
+    p_extra: np.ndarray = None
+
+    def __post_init__(self) -> None:
+        if self.p_extra is None:
+            self.p_extra = np.zeros_like(self.f)
 
     @property
     def n(self) -> int:
@@ -64,7 +71,8 @@ class IslandState:
 
     def p_load(self, f: np.ndarray | None = None) -> np.ndarray:
         f_eval = self.f if f is None else f
-        return self.p_l0 * self.w * (1.0 + self.d_pu * (f_eval - F0) / F0)
+        return (self.p_l0 * self.w * (1.0 + self.d_pu * (f_eval - F0) / F0)
+                + self.p_extra)
 
     def swing_update(self, dt_us: int, p_inj: np.ndarray) -> np.ndarray:
         """Semi-implicit update; returns the new f (also stored).
@@ -75,7 +83,8 @@ class IslandState:
         dt_s = dt_us / US
         alive = self.e_k > 0.0
         k_f = np.where(alive, dt_s * F0 / (2.0 * np.maximum(self.e_k, 1e-9)), 0.0)
-        numer = self.f + k_f * (p_inj - self.p_loss - self.p_l0 * self.w * (1.0 - self.d_pu))
+        numer = self.f + k_f * (p_inj - self.p_loss - self.p_extra
+                                - self.p_l0 * self.w * (1.0 - self.d_pu))
         denom = 1.0 + k_f * self.p_l0 * self.w * self.d_pu / F0
         self.f = np.where(alive, numer / denom, self.f)
         return self.f
@@ -107,8 +116,9 @@ class Integrator:
         cfg: ModeConfig | None = None,
         pf_hook: Callable[[str], None] | None = None,
         trajectory_max_samples: int = 512,
+        protection_seed: int = 0,
     ) -> None:
-        from .protection import FrequencyWindowRelays
+        from .protection import DefensePlan, FrequencyWindowRelays
 
         self.fleet = fleet
         self.islands = islands
@@ -116,6 +126,10 @@ class Integrator:
         self.pf_hook = pf_hook  # called with reason "scheduled"|"event"; updates p_loss
         self.trajectory_max_samples = trajectory_max_samples
         self.relays = FrequencyWindowRelays(fleet)
+        self.defense = DefensePlan(islands.n, protection_seed)
+        # analytic fixtures pin the bare swing+FCR path (PHYSICS §6 runs
+        # "with clamps disabled" — the defense layer counts as one)
+        self.defense_enabled = True
 
         self.t_us = 0
         self.mode = "calm"
@@ -274,6 +288,30 @@ class Integrator:
                 self.queue.schedule(Event(self.t_us, "trip", device_id,
                                           {"cause": "f_window"}))
 
+            # defense plan (UFLS / interruptible tier / RoCoF table /
+            # restoration ramp): trips are scheduled, sheds are applied
+            def_trips: list = []
+            def_events: list = []
+            if self.defense_enabled:
+                win_rocof = np.array([self.rings[i].rocof_window(self.t_us)
+                                      for i in range(self.islands.n)])
+                def_trips, def_events = self.defense.tick(
+                    self.fleet, self.islands, self.t_us, dt, win_rocof)
+            for device_id, trip_data in def_trips:
+                self.queue.schedule(Event(self.t_us, "trip", device_id,
+                                          trip_data))
+            defense_early = False
+            for kind, element, data in def_events:
+                if kind == "trip":
+                    continue  # the scheduled trip event carries the cause
+                significant = kind in ("ufls_stage", "rocof_dg_trip")
+                fired.append(Event(self.t_us, kind, element, data,
+                                   significant=significant))
+                if significant:
+                    buffer.mark_event(self.t_us)
+                    self.enter_alert()
+                    defense_early = True
+
             due = self.queue.pop_due(self.t_us)
             if due:
                 self._apply_events(due)
@@ -288,6 +326,9 @@ class Integrator:
                 if interrupt_on_event and any(e.significant for e in due):
                     early = True
                     break
+            if interrupt_on_event and defense_early:
+                early = True
+                break
 
             if self.t_us == next_pf:
                 if self.pf_hook is not None:
@@ -359,6 +400,8 @@ class Integrator:
             if self.fleet.h2_starved is not None else None,
             "hvdc": self.fleet.hvdc.state_dict()
             if self.fleet.hvdc is not None else None,
+            "p_extra": [repr(float(v)) for v in self.islands.p_extra],
+            "defense": self.defense.state_dict(),
             "relays": self.relays.state_dict(),
             "events": self.queue.snapshot(),
         }
@@ -384,6 +427,10 @@ class Integrator:
             self.fleet.h2_starved[:] = np.array(state["h2_starved"], dtype=bool)
         if state.get("hvdc") is not None and self.fleet.hvdc is not None:
             self.fleet.hvdc.restore_state(state["hvdc"])
+        if state.get("p_extra") is not None:
+            self.islands.p_extra = np.array([float(v) for v in state["p_extra"]])
+        if state.get("defense") is not None:
+            self.defense.restore_state(state["defense"])
         self.relays.restore_state(state["relays"])
         self.queue.restore(state["events"])
         self.refresh_e_k()
