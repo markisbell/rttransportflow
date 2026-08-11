@@ -144,7 +144,9 @@
       "t_down_s": 0.2,
       "lfsm_o_from_hz": 50.2,
       "lfsm_o_droop_pu": 0.05,
-      "rationale": "PARAMETERS §1.7: converter-coupled, H = 0; pitch-limited upward (2 s), fast curtail down (0.2 s); mandatory LFSM-O above 50.2 Hz at 5% droop (RfG)."
+      "rationale": "PARAMETERS §1.7: converter-coupled, H = 0; pitch-limited upward (2 s), fast curtail down (0.2 s); mandatory LFSM-O above 50.2 Hz at 5% droop (RfG).",
+      "avail_slew_pct_pn_min": 20.0,
+      "_avail_slew_rationale": "synoptic/frontal wind changes move a whole park's output over ~5 min, not in one instant — smooths the 15-min wire sample-and-hold into the ramp the atmosphere actually delivers"
     },
     "wind_offshore": {
       "model": "inverter",
@@ -152,7 +154,9 @@
       "t_down_s": 0.2,
       "lfsm_o_from_hz": 50.2,
       "lfsm_o_droop_pu": 0.05,
-      "rationale": "PARAMETERS §1.8: as onshore; the far-shore/hub connection story is GAME_DESIGN §1.4 + PARAMETERS §1.16."
+      "rationale": "PARAMETERS §1.8: as onshore; the far-shore/hub connection story is GAME_DESIGN §1.4 + PARAMETERS §1.16.",
+      "avail_slew_pct_pn_min": 20.0,
+      "_avail_slew_rationale": "as onshore: a front crosses a 500 MW park in minutes"
     },
     "solar_pv": {
       "model": "inverter",
@@ -160,7 +164,9 @@
       "t_down_s": 0.1,
       "lfsm_o_from_hz": 50.2,
       "lfsm_o_droop_pu": 0.05,
-      "rationale": "PARAMETERS §1.9: effectively instant converter (0.1 s), zero inertia — the midday displacement of synchronous units is the campaign's core tension."
+      "rationale": "PARAMETERS §1.9: effectively instant converter (0.1 s), zero inertia — the midday displacement of synchronous units is the campaign's core tension.",
+      "avail_slew_pct_pn_min": 40.0,
+      "_avail_slew_rationale": "cloud edges sweep a 150 MW park in ~2.5 min at the fastest"
     },
     "battery": {
       "model": "battery",

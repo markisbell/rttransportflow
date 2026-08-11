@@ -262,7 +262,8 @@ class Integrator:
                     break
 
             # commitment completions (informational events)
-            for device_id in self.fleet.poll_commitment(self.t_us):
+            for device_id in self.fleet.poll_commitment(
+                    self.t_us, self.islands.f, self.islands.blackout()):
                 self.refresh_e_k()
                 completed = Event(self.t_us, "start_complete", device_id,
                                   significant=False)

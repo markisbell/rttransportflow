@@ -95,12 +95,16 @@ def sync_spec(kind: str, params: dict, *, device_id: str, island: int,
 
 def inverter_spec(kind: str, params: dict, *, device_id: str, island: int,
                   p_rated_mw: float, avail_mw: float) -> dict:
-    return {
+    spec = {
         "id": device_id, "island": island, "p_rated": p_rated_mw,
         "avail": avail_mw,
         "t_up": params["t_up_s"], "t_down": params["t_down_s"],
         "lfsm_from": params["lfsm_o_from_hz"], "lfsm_droop": params["lfsm_o_droop_pu"],
     }
+    if "avail_slew_pct_pn_min" in params:
+        spec["avail_slew_mw_s"] = (
+            params["avail_slew_pct_pn_min"] / 100.0 * p_rated_mw / 60.0)
+    return spec
 
 
 def battery_spec(kind: str, params: dict, *, device_id: str, island: int,

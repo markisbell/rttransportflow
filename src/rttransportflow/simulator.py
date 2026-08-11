@@ -286,6 +286,7 @@ def _parse_wire_devices(devices: list[dict], catalog: dict, bus_index: dict) -> 
                 out["hubs"].append({
                     "id": did, "island": 0, "p_rated": p_max, "avail": 0.0,
                     "t_up": 0.1, "t_down": 0.1,
+                    "avail_slew_mw_s": 0.20 * p_max / 60.0,  # front-crossing rate
                     "lfsm_from": 50.2, "lfsm_droop": 0.05,
                     "aux_mw": NO_LOAD_AUX_FRAC * p_max,
                     # extra keys (ignored by make_fleet), kept for the sim maps

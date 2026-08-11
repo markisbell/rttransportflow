@@ -118,12 +118,18 @@ class Fleet:
     inv_t_down: np.ndarray
     inv_lfsm_from: np.ndarray
     inv_lfsm_gain: np.ndarray  # 1/(droop·f0) per unit of current P, per Hz
-    inv_avail: np.ndarray  # availability target [MW]
+    inv_avail: np.ndarray  # availability TARGET [MW] (wire, sample-and-hold)
     inv_curtail: np.ndarray  # curtailment cap [MW]
     inv_p: np.ndarray
     inv_online: np.ndarray
     inv_energy_mwh: np.ndarray
     inv_aux_mw: np.ndarray  # no-load station service while energized (hubs)
+    # weather does not STEP: the 15-min wire cadence is a sampling artifact,
+    # so the effective availability slews toward the target at a physical
+    # rate (default inf = instant, keeps every pre-slew pin). A GW-scale
+    # avail step relayed out a small island twice (P6/P7 smoke hunts).
+    inv_slew_mw_s: np.ndarray
+    inv_avail_eff: np.ndarray
 
     # --- batteries ---
     bat_ids: list[str]
@@ -286,11 +292,26 @@ class Fleet:
             self.hy_xc[row] = self.hy_g[row] = self.hy_xh[row] = 0.0
             self.y[row] = 0.0
 
-    def poll_commitment(self, t_us: int) -> list[str]:
-        """Complete due start sequences; sync at P_min. Returns completed ids."""
+    def poll_commitment(self, t_us: int, f_island: np.ndarray | None = None,
+                        blackout: np.ndarray | None = None) -> list[str]:
+        """Complete due start sequences; sync at P_min. Returns completed ids.
+
+        A unit cannot synchronize to a collapsed or dying island: while the
+        island is blacked out or |f − f0| > 1 Hz the completion is HELD
+        (re-checked every 30 s). Without this, dispatcher auto-restarts into
+        a sagging island fed a death spiral that integrated f to −27 Hz
+        (found by calm_week). Proper black-start restoration is P8."""
         done: list[str] = []
         rows = np.nonzero((self.status == STARTING) & (self.start_done_us <= t_us))[0]
         for row in rows:
+            if f_island is not None:
+                island = int(self.island_of[row])
+                sick = abs(float(f_island[island]) - F0) > 1.0
+                if blackout is not None:
+                    sick = sick or bool(blackout[island])
+                if sick:
+                    self.start_done_us[row] = t_us + int(30.0 * US)
+                    continue
             self.status[row] = ONLINE
             self.tripped_at_us[row] = -1
             p0 = self.p_min[row]
@@ -312,6 +333,7 @@ class Fleet:
         self.hy_g[:] = self.p_set
         self.hy_xh[:] = self.p_set
         self.y[:] = np.where(self.online, self.p_set, 0.0)
+        self.inv_avail_eff[:] = self.inv_avail
         self.inv_p[:] = np.minimum(self.inv_avail, self.inv_curtail)
         self.bat_p[:] = 0.0
         self.ely_p[:] = self.ely_p_set
@@ -425,7 +447,10 @@ class Fleet:
 
         # --- inverter plants (wind/PV): lags + LFSM-O -------------------
         if len(self.inv_ids):
-            target = np.minimum(self.inv_avail, self.inv_curtail)
+            slew = self.inv_slew_mw_s * dt_s
+            self.inv_avail_eff += np.clip(self.inv_avail - self.inv_avail_eff,
+                                          -slew, slew)
+            target = np.minimum(self.inv_avail_eff, self.inv_curtail)
             df_i = f_island[self.inv_island] - F0
             over = np.maximum(df_i - (self.inv_lfsm_from - F0), 0.0)
             target = np.maximum(target - self.inv_p * over * self.inv_lfsm_gain, 0.0)
@@ -512,7 +537,8 @@ class Fleet:
             "y": rf(self.y),
             "energy_mwh": rf(self.energy_mwh), "fuel_mwh_th": rf(self.fuel_mwh_th),
             "inv_online": self.inv_online.tolist(),
-            "inv_avail": rf(self.inv_avail), "inv_curtail": rf(self.inv_curtail),
+            "inv_avail": rf(self.inv_avail), "inv_avail_eff": rf(self.inv_avail_eff),
+            "inv_curtail": rf(self.inv_curtail),
             "inv_p": rf(self.inv_p), "inv_energy_mwh": rf(self.inv_energy_mwh),
             "bat_online": self.bat_online.tolist(),
             "bat_p_set": rf(self.bat_p_set), "bat_p": rf(self.bat_p),
@@ -535,6 +561,9 @@ class Fleet:
                      "inv_curtail", "inv_p", "inv_energy_mwh", "bat_p_set",
                      "bat_p", "bat_soc", "ely_p_set", "ely_p", "ely_energy_mwh"):
             getattr(self, name)[:] = np.array([float(v) for v in state[name]])
+        # pre-slew snapshots lack the field: converged fallback
+        self.inv_avail_eff[:] = np.array(
+            [float(v) for v in state.get("inv_avail_eff", state["inv_avail"])])
 
 
 def make_fleet(
@@ -552,7 +581,7 @@ def make_fleet(
       t_r/r_t/t_servo/gate_rate_pu_s/t_w (hydro), start_hot_s/…,
       eta_full/eta_min, offline: bool]}
     inverters: {id, island, p_rated, [avail, curtail, t_up, t_down,
-      lfsm_from, lfsm_droop, aux_mw]}
+      lfsm_from, lfsm_droop, aux_mw, avail_slew_mw_s]}
     batteries: {id, island, p_max, e_mwh, [soc_frac, p_set, k_f, db, t_b,
       eta_ch, eta_dis, soc_min/max/target_frac, recharge_frac, quiet_hz, h_v]}
     electrolyzers: {id, island, p_max, [p_set, t_e, db, shed_full_hz]}
@@ -676,6 +705,10 @@ def make_fleet(
         inv_online=np.ones(len(inverters), dtype=bool),
         inv_energy_mwh=np.zeros(len(inverters)),
         inv_aux_mw=np.array([float(i.get("aux_mw", 0.0)) for i in inverters]),
+        inv_slew_mw_s=np.array([float(i.get("avail_slew_mw_s", np.inf))
+                                for i in inverters]),
+        inv_avail_eff=np.array([float(i.get("avail", i.get("p_target", 0.0)))
+                                for i in inverters]),
         bat_ids=[b["id"] for b in batteries],
         bat_island=np.array([int(b.get("island", 0)) for b in batteries], dtype=np.int64),
         bat_p_max=np.array([float(b["p_max"]) for b in batteries]),

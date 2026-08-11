@@ -216,8 +216,10 @@ def test_hvdc_trip_is_not_an_infeed_loss(client) -> None:
 
 def test_hub_delivery_minus_losses(client) -> None:
     _reset(client, reset_with_devices())
-    _step(client, 0, dt_s=30.0, avail_mw={"hub_dogger": 1800.0})
-    res = _step(client, 1, dt_s=60.0, avail_mw={"hub_dogger": 1800.0})
+    # the hub SLEWS to its avail target (20 %/min front-crossing rate):
+    # 1.75 GW from cold needs ~260 s — step long enough to converge
+    _step(client, 0, dt_s=300.0, avail_mw={"hub_dogger": 1800.0})
+    res = _step(client, 1, dt_s=120.0, avail_mw={"hub_dogger": 1800.0})
     hub = res["devices"]["hub_dogger"]
     assert hub["p_mw"] == pytest.approx(1800.0 * (1.0 - HUB_LOSS), rel=0.02)
     assert hub["avail_mw"] == pytest.approx(1800.0 * (1.0 - HUB_LOSS), rel=1e-6)
@@ -232,7 +234,7 @@ def test_hub_rating_clamps_avail(client) -> None:
 
 def test_hub_trip_is_an_infeed_loss(client) -> None:
     _reset(client, reset_with_devices())
-    _step(client, 0, dt_s=60.0, avail_mw={"hub_dogger": 1800.0})
+    _step(client, 0, dt_s=300.0, avail_mw={"hub_dogger": 1800.0})
     res = _step(client, 1, dt_s=60.0, avail_mw={"hub_dogger": 1800.0},
                 scheduled_events=[{"at_s_rel": 5.0, "kind": "trip",
                                    "element": "hub_dogger"}])

@@ -273,6 +273,34 @@ def test_ocgt_quick_start_cycle() -> None:
     fleet = make_fleet([spec])
     fleet.command_start("o", t_us=0)
     assert fleet.poll_commitment(s_to_us(900.0)) == ["o"]  # 15 min, any state
+
+
+def test_start_completion_held_on_sick_island():
+    """A unit cannot sync to a collapsed island: completion is HELD while
+    |f - f0| > 1 Hz or the island is blacked out, and lands normally once
+    the frequency recovers (the calm_week death-spiral fix)."""
+    import numpy as np
+
+    from rttransportflow.dynamics import s_to_us
+    from rttransportflow.dynamics.fleet import make_fleet
+    from rttransportflow.dynamics.plant_types import load_catalog, sync_spec
+
+    catalog = load_catalog("data/catalogs/plant_types.json")["kinds"]
+    fleet = make_fleet([sync_spec("gas_ocgt", catalog["gas_ocgt"], device_id="o",
+                                  island=0, p_max_mw=200.0, p_min_mw=40.0,
+                                  p_set_mw=0.0, offline=True)])
+    fleet.off_since_us[0] = 0
+    fleet.command_start("o", 0)
+    due = int(fleet.start_done_us[0])
+    # island deeply sagged: held, re-armed 30 s out
+    assert fleet.poll_commitment(due, np.array([47.0]), np.array([False])) == []
+    assert int(fleet.start_done_us[0]) == due + s_to_us(30.0)
+    # island blacked out: held too
+    assert fleet.poll_commitment(due + s_to_us(30.0), np.array([50.0]),
+                                 np.array([True])) == []
+    # island healthy again: completes
+    assert fleet.poll_commitment(due + s_to_us(60.0), np.array([49.9]),
+                                 np.array([False])) == ["o"]
     fleet.command_stop("o", t_us=s_to_us(1000.0))
     assert float(fleet.y[0]) == 0.0
 
@@ -353,3 +381,38 @@ def test_h2_starvation_chain() -> None:
             break
     assert seen_recovery
     assert bool(fleet.h2_starved[0]) is False
+
+
+def test_avail_slew_limits_wire_steps():
+    """The 15-min wire sample-and-hold is a sampling artifact: with
+    avail_slew set, a GW-scale avail step reaches the plant as a ramp at
+    the physical rate; without it (default inf) the step is instant."""
+    import numpy as np
+
+    from rttransportflow.dynamics import s_to_us
+    from rttransportflow.dynamics.fleet import make_fleet
+
+    def build(slew):
+        spec = {"id": "w", "island": 0, "p_rated": 1000.0, "avail": 1000.0,
+                "t_up": 0.01, "t_down": 0.01}
+        if slew is not None:
+            spec["avail_slew_mw_s"] = slew
+        fleet = make_fleet([], [spec])
+        fleet.init_steady_state()
+        return fleet
+
+    f0 = np.array([50.0])
+    # slewed: 1000 -> 0 target moves at 10 MW/s
+    fleet = build(10.0)
+    fleet.inv_avail[0] = 0.0
+    fleet.tick(s_to_us(1.0), f0, 1)
+    assert fleet.inv_avail_eff[0] == 990.0
+    for _ in range(9):
+        fleet.tick(s_to_us(1.0), f0, 1)
+    assert fleet.inv_avail_eff[0] == 900.0
+    assert 880.0 < fleet.inv_p[0] < 920.0  # follows the ramp, not the cliff
+    # default: instant (every pre-slew pin unchanged)
+    fleet = build(None)
+    fleet.inv_avail[0] = 0.0
+    fleet.tick(s_to_us(1.0), f0, 1)
+    assert fleet.inv_avail_eff[0] == 0.0
