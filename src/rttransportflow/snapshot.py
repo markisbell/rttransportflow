@@ -41,7 +41,18 @@ def model_hash(fleet) -> str:
                 fleet.w_a, fleet.w_b, fleet.w_c,
                 fleet.hy_t_lag, fleet.hy_k_lead, fleet.hy_t_srv, fleet.hy_t_w2,
                 fleet.inv_t_up, fleet.inv_t_down, fleet.inv_p_rated,
+                fleet.inv_aux_mw,
                 fleet.bat_p_max, fleet.bat_e_mwh, fleet.bat_h_v,
                 fleet.ely_p_max):
         h.update(arr.tobytes())
+    if fleet.h2 is not None:
+        h.update(",".join(fleet.h2.ids).encode())
+        h.update(fleet.h2.capacity_kg.tobytes())
+        h.update(fleet.h2.inject_max_kgph.tobytes())
+        h.update(fleet.h2.withdraw_max_kgph.tobytes())
+    if fleet.hvdc is not None:
+        h.update(",".join(fleet.hvdc.link_ids).encode())
+        h.update(",".join(fleet.hvdc.term_ids).encode())
+        h.update(fleet.hvdc.p_max.tobytes())
+        h.update(fleet.hvdc.loss_frac.tobytes())
     return h.hexdigest()[:16]

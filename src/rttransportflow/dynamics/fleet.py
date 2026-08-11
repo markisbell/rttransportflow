@@ -123,6 +123,7 @@ class Fleet:
     inv_p: np.ndarray
     inv_online: np.ndarray
     inv_energy_mwh: np.ndarray
+    inv_aux_mw: np.ndarray  # no-load station service while energized (hubs)
 
     # --- batteries ---
     bat_ids: list[str]
@@ -157,6 +158,14 @@ class Fleet:
     ely_p: np.ndarray  # consumption, positive
     ely_online: np.ndarray
     ely_energy_mwh: np.ndarray
+    # H2 chain (attach_h2 wires these; PHYSICS §2.8) — defaulted fields last
+    fuel_is_h2: np.ndarray = None
+    h2_store_row: np.ndarray = None
+    h2_starved: np.ndarray = None
+    ely_store_row: np.ndarray = None
+    h2: object = None  # H2Stores (attach_h2)
+    hvdc: object = None  # HVDCLinks (attach_hvdc)
+    notices: list = None  # (kind, device_id) engine notices, polled per tick
 
     _coeff_cache: dict[int, dict[str, np.ndarray]] = field(default_factory=dict, repr=False)
 
@@ -240,6 +249,8 @@ class Fleet:
             row = self.ely_ids.index(device_id)
             self.ely_online[row] = False
             self.ely_p[row] = 0.0
+        elif self.hvdc is not None and self.hvdc.has(device_id):
+            self.hvdc.trip(device_id)
         else:
             raise KeyError(device_id)
 
@@ -305,6 +316,29 @@ class Fleet:
         self.bat_p[:] = 0.0
         self.ely_p[:] = self.ely_p_set
 
+    def attach_h2(self, stores, sync_store_ids: dict, ely_store_ids: dict) -> None:
+        """Wire the H2 chain: `stores` is an H2Stores; the dicts map device
+        id -> store id for H2-fired plants and electrolyzers."""
+        self.h2 = stores
+        self.fuel_is_h2 = np.zeros(self.n_sync, dtype=bool)
+        self.h2_store_row = np.full(self.n_sync, -1, dtype=np.int64)
+        self.h2_starved = np.zeros(self.n_sync, dtype=bool)
+        self.ely_store_row = np.full(len(self.ely_ids), -1, dtype=np.int64)
+        self.notices = []
+        for pid, store_id in sync_store_ids.items():
+            row = self.ids.index(pid)
+            self.fuel_is_h2[row] = True
+            self.h2_store_row[row] = stores.row(store_id)
+        for pid, store_id in ely_store_ids.items():
+            self.ely_store_row[self.ely_ids.index(pid)] = stores.row(store_id)
+
+    def attach_hvdc(self, links) -> None:
+        """Wire the HVDC block (HVDCLinks); its per-island injection joins
+        p_inv each tick. H = 0 — never enters e_k."""
+        self.hvdc = links
+        if self.notices is None:
+            self.notices = []
+
     # ------------------------------------------------------------------
 
     def tick(self, dt_us: int, f_island: np.ndarray, n_islands: int,
@@ -345,6 +379,34 @@ class Fleet:
 
         y = np.where(self.is_hydro, y_hydro, y_chain)
         y = np.where(online, y, 0.0)
+
+        # H2 fuel gating (PHYSICS §2.8): a store at its cushion floor derates
+        # its plants to the withdrawal limit, then starves them. Deviation
+        # (documented): starvation cuts at the physical withdrawal limit
+        # rather than a cosmetic 10 s purge ramp.
+        if self.h2 is not None and self.fuel_is_h2.any():
+            rows = np.nonzero(self.fuel_is_h2)[0]
+            span = np.maximum(self.p_max[rows] - self.p_min[rows], 1e-9)
+            frac = np.clip((y[rows] - self.p_min[rows]) / span, 0.0, 1.0)
+            eta = self.eta_min[rows] + (self.eta_full[rows] - self.eta_min[rows]) * frac
+            # a STARVED plant draws nothing until recovery — otherwise it eats
+            # every freshly injected kg and the level never clears the floor
+            request = np.where(self.h2_starved[rows], 0.0, y[rows])
+            allowed = self.h2.draw_for_plants(
+                self.h2_store_row[rows], request, eta, dt_us / US)
+            floor = self.h2.floor_kg()
+            for i, row in enumerate(rows):
+                store = self.h2_store_row[row]
+                level = self.h2.level_kg[store]
+                if allowed[i] < request[i] - 1e-6 and level <= floor[store] + 1e-6:
+                    if not self.h2_starved[row]:
+                        self.h2_starved[row] = True
+                        self.notices.append(("fuel_starved", self.ids[row]))
+                elif self.h2_starved[row] \
+                        and level > 0.07 * self.h2.capacity_kg[store]:
+                    self.h2_starved[row] = False
+                    self.notices.append(("fuel_recovered", self.ids[row]))
+            y[rows] = allowed
         self.y = y
 
         # meters: energy + fuel through the part-load efficiency line
@@ -371,7 +433,8 @@ class Fleet:
             self.inv_p += (1.0 - a_i) * (target - self.inv_p)
             self.inv_p = np.where(self.inv_online, self.inv_p, 0.0)
             self.inv_energy_mwh += self.inv_p * (dt_s / 3600.0)
-            np.add.at(p_inv, self.inv_island, self.inv_p)
+            aux = np.where(self.inv_online, self.inv_aux_mw, 0.0)
+            np.add.at(p_inv, self.inv_island, self.inv_p - aux)
 
         # --- batteries: FFR + SoC -------------------------------------
         if len(self.bat_ids):
@@ -419,6 +482,16 @@ class Fleet:
             self.ely_p = np.where(self.ely_online, self.ely_p, 0.0)
             self.ely_energy_mwh += self.ely_p * (dt_s / 3600.0)
             np.add.at(p_inv, self.ely_island, -self.ely_p)
+            if self.h2 is not None and self.ely_store_row is not None \
+                    and (self.ely_store_row >= 0).any():
+                aux = self.h2.inject_from_electrolyzers(
+                    self.ely_store_row, self.ely_p, self.ely_p_max,
+                    dt_s, n_islands)
+                p_inv -= aux  # compressor consumes on the store's island
+
+        # --- HVDC links: paired ±P, embedded links net ≈ −losses ------
+        if self.hvdc is not None:
+            p_inv += self.hvdc.tick(dt_us, n_islands)
 
         return p_mech, p_inv
 
@@ -479,7 +552,7 @@ def make_fleet(
       t_r/r_t/t_servo/gate_rate_pu_s/t_w (hydro), start_hot_s/…,
       eta_full/eta_min, offline: bool]}
     inverters: {id, island, p_rated, [avail, curtail, t_up, t_down,
-      lfsm_from, lfsm_droop]}
+      lfsm_from, lfsm_droop, aux_mw]}
     batteries: {id, island, p_max, e_mwh, [soc_frac, p_set, k_f, db, t_b,
       eta_ch, eta_dis, soc_min/max/target_frac, recharge_frac, quiet_hz, h_v]}
     electrolyzers: {id, island, p_max, [p_set, t_e, db, shed_full_hz]}
@@ -602,6 +675,7 @@ def make_fleet(
         inv_p=np.zeros(len(inverters)),
         inv_online=np.ones(len(inverters), dtype=bool),
         inv_energy_mwh=np.zeros(len(inverters)),
+        inv_aux_mw=np.array([float(i.get("aux_mw", 0.0)) for i in inverters]),
         bat_ids=[b["id"] for b in batteries],
         bat_island=np.array([int(b.get("island", 0)) for b in batteries], dtype=np.int64),
         bat_p_max=np.array([float(b["p_max"]) for b in batteries]),

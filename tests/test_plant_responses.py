@@ -291,3 +291,65 @@ def test_energy_and_fuel_meters() -> None:
     assert float(fleet.energy_mwh[0]) == pytest.approx(600.0, rel=1e-3)
     # Full load => eta_full = 0.59
     assert float(fleet.fuel_mwh_th[0]) == pytest.approx(600.0 / 0.59, rel=1e-3)
+
+
+def test_h2_starvation_chain() -> None:
+    """PHYSICS §6.13: an electrolyzer fills a cavern; an H2-CCGT drains it;
+    at the cushion floor the plant is starved (event) and frequency feels
+    it; refilling recovers the plant."""
+    from rttransportflow.dynamics.hydrogen import make_stores
+    from rttransportflow.dynamics.integrator import Integrator, IslandState
+    from rttransportflow.dynamics.events import Event
+
+    # Sized so the island SURVIVES the starvation (an early fixture lost
+    # 400 MW against a 40 MW FCR band -> collapse -> frozen blackout ->
+    # the UF-shed electrolyzer never refilled: coherent physics, wrong test).
+    stores = make_stores([{"id": "cavern", "island": 0, "capacity_kg": 20_000.0,
+                           "level_kg": 1_400.0,  # floor is 1 000 kg
+                           "withdraw_max_kgph": 40_000.0,
+                           "inject_max_kgph": 40_000.0}])
+    h2_ccgt = sync_spec("gas_ccgt", CATALOG["gas_ccgt"], device_id="h2gt",
+                        island=0, p_max_mw=200.0, p_min_mw=0.0, p_set_mw=200.0)
+    # SIX units with real headroom: at 5×800 the island sat exactly at its
+    # capacity ceiling and could never recover (droop had already maxed the
+    # fleet; redispatch had nothing to give — measured).
+    coal = [sync_spec("coal", CATALOG["coal"], device_id=f"coal{i}", island=0,
+                      p_max_mw=800.0, p_min_mw=0.0, p_set_mw=633.3)
+            for i in range(6)]
+    ely = [{"id": "ely1", "island": 0, "p_max": 100.0, "p_set": 0.0}]
+    fleet = make_fleet([h2_ccgt] + coal, electrolyzers=ely)
+    fleet.attach_h2(stores, {"h2gt": "cavern"}, {"ely1": "cavern"})
+    fleet.init_steady_state()
+    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
+                          p_l0=np.array([4000.0]), w=np.ones(1),
+                          p_loss=np.zeros(1), d_pu=0.5)
+    integ = Integrator(fleet, islands)
+
+    # Draw at 200 MW: ~10.2 t/h; the 400 kg above the floor lasts ~2.4 min
+    # -> starvation, early return, ALERT; the coal FCR arrests the loss.
+    res = integ.advance(s_to_us(300.0), interrupt_on_event=True)
+    assert res.early_return is True
+    kinds = [e.kind for e in res.events]
+    assert "fuel_starved" in kinds
+    assert bool(fleet.h2_starved[0]) is True
+    assert float(stores.level_kg[0]) <= 1_000.0 + 1.0
+    # the lost 200 MW is a real frequency event the coal fleet arrests
+    # (assert past the ~10 s reheat transient — QSS ≈ −0.11 Hz)
+    integ.advance(s_to_us(60.0), interrupt_on_event=False)
+    assert 49.6 < float(islands.f[0]) < 49.99
+
+    # The dispatcher's job (P6): redispatch the coal fleet to cover the lost
+    # unit — frequency recovers, the UF-shed electrolyzer un-sheds and
+    # refills at full power (without this, refill crawls at ~150 kg/h
+    # because the electrolyzer keeps shedding at 49.81 Hz — measured).
+    for i in range(6):
+        fleet.p_set[1 + i] = 700.0
+    fleet.ely_p_set[0] = 100.0
+    seen_recovery = False
+    for _ in range(40):  # ~1.1 h sim in 100 s chunks
+        res = integ.advance(s_to_us(100.0), interrupt_on_event=False)
+        if any(e.kind == "fuel_recovered" for e in res.events):
+            seen_recovery = True
+            break
+    assert seen_recovery
+    assert bool(fleet.h2_starved[0]) is False

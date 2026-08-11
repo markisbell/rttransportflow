@@ -86,6 +86,10 @@ class PlantSpec(_Doc):
     p_min_mw: float = 0.0
     vm_pu: float = 1.02  # voltage setpoint (synchronous kinds, PV node)
     profile_p_mw: list[float]  # standalone dispatch profile, one value per step
+    # H2 fuel chain (P7): converted gas plants burn from a named store.
+    # v1 supports full conversion only (x_h2 = 1.0) — PHYSICS §2.8 gating.
+    fuel: Literal["ng", "h2", "coal", "lignite", "uranium"] | None = None
+    h2_store_id: str | None = None
 
 
 class PlantsDoc(_Doc):

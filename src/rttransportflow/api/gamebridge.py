@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from .. import APP_NAME, __version__
 from ..dynamics import QUANTUM_US, US, s_to_us
 from ..dynamics.events import Event
-from ..simulator import DynSimulator, _as_int, _r
+from ..simulator import DynSimulator, WireDeviceError, _as_int, _r
 from ..snapshot import model_hash
 
 CONTRACT = "2.0"
@@ -89,12 +89,15 @@ async def net_reset(request: Request) -> dict:
     except (KeyError, BundleError) as exc:
         raise HTTPException(status_code=400, detail=f"invalid native bundle: {exc}") from None
 
-    unsupported = [d.get("kind") for d in body.get("devices", [])
-                   if d.get("kind") not in (None,)]
+    wire_devices = body.get("devices", [])
+    allowed_kinds = {"battery", "grid_forming", "electrolyzer", "h2_store",
+                     "hvdc", "offshore_hub"}
+    unsupported = sorted({str(d.get("kind")) for d in wire_devices
+                          if d.get("kind") not in allowed_kinds})
     if unsupported:
-        # P4: device overrides land with storage (P7); reject loudly, never ignore.
+        # sync_plant/wind/pv travel in the native bundle; reject loudly, never ignore.
         raise HTTPException(status_code=400,
-                            detail=f"unsupported reset devices in P4: {unsupported}")
+                            detail=f"unsupported reset device kinds: {unsupported}")
 
     def build() -> DynSimulator:
         sim = DynSimulator(
@@ -103,12 +106,16 @@ async def net_reset(request: Request) -> dict:
             d_load_pct_per_hz=container.settings.d_load_pct_per_hz,
             warm_start=container.settings.warm_start,
             catalog_path=container.settings.catalog_path,
+            wire_devices=wire_devices,
         )
         sim.warmup()
         return sim
 
     t0 = time.perf_counter()
-    sim = await asyncio.to_thread(build)
+    try:
+        sim = await asyncio.to_thread(build)
+    except WireDeviceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     warmup_ms = (time.perf_counter() - t0) * 1e3
 
     hash_ = model_hash(sim.fleet)
@@ -194,6 +201,10 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
     e_before = sim.fleet.energy_mwh.copy()
     fuel_before = sim.fleet.fuel_mwh_th.copy()
     inv_e_before = sim.fleet.inv_energy_mwh.copy()
+    ely_e_before = sim.fleet.ely_energy_mwh.copy()
+    h2 = sim.fleet.h2
+    h2_wd_before = h2.withdrawn_kg.copy() if h2 is not None else None
+    h2_in_before = h2.injected_kg.copy() if h2 is not None else None
     sim._pf_window_max = {}
 
     res = sim.integrator.advance(s_to_us(dt_s), interrupt_on_event=interrupt)
@@ -209,6 +220,9 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
         state = status_names[int(sim.fleet.status[row])]
         if state == "offline" and sim.fleet.tripped_at_us[row] >= 0:
             state = "tripped"
+        if state == "online" and sim.fleet.h2_starved is not None \
+                and bool(sim.fleet.h2_starved[row]):
+            state = "starved"
         devices[pid] = {
             "p_mw": float(sim.fleet.y[row]),
             "state": state,
@@ -223,14 +237,49 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
             "avail_mw": float(sim.fleet.inv_avail[row]),
             "energy_mwh_step": float(sim.fleet.inv_energy_mwh[row] - inv_e_before[row]),
         }
+    for pid, row in sim._bat_row.items():
+        e_cap = float(sim.fleet.bat_e_mwh[row])
+        devices[pid] = {
+            "p_mw": float(sim.fleet.bat_p[row]),
+            "state": "online" if sim.fleet.bat_online[row] else "tripped",
+            "soc": float(sim.fleet.bat_soc[row]) / e_cap if e_cap > 0 else 0.0,
+            "soc_mwh": float(sim.fleet.bat_soc[row]),
+            "clamped": bool(sim.fleet.bat_clamped[row]),
+        }
+    for pid, row in sim._ely_row.items():
+        devices[pid] = {
+            "p_mw": -float(sim.fleet.ely_p[row]),  # a load: negative injection
+            "state": "online" if sim.fleet.ely_online[row] else "tripped",
+            "energy_mwh_step": float(sim.fleet.ely_energy_mwh[row] - ely_e_before[row]),
+        }
+    for sid, row in sim._store_row.items():
+        devices[sid] = {
+            "h2_kg": float(h2.level_kg[row]),
+            "capacity_kg": float(h2.capacity_kg[row]),
+            "injected_kg_step": float(h2.injected_kg[row] - h2_in_before[row]),
+            "withdrawn_kg_step": float(h2.withdrawn_kg[row] - h2_wd_before[row]),
+            "state": "online",
+        }
+    if sim.fleet.hvdc is not None:
+        term_p = sim.fleet.hvdc.term_p()
+        for tid, i in sim._term_row.items():
+            link = int(sim.fleet.hvdc.term_link[i])
+            devices[tid] = {
+                "p_mw": float(term_p[i]),
+                "q_mvar": float(sim.fleet.hvdc.term_q[i]),
+                "state": "online" if sim.fleet.hvdc.online[link] else "tripped",
+                "link_id": sim.fleet.hvdc.link_ids[link],
+            }
 
     pf = sim._latest_pf
     zones = {}
+    island_black = bool(sim.integrator.islands.blackout()[0])
     for zone_id, bus in sim._zone_bus.items():
         detail = {}
         if pf.get("buses", {}).get(bus):
             detail["v_pu"] = pf["buses"][bus]["vm_pu"]
-        zones[zone_id] = {"supplied": 1.0, "detail": detail}
+        zones[zone_id] = {"supplied": 0.0 if island_black else 1.0,
+                          "detail": detail}
 
     violations: list[dict[str, Any]] = []
     for line_id, vals in pf.get("lines", {}).items():
