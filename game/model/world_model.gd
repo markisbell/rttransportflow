@@ -7,6 +7,9 @@ extends Node
 ## Static typing mandatory in model/ (infrastruct ADR-004 discipline).
 
 signal world_changed  # any edit; the debounced reset listens to this
+signal plant_placed(pid: String, kind: String, p_max_mw: float)
+signal corridor_placed(tile: Vector2i, kind: String)
+signal substation_placed(tile: Vector2i)
 
 const ENVELOPE_VERSION := 1
 
@@ -37,13 +40,23 @@ var _next_pid: int = 1
 const SYNC_KINDS: Array[String] = ["nuclear", "coal", "lignite", "gas_ccgt",
 	"gas_ocgt", "hydro_ps"]
 const CONVERTER_KINDS: Array[String] = ["wind_onshore", "wind_offshore", "solar_pv"]
+## P7 wire devices: placed like plants but emitted on the reset `devices`
+## channel, never in the native plants doc (contract v2 kinds table).
+const DEVICE_KINDS: Array[String] = ["battery", "electrolyzer", "h2_cavern",
+	"hvdc_converter", "offshore_platform"]
 
 ## Default unit sizes per kind (PARAMETERS §1; balancing constants)
 const PLANT_SIZES := {
 	"nuclear": 1600.0, "coal": 800.0, "lignite": 900.0,
 	"gas_ccgt": 600.0, "gas_ocgt": 200.0, "hydro_ps": 300.0,
 	"wind_onshore": 200.0, "wind_offshore": 500.0, "solar_pv": 150.0,
+	"battery": 300.0, "electrolyzer": 300.0, "h2_cavern": 0.0,
+	"hvdc_converter": 2000.0, "offshore_platform": 2000.0,
 }
+const BATTERY_HOURS := 2.0  # PARAMETERS §1.11 default duration
+const CAVERN_CAPACITY_KG := 4_000_000.0  # §1.14 working gas
+## far-shore farms bind to a platform within this ring (§1.16 collector rule)
+const HUB_BIND_TILES := 2
 
 
 func load_map(doc: Dictionary) -> bool:
@@ -111,7 +124,11 @@ func has_resource(kind: String, tile: Vector2i) -> bool:
 
 ## Placement validation per GAME_DESIGN §1.3 (ghost-preview truth).
 func can_place_plant(kind: String, tile: Vector2i) -> bool:
-	if _plant_tiles.has(tile) or _load_center_tiles.has(tile):
+	# corridors block plant sites too: a plant dropped ON a corridor tile
+	# blocks routing through it and orphaned whole demo cities (frankfurt's
+	# single tap exit buried under a nuclear unit — found by buildcheck)
+	if _plant_tiles.has(tile) or _load_center_tiles.has(tile) \
+			or corridors.has(tile):
 		return false
 	var t := terrain_at(tile)
 	match kind:
@@ -126,18 +143,44 @@ func can_place_plant(kind: String, tile: Vector2i) -> bool:
 		"wind_onshore":
 			return t in ["p", "h", "c"]
 		"wind_offshore":
-			return t == "s"
+			# near-shore AC on the shelf; far-shore DEEP sea only within the
+			# collector ring of an offshore platform (§1.16 binding rule)
+			return t == "s" or (t == "S" and platform_near(tile) != "")
 		"solar_pv":
 			return t in ["p", "h"]
 		"hydro_ps":
 			return has_resource("phs_site", tile)
+		"battery", "electrolyzer", "hvdc_converter":
+			return is_land(tile)
+		"h2_cavern":
+			return has_resource("salt_cavern", tile)
+		"offshore_platform":
+			return t in ["s", "S"]
 	return false
 
 
-func can_place_corridor(tile: Vector2i) -> bool:
-	# AC corridors: land or shelf sea (submarine); deep sea is HVDC-only
-	# (P7); never across an occupied site tile.
-	return terrain_at(tile) in ["c", "p", "h", "m", "s"] \
+## Nearest offshore platform pid within the collector ring, "" if none.
+func platform_near(tile: Vector2i) -> String:
+	var best := ""
+	var best_d := HUB_BIND_TILES + 1
+	for pid: String in plants:
+		if str(plants[pid]["kind"]) != "offshore_platform":
+			continue
+		var d: Vector2i = (plants[pid]["tile"] as Vector2i) - tile
+		var cheb := maxi(absi(d.x), absi(d.y))
+		if cheb <= HUB_BIND_TILES and cheb < best_d:
+			best_d = cheb
+			best = pid
+	return best
+
+
+func can_place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
+	# AC corridors: land or shelf sea (submarine). HVDC corridors may also
+	# cross DEEP sea (the far-shore export path). Never across an occupied
+	# site tile.
+	var allowed: bool = terrain_at(tile) in ["c", "p", "h", "m", "s"] \
+		or (kind == "hvdc" and terrain_at(tile) == "S")
+	return allowed \
 		and not _plant_tiles.has(tile) and not _load_center_tiles.has(tile)
 
 
@@ -146,11 +189,33 @@ func place_plant(kind: String, tile: Vector2i) -> String:
 		return ""
 	var pid := "%s_%d" % [kind, _next_pid]
 	_next_pid += 1
-	plants[pid] = {"kind": kind, "tile": tile,
+	var entry := {"kind": kind, "tile": tile,
 		"p_max_mw": float(PLANT_SIZES[kind])}
+	match kind:
+		"battery":
+			entry["e_mwh"] = float(PLANT_SIZES[kind]) * BATTERY_HOURS
+		"h2_cavern":
+			entry["capacity_kg"] = CAVERN_CAPACITY_KG
+	plants[pid] = entry
 	_plant_tiles[tile] = pid
+	plant_placed.emit(pid, kind, float(PLANT_SIZES[kind]))
 	world_changed.emit()
 	return pid
+
+
+## Fuel-switch a gas plant to H2 firing from a named cavern (GAME_DESIGN
+## §1.4 conversion; the engine gates it per PHYSICS §2.8).
+func convert_to_h2(pid: String, cavern_pid: String) -> bool:
+	if not plants.has(pid) or not plants.has(cavern_pid):
+		return false
+	if not str(plants[pid]["kind"]).begins_with("gas_"):
+		return false
+	if str(plants[cavern_pid]["kind"]) != "h2_cavern":
+		return false
+	plants[pid]["fuel"] = "h2"
+	plants[pid]["h2_store_id"] = cavern_pid
+	world_changed.emit()
+	return true
 
 
 func remove_plant(pid: String) -> void:
@@ -161,11 +226,12 @@ func remove_plant(pid: String) -> void:
 
 
 func place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
-	if not can_place_corridor(tile):
+	if not can_place_corridor(tile, kind):
 		return false
 	if corridors.get(tile, "") == kind:
 		return true
 	corridors[tile] = kind
+	corridor_placed.emit(tile, kind)
 	world_changed.emit()
 	return true
 
@@ -179,6 +245,7 @@ func place_substation(tile: Vector2i) -> bool:
 	if not is_land(tile):
 		return false
 	substations[tile] = true
+	substation_placed.emit(tile)
 	world_changed.emit()
 	return true
 
@@ -203,9 +270,13 @@ func serialize() -> Dictionary:
 	var plant_list: Array = []
 	for pid: String in plants:
 		var p: Dictionary = plants[pid]
-		plant_list.append({"pid": pid, "kind": p["kind"],
+		var row := {"pid": pid, "kind": p["kind"],
 			"tile": [(p["tile"] as Vector2i).x, (p["tile"] as Vector2i).y],
-			"p_max_mw": p["p_max_mw"]})
+			"p_max_mw": p["p_max_mw"]}
+		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id"]:
+			if p.has(extra):
+				row[extra] = p[extra]
+		plant_list.append(row)
 	return {"version": ENVELOPE_VERSION, "corridors": corridor_list,
 		"substations": substation_list, "plants": plant_list,
 		"next_pid": _next_pid}
@@ -221,8 +292,12 @@ func restore(envelope: Dictionary) -> bool:
 		substations[Vector2i(int(entry[0]), int(entry[1]))] = true
 	for p: Dictionary in envelope.get("plants", []):
 		var tile := Vector2i(int(p["tile"][0]), int(p["tile"][1]))
-		plants[str(p["pid"])] = {"kind": str(p["kind"]), "tile": tile,
+		var entry := {"kind": str(p["kind"]), "tile": tile,
 			"p_max_mw": float(p["p_max_mw"])}
+		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id"]:
+			if p.has(extra):
+				entry[extra] = p[extra]
+		plants[str(p["pid"])] = entry
 		_plant_tiles[tile] = str(p["pid"])
 	_next_pid = int(envelope.get("next_pid", 1))
 	world_changed.emit()

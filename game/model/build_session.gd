@@ -14,10 +14,21 @@ const DEBOUNCE_S := 2.5
 ## smokes/tests drive rebuild_now() explicitly so edits never spawn
 ## background registration attempts mid-test).
 var enabled := false
+## After registration, drive boundaries from the live GridCo models
+## (Weather/Demand/Dispatch) instead of profile replay. The interactive boot
+## turns this on once the models are seeded; profile-based smokes leave it off.
+var use_gridco := false
 var last_build: Dictionary = {}
 var registered := false
 var _timer: Timer
 var _map_doc: Dictionary = {}
+
+
+static func load_repo_json(rel_path: String) -> Dictionary:
+	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(repo + "/" + rel_path))
+	return parsed if parsed is Dictionary else {}
 
 
 func _ready() -> void:
@@ -36,6 +47,10 @@ static func map_path() -> String:
 	if FileAccess.file_exists(europe):
 		return europe
 	return ProjectSettings.globalize_path("res://testdata/mini_map.json")
+
+
+func map_projection() -> Dictionary:
+	return _map_doc.get("projection", {})
 
 
 func load_map() -> bool:
@@ -68,12 +83,18 @@ func _emit_status(ok: bool, message: String, warnings: Array) -> void:
 
 
 func _rebuild() -> void:
-	var built := GridTopology.build(World)
+	var sampler := Callable()
+	if use_gridco:
+		var day0 := floorf(GameClock.t_sim / 86400.0)
+		sampler = func(lc_id: String, step: int) -> float:
+			return Demand.zone_mw_forecast(lc_id, day0 + step / 96.0)
+	var built := GridTopology.build(World, sampler)
 	last_build = built
 	if not built["ok"]:
 		_emit_status(false, str(built["error"]), built["warnings"])
 		return
-	Boundary.set_native(built["native"])
+	Boundary.set_native(built["native"], built.get("devices", []),
+		built.get("hub_farms", {}))
 	_register_async(built)
 
 
@@ -93,6 +114,8 @@ func _register_async(built: Dictionary) -> void:
 		_emit_status(false, "backend rejected the build", built["warnings"])
 		return
 	registered = true
+	if use_gridco:
+		Boundary.enable_gridco()
 	Orchestrator.start()
 	_emit_status(true, "%d buses, %d lines, %d zones" % [
 		built["interpretation"]["n_buses"],

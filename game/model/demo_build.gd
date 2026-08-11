@@ -50,27 +50,35 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 
 
 ## Find a placeable tile for `kind` near `anchor` (ring search, deterministic).
-static func find_site(world: Node, kind: String, anchor: Vector2i, max_r: int = 8) -> Vector2i:
+## `banned`: sites that already failed routing — never offer them again.
+static func find_site(world: Node, kind: String, anchor: Vector2i, max_r: int = 8,
+		banned: Dictionary = {}) -> Vector2i:
 	for r in range(1, max_r + 1):
 		for dy in range(-r, r + 1):
 			for dx in range(-r, r + 1):
 				if maxi(absi(dx), absi(dy)) != r:
 					continue
 				var tile := anchor + Vector2i(dx, dy)
-				if world.can_place_plant(kind, tile):
+				if not banned.has(tile) and world.can_place_plant(kind, tile):
 					return tile
 	return Vector2i(-1, -1)
 
 
 ## First corridor-placeable tile on a site's perimeter (deterministic scan).
-static func tap_for(world: Node, tiles: Array) -> Vector2i:
+## Prefers tiles outside `avoid` — a tap seeded inside a foreign city's ring
+## can never route anywhere (frankfurt sat in ruhr's ring; found offline).
+static func tap_for(world: Node, tiles: Array, avoid: Dictionary = {}) -> Vector2i:
+	var fallback := Vector2i(-1, -1)
 	for tile: Vector2i in tiles:
 		for offset: Vector2i in GridTopology.NEIGHBORS:
 			var n: Vector2i = tile + offset
 			if world.can_place_corridor(n) and world.plant_at(n) == "" \
 					and world.load_center_at(n) == "":
-				return n
-	return Vector2i(-1, -1)
+				if not avoid.has(n):
+					return n
+				if fallback == Vector2i(-1, -1):
+					fallback = n
+	return fallback
 
 
 ## Pick a compact cluster: the seed city plus its 2 nearest neighbors
@@ -99,8 +107,11 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 	var ids: Array[String] = lc_ids.duplicate()
 	if ids.is_empty() and not world.load_centers.is_empty():
 		# Prefer a SPREAD trio (adjacent metros collapse into one bus blob at
-		# 50 km tiles — no branches, no grid); fall back to a nearby cluster.
-		var spread: Array[String] = ["frankfurt", "berlin", "munich"]
+		# 50 km tiles — no branches, no grid). Frankfurt is out: ruhr's
+		# footprint is ADJACENT to it and its avoid ring seals the tap
+		# (verified offline against europe_v1). Hamburg/berlin/munich
+		# pairwise-connect on the empty map.
+		var spread: Array[String] = ["hamburg", "berlin", "munich"]
 		var have_all := true
 		for lc_id: String in spread:
 			have_all = have_all and world.load_centers.has(lc_id)
@@ -129,45 +140,72 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 	var taps: Array[Vector2i] = []
 	for lc_id: String in ids:
 		var lc: Dictionary = world.load_centers[lc_id]
-		var lc_tap := tap_for(world, lc["tiles"])
+		var lc_tap := tap_for(world, lc["tiles"], avoid)
 		if lc_tap == Vector2i(-1, -1):
 			continue
 		var anchor: Vector2i = lc["tiles"][0]
-		var need: float = lc["peak_mw"] * 1.2
+		# 1.35: the LIVE demand model's weather-driven peak runs above the
+		# map's static peak_mw — a 1.2 build blacked out at 10:00 (found by
+		# the dispatch_day DBG trace: 10.4 GW fleet, 11.5 GW forecast peak).
+		var need: float = lc["peak_mw"] * 1.35
 		var placed := 0.0
+		# unroutable sites — retrying them loops forever; seeded with the
+		# avoid rings: a site inside a foreign ring can never route out, and
+		# each doomed BFS floods the whole map (385 of them stalled buildcheck)
+		var banned := avoid.duplicate()
 		world.place_corridor(lc_tap)  # seed so plant spurs can merge into it
 		while placed < need:
-			# unit-size ladder keeps big cities to a sane plant count and
-			# the plant ring COMPACT (sprawling rings of neighboring metros
-			# merge into one bus blob)
+			# unit-size ladder keeps big cities to a sane plant count and the
+			# plant ring COMPACT. Every rung falls through to gas (gas only
+			# needs land — nuclear/coal site exhaustion used to BREAK the loop
+			# and leave the city short with zero peakers), and the top ~30 %
+			# tranche is gas OUTRIGHT so the merit order has evening peakers.
+			# tranches: ~45 % nuclear base, coal to ~70 %, gas for the top —
+			# an all-nuclear build priced the whole day at 8 €/MWh with
+			# 2.6 g/kWh and broke the economy smoke's mixed-fleet windows
+			var remaining := need - placed
 			var kinds: Array[String] = []
-			if need - placed > 1200.0:
-				kinds = ["nuclear", "coal"]  # nuclear needs coast/river; coal fallback
-			elif need - placed > 700.0:
-				kinds = ["coal"]
-			elif need - placed > 300.0:
-				kinds = ["gas_ccgt"]
+			if remaining > 1200.0 and placed < need * 0.45:
+				kinds = ["nuclear", "coal", "gas_ccgt"]
+			elif remaining > 700.0 and placed < need * 0.7:
+				kinds = ["coal", "gas_ccgt"]
+			elif remaining > 300.0:
+				kinds = ["gas_ccgt", "gas_ocgt"]
 			else:
 				kinds = ["gas_ocgt"]
 			var site := Vector2i(-1, -1)
 			var kind := ""
 			for candidate: String in kinds:
-				site = find_site(world, candidate, anchor, 6)
+				site = find_site(world, candidate, anchor, 6, banned)
+				if site == Vector2i(-1, -1):
+					site = find_site(world, candidate, anchor, 12, banned)
 				if site != Vector2i(-1, -1):
 					kind = candidate
 					break
 			if site == Vector2i(-1, -1):
 				break
-			world.place_plant(kind, site)
-			placed += world.PLANT_SIZES[kind]
-			var plant_tap := tap_for(world, [site])
-			if plant_tap == Vector2i(-1, -1):
+			var pid: String = world.place_plant(kind, site)
+			var plant_tap := tap_for(world, [site], avoid)
+			var path: Array[Vector2i] = []
+			if plant_tap != Vector2i(-1, -1):
+				path = route(world, plant_tap, lc_tap, true, avoid)
+			if path.is_empty():
+				# an unconnectable plant is 100 % waste: remove it and let the
+				# ladder try elsewhere (silent orphans starved dispatch_day)
+				world.remove_plant(pid)
+				banned[site] = true
+				push_warning("auto_build: %s at %s unroutable to %s — removed"
+					% [kind, site, lc_id])
 				continue
-			for tile: Vector2i in route(world, plant_tap, lc_tap, true, avoid):
+			placed += world.PLANT_SIZES[kind]
+			for tile: Vector2i in path:
 				world.place_corridor(tile)
 		taps.append(lc_tap)
 
 	for i in range(taps.size() - 1):  # chain the cluster
-		for tile: Vector2i in route(world, taps[i], taps[i + 1], false, avoid):
+		var link := route(world, taps[i], taps[i + 1], false, avoid)
+		if link.is_empty():
+			push_warning("auto_build: cluster chain %d->%d unroutable" % [i, i + 1])
+		for tile: Vector2i in link:
 			world.place_corridor(tile)
 	return not taps.is_empty()

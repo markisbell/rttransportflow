@@ -99,6 +99,66 @@ func test_line_length_uses_sinuosity() -> void:
 			steps * 50.0 * GridTopology.SINUOSITY, 0.01)
 
 
+func test_wire_devices_emitted() -> void:
+	_load_fixture()
+	DemoBuild.fixture_build(World)
+	# storage + H2 sites off the trunk (trunk runs y = 6, x = 5..18)
+	World.resources["salt_cavern"] = {Vector2i(6, 8): {"kind": "salt_cavern"}}
+	var cavern := World.place_plant("h2_cavern", Vector2i(6, 8))
+	var bat := World.place_plant("battery", Vector2i(8, 5))
+	var ely := World.place_plant("electrolyzer", Vector2i(10, 5))
+	# embedded point-to-point link between two trunk-adjacent converters
+	var conv_a := World.place_plant("hvdc_converter", Vector2i(12, 5))
+	var conv_b := World.place_plant("hvdc_converter", Vector2i(16, 5))
+	for x in range(13, 16):
+		assert_bool(World.place_corridor(Vector2i(x, 5), "hvdc")).is_true()
+	# far-shore hub: platform + bound farm on DEEP sea, onshore converter
+	var platform := World.place_plant("offshore_platform", Vector2i(0, 2))
+	var farm := World.place_plant("wind_offshore", Vector2i(0, 4))
+	var conv_c := World.place_plant("hvdc_converter", Vector2i(2, 2))
+	assert_bool(World.place_corridor(Vector2i(1, 2), "hvdc")).is_true()
+	for tile: Vector2i in [Vector2i(2, 3), Vector2i(2, 4), Vector2i(2, 5),
+			Vector2i(2, 6), Vector2i(3, 6), Vector2i(4, 6)]:
+		assert_bool(World.place_corridor(tile)).is_true()
+	assert_str(cavern).is_not_empty()
+	assert_str(farm).is_not_empty()
+
+	var built := GridTopology.build(World)
+	assert_bool(built["ok"]).is_true()
+	var by_id := {}
+	for dev: Dictionary in built["devices"]:
+		by_id[str(dev["id"])] = dev
+	assert_bool(by_id.has(cavern)).is_true()
+	assert_str(str(by_id[cavern]["kind"])).is_equal("h2_store")
+	assert_str(str(by_id[bat]["kind"])).is_equal("battery")
+	assert_float(float(by_id[bat]["params"]["e_mwh"])).is_equal(600.0)
+	assert_str(str(by_id[ely]["params"]["h2_store_id"])).is_equal(cavern)
+	assert_str(str(by_id[conv_a]["kind"])).is_equal("hvdc")
+	assert_str(str(by_id[conv_a]["params"]["link_id"])) \
+		.is_equal(str(by_id[conv_b]["params"]["link_id"]))
+	assert_str(str(by_id[platform]["kind"])).is_equal("offshore_hub")
+	assert_bool(by_id.has(conv_c)).is_false()  # hub side: single injection
+	assert_array(built["hub_farms"][platform]).is_equal([farm])
+	# the bound farm is a game-side entity only — never in the native doc
+	for plant: Dictionary in built["native"]["plants"]["plants"]:
+		assert_str(str(plant["id"])).is_not_equal(farm)
+
+
+func test_h2_conversion_lands_in_native() -> void:
+	_load_fixture()
+	DemoBuild.fixture_build(World)
+	World.resources["salt_cavern"] = {Vector2i(6, 8): {"kind": "salt_cavern"}}
+	var cavern := World.place_plant("h2_cavern", Vector2i(6, 8))
+	var gas_pid: String = World.plant_at(Vector2i(10, 8))
+	assert_bool(World.convert_to_h2(gas_pid, cavern)).is_true()
+	var built := GridTopology.build(World)
+	assert_bool(built["ok"]).is_true()
+	for plant: Dictionary in built["native"]["plants"]["plants"]:
+		if str(plant["id"]) == gas_pid:
+			assert_str(str(plant["fuel"])).is_equal("h2")
+			assert_str(str(plant["h2_store_id"])).is_equal(cavern)
+
+
 func test_debounce_restarts_and_defers() -> void:
 	_load_fixture()
 	BuildSession.enabled = true

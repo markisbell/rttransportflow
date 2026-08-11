@@ -1,0 +1,194 @@
+extends Node
+## EconomyBooks — GridCo's ledgers (GAME_DESIGN §3.4). Family principles:
+## revenue bills DELIVERED MWh only (blackouts cost revenue), all costs come
+## from SOLVED outputs and engine meters, never estimates. The wholesale
+## price is a teaching KPI (Dispatch computes it), not the revenue source.
+
+signal books_updated
+
+var cfg: Dictionary = {}
+var treasury_eur := 0.0
+var loan_eur := 0.0
+
+## cumulative books [EUR]
+var revenue := 0.0
+var fuel_cost := 0.0
+var co2_cost := 0.0
+var vom_cost := 0.0
+var fom_cost := 0.0
+var capex_spent := 0.0
+var voll_penalty := 0.0
+var reserve_income := 0.0
+var redispatch_cost := 0.0
+## KPI accumulators
+var delivered_mwh := 0.0
+var unserved_mwh := 0.0
+var co2_t := 0.0
+
+var _pid_kind: Dictionary = {}  # plant id -> kind (from the registered native)
+var _pid_fuel: Dictionary = {}  # per-plant fuel override (H2 conversions)
+var _fom_billed_days := 0
+var _last_redispatch_seen := 0.0
+
+
+func setup(economy: Dictionary) -> void:
+	cfg = economy
+	treasury_eur = float(economy.get("start_treasury_meur", 0.0)) * 1e6
+	World.plant_placed.connect(_on_plant_placed)
+	World.corridor_placed.connect(_on_corridor_placed)
+	World.substation_placed.connect(_on_substation_placed)
+	Orchestrator.step_completed.connect(_on_step)
+
+
+func set_fleet(plants: Array, devices: Array = []) -> void:
+	_pid_kind.clear()
+	_pid_fuel.clear()
+	for plant: Dictionary in plants:
+		_pid_kind[str(plant["id"])] = str(plant["kind"])
+		# a converted plant burns from its cavern — book H2, not pipeline gas
+		if plant.has("fuel"):
+			_pid_fuel[str(plant["id"])] = str(plant["fuel"])
+	for dev: Dictionary in devices:
+		var kind := str(dev.get("kind", ""))
+		if kind == "grid_forming":
+			kind = "battery"
+		elif kind == "hvdc":
+			kind = "hvdc_converter"
+		elif kind == "offshore_hub":
+			kind = "offshore_platform"
+		elif kind == "h2_store":
+			kind = "h2_cavern"
+		_pid_kind[str(dev.get("id", ""))] = kind
+
+
+# --- capex on placement (gameplay rule: pay when you build) ---------------
+
+func _on_plant_placed(_pid: String, kind: String, p_max_mw: float) -> void:
+	if kind == "h2_cavern":
+		# leached volume, not nameplate MW: flat per-cavern price (§1.14)
+		_spend_capex(float(cfg.get("h2_cavern_meur", 93.0)) * 1e6)
+		return
+	var eur_per_kw: float = (cfg["capex_eur_per_kw"] as Dictionary).get(kind, 0.0)
+	_spend_capex(eur_per_kw * p_max_mw * 1000.0)
+
+
+func _on_corridor_placed(tile: Vector2i, kind: String) -> void:
+	var per_km: float = (cfg["line_cost_meur_per_km"] as Dictionary).get(kind, 1.0) * 1e6
+	var terrain := World.terrain_at(tile)
+	var factor := 1.0
+	if kind == "hvdc":
+		# submarine export cable has its own §1.16 price; no AC sea factor
+		if terrain == "s" or terrain == "S":
+			per_km = float(cfg.get("hvdc_submarine_meur_per_km", 2.0)) * 1e6
+	elif terrain == "s":
+		factor = 2.2  # submarine (GAME_DESIGN §1.5)
+	elif terrain == "m":
+		factor = 1.6  # mountain
+	_spend_capex(per_km * World.tile_km * 1.12 * factor)
+
+
+func _on_substation_placed(_tile: Vector2i) -> void:
+	_spend_capex(float(cfg.get("substation_meur", 15.0)) * 1e6)
+
+
+func _spend_capex(eur: float) -> void:
+	capex_spent += eur
+	treasury_eur -= eur
+	books_updated.emit()
+
+
+# --- per-step operating books --------------------------------------------
+
+func _on_step(_t: int, result: Dictionary) -> void:
+	var dt_h := float(result.get("dt_done_s", 0.0)) / 3600.0
+	if dt_h <= 0.0:
+		return
+	var t_days := float(result.get("t_sim_end", 0.0)) / 86400.0
+	var tariff := float(cfg.get("tariff_eur_per_mwh", 95.0))
+	var voll := float(cfg.get("voll_eur_per_mwh", 3000.0))
+
+	for zone_id: String in result.get("zones", {}):
+		var supplied: Variant = result["zones"][zone_id].get("supplied", 0.0)
+		var frac: float = 0.0 if supplied == null else float(supplied)
+		var zone_mwh: float = Demand.zone_mw(zone_id, t_days) * dt_h
+		revenue += frac * zone_mwh * tariff
+		treasury_eur += frac * zone_mwh * tariff
+		delivered_mwh += frac * zone_mwh
+		var lost := (1.0 - frac) * zone_mwh
+		unserved_mwh += lost
+		voll_penalty += lost * voll
+		treasury_eur -= lost * voll
+
+	for pid: String in result.get("devices", {}):
+		var device: Dictionary = result["devices"][pid]
+		var kind := str(_pid_kind.get(pid, ""))
+		if kind == "":
+			continue
+		var energy: Variant = device.get("energy_mwh_step", 0.0)
+		var fuel_th: Variant = device.get("fuel_mwh_th_step", 0.0)
+		var energy_mwh: float = 0.0 if energy == null else float(energy)
+		var fuel_mwh: float = 0.0 if fuel_th == null else float(fuel_th)
+		var vom: float = (cfg["vom_eur_per_mwh"] as Dictionary).get(kind, 0.0)
+		vom_cost += energy_mwh * vom
+		treasury_eur -= energy_mwh * vom
+		var fuel := str(_pid_fuel.get(pid,
+			(Dispatch.plant_catalog.get(kind, {}) as Dictionary).get("fuel", "")))
+		if fuel != "" and fuel != "<null>":
+			var fuel_price: float = (cfg["fuel_eur_per_mwh_th"] as Dictionary).get(fuel, 0.0)
+			var ef: float = (cfg["co2_t_per_mwh_th"] as Dictionary).get(fuel, 0.0)
+			fuel_cost += fuel_mwh * fuel_price
+			co2_cost += fuel_mwh * ef * float(cfg["co2_eur_per_t"])
+			co2_t += fuel_mwh * ef
+			treasury_eur -= fuel_mwh * fuel_price + fuel_mwh * ef * float(cfg["co2_eur_per_t"])
+
+	# reserve remuneration (regulator pays for procured FCR/aFRR headroom)
+	var island: Dictionary = result.get("islands", {}).get("0", {})
+	var s_online: Variant = island.get("s_online_mva", 0.0)
+	if s_online != null and float(s_online) > 0.0:
+		var fcr_mw := float(cfg.get("reserve_margin_mw_min", 3000.0))
+		reserve_income += fcr_mw * dt_h * float(cfg.get("fcr_eur_per_mw_h", 8.0))
+		treasury_eur += fcr_mw * dt_h * float(cfg.get("fcr_eur_per_mw_h", 8.0))
+
+	# redispatch cost (accrued by Dispatch, booked here once)
+	var redispatch_delta: float = Dispatch.redispatch_cost_eur - _last_redispatch_seen
+	if redispatch_delta > 0.0:
+		redispatch_cost += redispatch_delta
+		treasury_eur -= redispatch_delta
+		_last_redispatch_seen = Dispatch.redispatch_cost_eur
+
+	# daily fixed O&M + loan interest
+	var day := int(t_days)
+	if day > _fom_billed_days:
+		_bill_fom(day - _fom_billed_days)
+		_fom_billed_days = day
+	books_updated.emit()
+
+
+func _bill_fom(days: int) -> void:
+	var daily := 0.0
+	for pid: String in _pid_kind:
+		var kind: String = _pid_kind[pid]
+		if kind == "h2_cavern":  # flat per-cavern FOM (1.5 % capex/a, §1.14)
+			daily += float(cfg.get("h2_cavern_fom_meur_a", 1.4)) * 1e6 / 365.0
+			continue
+		var p_max: float = World.plants.get(pid, {}).get("p_max_mw", 0.0)
+		daily += (cfg["fom_eur_per_kw_a"] as Dictionary).get(kind, 0.0) * p_max * 1000.0 / 365.0
+	fom_cost += daily * days
+	treasury_eur -= daily * days
+	if treasury_eur < 0.0:
+		var interest: float = -treasury_eur * float(cfg.get("loan_rate_per_a", 0.04)) / 365.0 * days
+		loan_eur += interest
+		treasury_eur -= interest
+
+
+func avg_cost_eur_per_mwh() -> float:
+	if delivered_mwh <= 0.0:
+		return 0.0
+	return (fuel_cost + co2_cost + vom_cost + fom_cost + voll_penalty
+		+ redispatch_cost) / delivered_mwh
+
+
+func g_co2_per_kwh() -> float:
+	if delivered_mwh <= 0.0:
+		return 0.0
+	return co2_t * 1e6 / (delivered_mwh * 1000.0)

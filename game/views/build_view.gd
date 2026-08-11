@@ -12,6 +12,7 @@ const TERRAIN_COLORS := {
 }
 const KIND_COLORS := {
 	"line_400": Color(0.90, 0.25, 0.20), "line_220": Color(0.20, 0.75, 0.35),
+	"hvdc": Color(0.55, 0.25, 0.85),
 }
 
 ## tool id -> [key label, description]
@@ -27,6 +28,12 @@ const TOOLS: Array = [
 	["wind_offshore", "9", "wind offshore 500 MW (shelf)"],
 	["solar_pv", "0", "solar 150 MW"],
 	["hydro_ps", "-", "pumped hydro 300 MW (PHS site)"],
+	["battery", "q", "battery 300 MW / 600 MWh"],
+	["electrolyzer", "w", "electrolyzer 300 MW"],
+	["h2_cavern", "e", "H2 cavern 4000 t (salt cavern)"],
+	["hvdc_converter", "r", "HVDC converter 2000 MW"],
+	["offshore_platform", "u", "offshore platform 2000 MW (sea)"],
+	["corridor_hvdc", "z", "HVDC corridor (may cross deep sea)"],
 ]
 
 var tool_index := 0
@@ -124,6 +131,8 @@ func _apply_tool(tile: Vector2i) -> void:
 			World.place_corridor(tile, "line_400")
 		"corridor_220":
 			World.place_corridor(tile, "line_220")
+		"corridor_hvdc":
+			World.place_corridor(tile, "hvdc")
 		"substation":
 			World.place_substation(tile)
 		_:
@@ -143,6 +152,8 @@ func _delete_at(tile: Vector2i) -> void:
 
 func _tool_valid(tile: Vector2i) -> bool:
 	var tool_id: String = TOOLS[tool_index][0]
+	if tool_id == "corridor_hvdc":
+		return World.can_place_corridor(tile, "hvdc")
 	if tool_id.begins_with("corridor"):
 		return World.can_place_corridor(tile)
 	if tool_id == "substation":

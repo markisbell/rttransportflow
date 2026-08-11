@@ -16,6 +16,10 @@ CosimBridge="*res://autoloads/cosim_bridge.gd"
 Boundary="*res://autoloads/boundary.gd"
 Orchestrator="*res://autoloads/orchestrator.gd"
 World="*res://model/world_model.gd"
+Weather="*res://model/weather.gd"
+Demand="*res://model/demand.gd"
+Dispatch="*res://model/dispatch.gd"
+Economy="*res://model/economy_books.gd"
 BuildSession="*res://model/build_session.gd"
 
 [editor_plugins]

@@ -1,0 +1,12 @@
+metric,value,unit
+delivered,329234.889131,MWh
+unserved,0.000000,MWh
+revenue,31277314.467462,EUR
+fuel_cost,4491413.105674,EUR
+co2_cost,1654538.346636,EUR
+vom_cost,928675.069721,EUR
+fom_cost,4407123.287671,EUR
+capex,103430800000.000000,EUR
+reserve_income,576000.000000,EUR
+avg_cost,34.874037,EUR/MWh
+co2_intensity,167.513468,g/kWh

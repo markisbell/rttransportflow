@@ -1,0 +1,41 @@
+extends SmokeBase
+const TAG := "SMOKE_PROBE"
+
+func run() -> void:
+	var boot := preload("res://smokes/dispatch_day.gd").new()
+	add_child(boot)
+	if not await boot.gridco_boot():
+		return
+	var t0 := Time.get_ticks_msec()
+	DemoBuild.auto_build(World)
+	print("PROBE auto_build_ms=", Time.get_ticks_msec() - t0)
+	t0 = Time.get_ticks_msec()
+	BuildSession.rebuild_now()
+	var status: Array = await BuildSession.build_status
+	print("PROBE register_ms=", Time.get_ticks_msec() - t0, " ok=", status[0], " msg=", status[1])
+	Orchestrator.stop()
+	for i in range(6):
+		t0 = Time.get_ticks_msec()
+		var result: Dictionary = await Orchestrator.step_once(900.0)
+		var gen_sum := 0.0
+		for pid: String in result.get("devices", {}):
+			gen_sum += numf(result["devices"][pid], "p_mw", 0.0)
+		var demand_sum := 0.0
+		for zid: String in Boundary.zone_demand(GameClock.t_sim):
+			demand_sum += float(Boundary.zone_demand(GameClock.t_sim)[zid]["value_mw"])
+		var cmd_sum := 0.0
+		for pid: String in Dispatch.last_commands:
+			cmd_sum += float(Dispatch.last_commands[pid].get("dispatch_mw", 0.0))
+		print("PROBE step=", i, " wall_ms=", Time.get_ticks_msec() - t0,
+			" f=", result.get("islands", {}).get("0", {}).get("f_hz"),
+			" f_max=", result.get("islands", {}).get("0", {}).get("f_max"),
+			" gen=", gen_sum, " demand=", demand_sum, " cmds=", cmd_sum,
+			" events=", (result.get("events", []) as Array).size())
+		for event: Dictionary in result.get("events", []):
+			print("PROBE event t=", event.get("t_sim"), " ", event.get("kind"),
+				" ", event.get("element"), " ", event.get("data"))
+		if i == 0:
+			for pid: String in result.get("devices", {}):
+				print("PROBE dev ", pid, " p=", numf(result["devices"][pid], "p_mw", -1.0),
+					" state=", result["devices"][pid].get("state"))
+	_finish(TAG, {})

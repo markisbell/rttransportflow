@@ -10,6 +10,16 @@ const SMOKES := {
 	"trip_key": "res://smokes/trip_key.gd",
 	"build_and_supply": "res://smokes/build_and_supply.gd",
 	"island_cut": "res://smokes/island_cut.gd",
+	"dispatch_day": "res://smokes/dispatch_day.gd",
+	"economy": "res://smokes/economy.gd",
+	"calm_week": "res://smokes/calm_week.gd",
+	"probe": "res://smokes/probe.gd",
+	"buildcheck": "res://smokes/buildcheck.gd",
+	"calm_probe": "res://smokes/calm_probe.gd",
+	"hydrogen_chain": "res://smokes/hydrogen_chain.gd",
+	"battery_response": "res://smokes/battery_response.gd",
+	"hvdc_link": "res://smokes/hvdc_link.gd",
+	"north_sea_hub": "res://smokes/north_sea_hub.gd",
 }
 
 
@@ -37,6 +47,15 @@ func _boot_game() -> void:
 		push_error("map load failed — cannot boot")
 		return
 	BuildSession.enabled = true
+	# GridCo models (P6): seeded deterministically; the catalogs are the
+	# single source of truth for every constant.
+	Weather.setup(42)
+	Demand.setup(42)
+	Demand.weather = Weather
+	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
+		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
+	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
+	BuildSession.use_gridco = true
 	var view := preload("res://views/build_view.gd").new()
 	add_child(view)
 	var hud := preload("res://views/hud.gd").new()

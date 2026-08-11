@@ -51,8 +51,10 @@ docs/GAME_DESIGN.md.
   data, never 500.
 - **Ports**: backend 8003 / InfluxDB 8089 / Grafana 3003 (no web UI in v1 —
   ledger 25; 5176/8083 reserved-unused); game 8030 / smokes 8031 / contract
-  tests 8032. NEVER 8000–8002 (user dev instances), 8010–8016 (infrastruct
-  sidecars + smokes), or 8020–8029 (infrastruct contract tests).
+  tests 8032 / freeze smoke 8033 / P7 smokes 8034 (hydrogen_chain,
+  battery_response, hvdc_link, north_sea_hub — kept off 8031 so P6 and P7
+  smoke runs can overlap). NEVER 8000–8002 (user dev instances), 8010–8016
+  (infrastruct sidecars + smokes), or 8020–8029 (infrastruct contract tests).
 - **License**: no code from gridedit/gridgen (AGPL) — pattern reuse only.
 - **Commit/push only on explicit authorization.**
 - Lean solo agent work — ask before multi-agent fan-outs.
@@ -172,6 +174,46 @@ docs/GAME_DESIGN.md.
     costs deliberately ~2/3 of 2026 actuals, consistent with the game's cost
     level; milestone 3 requires hub capacity *committed*, not delivered
     (42-month platform build lands ~2031).
+29. **Corridors block plant sites** (P6/P7 build hunt, 2026-08-11): a plant
+    may not be placed on a tile that already carries a corridor (the reverse
+    was always true). Found via `--smoke=buildcheck`: a nuclear unit dropped
+    onto frankfurt's only tap-exit corridor orphaned the whole city. Same
+    hunt: ruhr's footprint is ADJACENT to frankfurt, so frankfurt's avoid
+    ring seals it — the demo trio is now **hamburg/berlin/munich** (verified
+    pairwise-routable offline), the ladder's site search is avoid-ring-aware
+    (a doomed site's BFS floods the full 7 680-tile map — 385 of them froze
+    a smoke), unroutable plants are removed + banned instead of silently
+    stranded, and the build margin is 1.35× map peak (the LIVE weather-driven
+    demand peak runs up to ~1.2× the map's static `peak_mw_2025`).
+30. **Commitment counts deliverable capacity** (2026-08-11): the dispatcher
+    commits against `0.92 · p_max` (the FCR headroom cap it will actually
+    dispatch to), not raw nameplate — raw accounting left Europe-scale
+    evenings ~5 % short and the gas fleet never committed while the evening
+    priced at the scarcity cap.
+31. **H2 fuel value is a fixed reference in v1** (P7, 2026-08-11):
+    `fuel_eur_per_mwh_th.h2 = 90` (≈ 3 €/kg LHV) prices converted plants'
+    burn and the merit order; the endogenous H2 book (production-cost
+    tracking per cavern) is deferred — documented simplification, the
+    ROADMAP's "endogenous fuel value" gate is satisfied by the fixed
+    reference + the hydrogen_chain smoke's round-trip assertion.
+32. **HVDC dispatcher mode is `manual` in v1** (P7, 2026-08-11):
+    `Dispatch.link_setpoints[terminal_pid] = MW` passes through per block;
+    `auto` congestion relief moves to P8 with the overload/cascade layer.
+    Electrolyzer/battery-charge MW feed back into next block's demand ledger
+    (`_flex_load_mw`) — without it every commanded flexibility MW became an
+    island deficit and the electrolyzers shed themselves (found by
+    hydrogen_chain).
+33. **Availability slew** (engine, 2026-08-11): `inv_avail` is a TARGET; the
+    effective availability ramps toward it at `avail_slew_pct_pn_min`
+    (catalog: wind 20 %/min, PV 40 %/min, offshore hubs 20 %/min; default
+    instant — every pre-slew pin unchanged). The 15-min wire sample-and-hold
+    is a SAMPLING artifact, not weather physics: a natural block-boundary
+    wind step of ~1 GW relayed out a small island twice (calm_week hunt,
+    predicted by the P7 fork's findings). model_hash covers the slew; old
+    snapshots restore tolerantly (eff falls back to the target). Companion
+    game truth: pre-aFRR, a small island survives sustained intra-block
+    ramps only with the full stack — slew (physics) + must-run synchronous
+    fleet (inertia) + batteries (FFR bridges the 15-min dispatch cadence).
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -493,6 +535,146 @@ deferred to P6 economy; `/gb/net/patch` add/remove_device still rejected
 (full debounced reset covers all edits).
 
 **Next:** P6 — demand, weather, dispatch, market, economy.
+
+### P6 — Demand, weather, dispatch, market, economy (2026-08-11)
+
+**Built:** GAME model layer (weather/demand fork-authored, integrated +
+extended): `model/weather.gd` (seeded regional weather: wind Weibull-λ
+diurnal/synoptic process, clearness, temperature; `force_window` test hooks;
+region-of-tile via the map projection), `model/demand.gd` (per-zone profiles:
+weekday/weekend shape, temperature response, `zone_mw` live + `zone_mw_forecast`
+that NEVER advances the weather timeline), `model/dispatch.gd` (GridCo
+dispatcher per GAME_DESIGN §3.3: marginal-cost merit order incl. per-plant
+fuel overrides, day-ahead-peak commitment against DELIVERABLE (0.92-capped)
+capacity, tier-PROPORTIONAL energy dispatch, renewable must-take + pro-rata
+curtailment, scarcity pricing at 4 000 €/MWh, redispatch heuristic on
+overloads, FCR-headroom withholding), `model/economy_books.gd` (capex on
+placement incl. per-terrain line factors, revenue on DELIVERED MWh at the
+regulated tariff, fuel/CO2/VOM from engine meters, daily FOM, VoLL, loan
+interest, reserve remuneration, ledger-consistency identity),
+`data/catalogs/economy.json` (PARAMETERS §1/§4 authority), gridco boot
+(Weather/Demand/Dispatch/Economy autoloads + `Boundary` mode "gridco":
+one dispatcher decision per 15-min block feeding the wire), topology-builder
+demand sampler (native profiles from the LIVE demand model), balancing
+harness `tools/balancing/economy_windows.csv` regenerated by the economy
+smoke; debug smokes `probe` (per-step wall/f/gen/demand) and `buildcheck`
+(no-backend build report: connectivity, capacity ladder, live-vs-map peaks).
+
+**Tests:** GdUnit weather/demand suites (seeded determinism, forecast purity,
+region mapping) in the 25-green matrix; smokes `dispatch_day` + `economy` +
+`calm_week` green (see below); backend 122 (start-hold pin new).
+
+**Acceptance evidence:** dispatch_day — full day 96/96 converged on the
+auto-built hamburg/berlin/munich grid (19 GW native, live peak 16.3 GW):
+nuclear base-loaded (mean factor > 0.7, never cycled below 0.4), gas peaks
+in the evening (2 085 MW evening window vs 85 MW night), wholesale 63.1 €/MWh
+evening vs 53.8 night, zero transport failures. economy — 329 GWh delivered,
+avg cost 34.9 €/MWh, 167.5 g CO2/kWh, ledger identity < 1 €, windows CSV
+regenerated. calm_week — the renewables-heavy Hamburg island (wind 1.6× +
+gas 1.28× must-run + batteries 0.3× peak) HOLDS a normal day at f_min 49.77;
+the staircased Dunkelflaute prices 48 scarcity blocks and sags to 47.50 —
+deep, brushing the trip floor, but SURVIVED (runtime note: this island runs
+in permanent ALERT, ~2 h wall for 2 sim days — P8 perf item: vectorize the
+tick hot path / revisit calm-return hysteresis for wobbly-but-stable
+islands).
+
+**Discoveries (each a real found bug):** (1) greedy merit dispatch + slew
+asymmetry built a 570 MW surplus that tripped the fleet at 51.5 Hz →
+tier-proportional dispatch. (2) demand forecasts dragged the weather state
+24 h/block → frozen-state `zone_mw_forecast`. (3) stub-vs-live demand
+mismatch collapsed the grid at t = 0 → the builder samples the live model.
+(4) a dead grid burned 27 s/step in futile PF retries → blackout skips PF.
+(5) commitment counted nameplate but dispatch delivers 0.92·P — every
+evening ~5 % short, gas never committed (ledger 30). (6) plants placeable ON
+corridor tiles + frankfurt sealed inside ruhr's avoid ring fragmented the
+demo build to one city at 1.02× peak → ledger 29 (corridor-blocks-plants,
+avoid-aware ladder, hamburg trio, 1.35× sizing, remove+ban unroutables).
+(7) the dispatcher auto-restarted tripped units into a dying island and
+sync-at-P_min ignored island health — f integrated to −27 Hz; starts now
+HOLD while |Δf| > 1 Hz or blackout (pinned backend test); calm_week runs
+its healthy baseline BEFORE the dark day (no restoration until P8).
+(8) calm_week's custom build routed spurs WITHOUT the avoid rings and
+dragged five foreign cities onto a 5 GW island (the P5 47.4 Hz lesson,
+refound — whole fleet tripped at t = 0.25 s); its build is avoid-aware now.
+(9) even with 1 city, a natural block-boundary wind step killed the island
+64 s into a block: gas parked at 0 MW by the merit order, ~270 MW FCR, and
+no aFRR until P8 — fixed by the full stack of ledger 33 (avail slew +
+must-run gas + a battery fleet at 0.3× peak). (10) two agents' smoke runs
+sharing port 8031 adopt each other's backends — P7 smokes moved to 8034;
+`pkill -f` of a smoke pattern in the same shell command kills the launcher
+itself (bracket-escape the pattern, or fuser the port).
+
+**Deviations (deliberate):** wholesale price is a teaching KPI (revenue is
+tariff-on-delivered); startup cost single warm value; no MILP commitment;
+battery VOM unbooked pending a throughput meter; aFRR/mFRR remuneration
+simplified to the FCR line item until P8.
+
+**Next:** P7 game side (below) — backend committed separately (0d10782).
+
+### P7 — Storage gameplay, hydrogen chain + HVDC (2026-08-11)
+
+**Built:** BACKEND (committed 0d10782): `dynamics/hydrogen.py` (H2Stores:
+rate-limited tanks, η_spec 48–52 kWh/kg, 2.5 kWh/kg compressor aux on the
+store's island, 5 %/7 % floor/recovery starvation gating), `dynamics/hvdc.py`
+(HVDCLinks: paired ±P terminals, 1 %/station + 0.30 %/100 km losses, 0.15 %
+no-load aux, T = 0.1 s lag; embedded trip frequency-neutral by construction),
+fleet attach hooks + `inv_aux_mw`, reset `devices` channel (battery |
+grid_forming | electrolyzer | h2_store | hvdc | offshore_hub → fleet + PF
+sgen/load rows; PlantSpec gains `fuel`/`h2_store_id`; dangling refs are 400s),
+offshore hub as inverter row with backend-owned §1.16 path losses + LFSM-O,
+per-class step commands with clamps, device reporting (soc/h2_kg/link p),
+snapshot + model_hash over the new blocks. GAME: buildables battery 300 MW/
+600 MWh, electrolyzer 300 MW, H2 cavern 4 000 t (salt-cavern resource),
+HVDC converter 2 GW, offshore platform 2 GW; `hvdc` corridor kind (may cross
+deep sea); far-shore farm→platform binding (2-tile collector ring, deep-sea
+farms only placeable inside one); topology builder emits the devices channel
+(HVDC component analysis: 2 converters = link, platform+converter = hub with
+cable_km; nearest-cavern electrolyzer binding; `convert_to_h2` fuel switch
+lands in the native doc), hub availability aggregated per block by Dispatch,
+price-signal arbitrage with hysteresis (batteries scarcity-discharge/cheap-
+charge, electrolyzers soak ≤ 20 €/MWh blocks), flex-load feedback into the
+demand ledger, `link_setpoints` manual HVDC, Economy capex/FOM/fuel entries
+(ledger 31), HUD storage/H2 strip; build-palette keys q/w/e/r/u/z.
+
+**Tests:** backend 121 (17-case wire-device suite: reset validation, FFR,
+H2 draw/derate at the 45 t/h cavern limit, paired-injection neutrality, hub
+loss/trip asymmetry, snapshot round-trip carrying SoC/levels/link state);
+GdUnit 25/25 (device-emission + H2-conversion topology tests new); smokes
+`hydrogen_chain` / `battery_response` / `hvdc_link` / `north_sea_hub` all
+green on port 8034 (P7SmokeBase).
+
+**Acceptance evidence (fork-verified, current code):** H2 round trip
+**0.349** (≈ 35 % §1.14 pin) across a forced windy→calm cycle with fill,
+burn, floor-derate and `fuel_starved` in sequence; battery fleet turns a
+47.47 Hz collapse into a **49.90 nadir** (Δ 2.43 Hz) on the same trip;
+embedded bipole at 800 MW relieves a 142 %-loaded AC path to 70 %, its trip
+redistributes flows back (155 %) at f_min 49.61 — while the hub trip on a
+comparable island is a genuine infeed loss to 47.41 (ledgers 27/28 as a
+matched pair); hub delivery ratio 0.9447 matches the §1.16 loss model.
+
+**Discoveries:** (1) REAL orchestrator bug: `register()` left a stale
+pre-reset `last_result` — after any rebuild the dispatcher read dead device
+states, zeroed every cap and dumped batteries into a healthy island; now
+cleared on register. (2) Threshold-only flexibility switching limit-cycled
+±600 MW/block into fleet-wide f-window trips — hysteresis added; battery
+discharge is scarcity-gated (SoC-aware policy queued for P8). (3) Per-block
+`avail_mw` sample-and-hold turns weather ramps into GW-scale steps (relayed
+out a 6 GW wind fleet twice): smokes ramp forces over 8–24 blocks; a wire
+avail-slew or game-side interpolation is a P8 candidate. (4) λ-forces > ~1.5
+push midday wind past the 25 m/s cutout — a "windy week" force of 3.0 is a
+zero-delivery storm. (5) Small islands idle ~0.1 Hz low with standing FCR
+(no aFRR until P8) — frequency assertions must be ambient-relative.
+
+**Deviations (deliberate):** H2 fuel value fixed at 90 €/MWh_th (ledger 31);
+HVDC dispatcher manual-only (ledger 32); battery VOM (throughput) not booked
+(no per-battery energy meter on the wire yet); GFM buildable variant + SoC-
+aware arbitrage + H2 monthly-projection panel deferred to P8 UI; `/gb/net/
+patch` add/remove_device (AC↔hub farm switching) still via full debounced
+reset; **PHS pump mode/SoC missed** — hydro_ps remains turbine-only (the
+P7 "pumped hydro dispatchable + SoC on the wire" clause): catch up in P8
+with the 49.7 Hz pump-shed tier, which is a no-op until pumping exists.
+
+**Next:** P8 — protection, UFLS, cascades, replay, teaching UX.
 
 ## 7. Open questions for the project owner
 

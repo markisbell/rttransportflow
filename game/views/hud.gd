@@ -15,7 +15,7 @@ func _ready() -> void:
 	add_child(bar)
 
 	_time_label = Label.new()
-	_time_label.custom_minimum_size = Vector2(260, 0)
+	_time_label.custom_minimum_size = Vector2(760, 0)
 	bar.add_child(_time_label)
 
 	for i in range(SPEEDS.size()):
@@ -65,11 +65,43 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
-	_time_label.text = "day %d  %s   speed %s   t=%d" % [
+	var economy_line := ""
+	if BuildSession.use_gridco:
+		economy_line = "   € %.0f M   price %.0f €/MWh%s   CO2 %.0f g/kWh%s" % [
+			Economy.treasury_eur / 1e6, Dispatch.wholesale_price,
+			" (SCARCITY)" if Dispatch.scarcity else "",
+			Economy.g_co2_per_kwh(), _flex_line(),
+		]
+	_time_label.text = "day %d  %s   speed %s   t=%d%s" % [
 		GameClock.day(), GameClock.time_of_day_string(),
 		("%.0f×" % GameClock.speed) if GameClock.speed > 0.0 else "paused",
-		Orchestrator.last_t,
+		Orchestrator.last_t, economy_line,
 	]
+
+
+## P7 flexibility strip: aggregate battery SoC + H2 cavern fill, only when
+## such devices exist (the H2 panel proper is a P8 UI refinement).
+func _flex_line() -> String:
+	var soc_mwh := 0.0
+	var e_mwh := 0.0
+	var h2_kg := 0.0
+	var h2_cap := 0.0
+	for id: String in _latest_devices:
+		var device: Dictionary = _latest_devices[id]
+		if device.has("soc_mwh") and device.get("soc_mwh") != null:
+			soc_mwh += float(device["soc_mwh"])
+			for dev: Dictionary in Boundary.wire_devices:
+				if str(dev.get("id", "")) == id:
+					e_mwh += float((dev.get("params", {}) as Dictionary).get("e_mwh", 0.0))
+		if device.has("h2_kg") and device.get("h2_kg") != null:
+			h2_kg += float(device["h2_kg"])
+			h2_cap += float(device.get("capacity_kg", 0.0))
+	var line := ""
+	if e_mwh > 0.0:
+		line += "   bat %d%%" % int(100.0 * soc_mwh / e_mwh)
+	if h2_cap > 0.0:
+		line += "   H2 %d%% (%.0f t)" % [int(100.0 * h2_kg / h2_cap), h2_kg / 1000.0]
+	return line
 
 
 func _on_events(events: Array) -> void:

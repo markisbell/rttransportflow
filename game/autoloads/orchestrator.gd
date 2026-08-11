@@ -82,6 +82,11 @@ func register(topology_doc: Dictionary) -> bool:
 		and str(response.get("status", "")) == "ok"
 	if ok:
 		last_t = -1
+		# a reset invalidates every prior wire result: serving a stale one
+		# fed the dispatcher pre-reset device states — it saw a dead fleet,
+		# zeroed every cap, declared scarcity and dumped the batteries into
+		# a healthy island (found by battery_response run B)
+		last_result = {}
 	else:
 		push_warning("net_reset failed: %s" % JSON.stringify(response))
 		supply_event.emit("reset_failed", "critical", response)

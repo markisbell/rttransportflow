@@ -32,16 +32,42 @@ static func _sorted_tiles(dict: Dictionary) -> Array[Vector2i]:
 	return tiles
 
 
-## Build. Returns {ok, native, zones, interpretation, warnings, error?}.
-static func build(world: Node) -> Dictionary:
+## Build. Returns {ok, native, devices, hub_farms, zones, interpretation,
+## warnings, error?}.
+static func build(world: Node, demand_sampler: Callable = Callable()) -> Dictionary:
 	var warnings: Array[String] = []
-	var corridors: Dictionary = world.corridors
+	# HVDC corridors are a separate electrical world: they never form AC
+	# buses or branches — they pair converter stations (P7, §1.16).
+	var corridors := {}
+	var hvdc_corridors := {}
+	for tile: Vector2i in world.corridors:
+		if str(world.corridors[tile]) == "hvdc":
+			hvdc_corridors[tile] = "hvdc"
+		else:
+			corridors[tile] = world.corridors[tile]
 	if corridors.is_empty():
 		return {"ok": false, "error": "nothing built", "warnings": warnings}
+
+	# far-shore farms bind to their platform and leave the AC world entirely
+	# (never wire devices — the hub aggregates them; contract v2 kinds table)
+	var farm_hub := {}  # wind_offshore pid -> platform pid
+	for pid: String in world.plants:
+		var p: Dictionary = world.plants[pid]
+		if str(p["kind"]) == "wind_offshore" \
+				and world.terrain_at(p["tile"]) == "S":
+			var platform: String = world.platform_near(p["tile"])
+			if platform == "":
+				warnings.append("far-shore farm %s has no platform in range — dropped" % pid)
+			else:
+				farm_hub[pid] = platform
 
 	# --- adjacency structures ------------------------------------------
 	var site_of_tile := {}  # corridor-adjacent tile -> "plant:<pid>"|"lc:<id>"
 	for pid: String in world.plants:
+		var kind := str(world.plants[pid]["kind"])
+		# caverns and platforms never attract AC buses; bound farms are gone
+		if kind in ["h2_cavern", "offshore_platform"] or farm_hub.has(pid):
+			continue
 		site_of_tile[world.plants[pid]["tile"]] = "plant:%s" % pid
 	for lc_id: String in world.load_centers:
 		for tile: Vector2i in world.load_centers[lc_id]["tiles"]:
@@ -169,6 +195,9 @@ static func build(world: Node) -> Dictionary:
 					zone_bus[lc_id] = bus_of_tile[tile]
 
 	for pid: String in world.plants:
+		var kind := str(world.plants[pid]["kind"])
+		if kind in ["h2_cavern", "offshore_platform"] or farm_hub.has(pid):
+			continue  # deliberately outside the AC world
 		if not plant_bus.has(pid):
 			warnings.append("plant %s not connected (no corridor touches it)" % pid)
 	var dropped_zones: Array[String] = []
@@ -209,11 +238,15 @@ static func build(world: Node) -> Dictionary:
 			bus_names.append("b%d" % bus_rename[bus])
 
 	var kept_plants: Array[String] = []
+	var device_bus := {}  # battery/electrolyzer/hvdc_converter pid -> bus
 	for pid: String in plant_bus:
-		if kept_bus.has(plant_bus[pid]):
-			kept_plants.append(pid)
-		else:
+		if not kept_bus.has(plant_bus[pid]):
 			warnings.append("plant %s dropped with its island" % pid)
+			continue
+		if str(world.plants[pid]["kind"]) in world.DEVICE_KINDS:
+			device_bus[pid] = plant_bus[pid]
+		else:
+			kept_plants.append(pid)
 	kept_plants.sort()
 	var kept_zones: Array[String] = []
 	for lc_id: String in zone_bus:
@@ -262,18 +295,28 @@ static func build(world: Node) -> Dictionary:
 	if lines["lines"].is_empty():
 		return {"ok": false, "error": "no branches between buses", "warnings": warnings}
 
-	var demand := _demand_profiles(world, kept_zones)
+	var demand := _demand_profiles(world, kept_zones, demand_sampler)
 	var dispatch := _dispatch_profiles(world, kept_plants, demand["total"])
 
 	var plants_doc := {"plants": []}
 	for pid: String in kept_plants:
 		var p: Dictionary = world.plants[pid]
-		plants_doc["plants"].append({
+		var row := {
 			"id": pid, "name": pid, "bus": "b%d" % bus_rename[plant_bus[pid]],
 			"kind": str(p["kind"]), "p_max_mw": float(p["p_max_mw"]),
 			"p_min_mw": 0.0, "vm_pu": 1.02,
 			"profile_p_mw": dispatch[pid],
-		})
+		}
+		if str(p.get("fuel", "")) == "h2":
+			var cavern := str(p.get("h2_store_id", ""))
+			if world.plants.has(cavern) \
+					and str(world.plants[cavern]["kind"]) == "h2_cavern":
+				row["fuel"] = "h2"
+				row["h2_store_id"] = cavern
+			else:
+				# a dangling store reference would 400 the whole reset
+				warnings.append("plant %s: h2 store %s missing — kept on gas" % [pid, cavern])
+		plants_doc["plants"].append(row)
 
 	var load_centers_doc := {"resolution_minutes": 15, "steps": STEPS,
 		"items": []}
@@ -284,10 +327,49 @@ static func build(world: Node) -> Dictionary:
 	var scenario := {"name": "built_world", "steps_per_day": STEPS,
 		"description": "player-built grid (P5)"}
 
+	# --- 7. wire devices (P7): storage, H2 chain, HVDC links + hubs -----
+	var devices: Array[Dictionary] = []
+	var caverns: Array[String] = []
+	for pid: String in world.plants:
+		if str(world.plants[pid]["kind"]) == "h2_cavern":
+			caverns.append(pid)
+	caverns.sort()
+	for pid: String in caverns:
+		devices.append({"id": pid, "kind": "h2_store", "params": {
+			"capacity_kg": float(world.plants[pid]["capacity_kg"]),
+			# a fresh cavern starts at the recovery threshold: nothing to
+			# burn until the electrolyzers fill it (PHYSICS §2.8 floor rule)
+			"level_kg": 0.07 * float(world.plants[pid]["capacity_kg"]),
+		}})
+	var device_ids: Array[String] = []
+	device_ids.assign(device_bus.keys())
+	device_ids.sort()
+	for pid: String in device_ids:
+		var p: Dictionary = world.plants[pid]
+		var node := "b%d" % bus_rename[device_bus[pid]]
+		match str(p["kind"]):
+			"battery":
+				devices.append({"id": pid, "kind": "battery", "node": node,
+					"params": {"p_max_mw": float(p["p_max_mw"]),
+						"e_mwh": float(p.get("e_mwh", float(p["p_max_mw"]) * 2.0))}})
+			"electrolyzer":
+				if caverns.is_empty():
+					warnings.append("electrolyzer %s: no cavern anywhere — dropped" % pid)
+					continue
+				devices.append({"id": pid, "kind": "electrolyzer", "node": node,
+					"params": {"p_max_mw": float(p["p_max_mw"]),
+						"h2_store_id": _nearest_cavern(world, caverns, p["tile"])}})
+			# hvdc_converter: emitted by the link/hub pass below
+	var hvdc_result := _hvdc_devices(world, hvdc_corridors, farm_hub,
+		device_bus, bus_rename, warnings)
+	devices.append_array(hvdc_result["devices"])
+
 	return {
 		"ok": true,
 		"native": {"grid": grid, "lines": lines, "plants": plants_doc,
 			"load_centers": load_centers_doc, "scenario": scenario},
+		"devices": devices,
+		"hub_farms": hvdc_result["hub_farms"],
 		"zones": grid["zones"],
 		"interpretation": {
 			"n_buses": bus_names.size(),
@@ -295,9 +377,124 @@ static func build(world: Node) -> Dictionary:
 			"bus_rename": bus_rename,
 			"dropped_zones": dropped_zones,
 			"plant_bus": plant_bus,
+			"device_bus": device_bus,
 		},
 		"warnings": warnings,
 	}
+
+
+static func _nearest_cavern(world: Node, caverns: Array[String],
+		tile: Vector2i) -> String:
+	# H2 transport (pipeline/trucking) is abstracted: an electrolyzer feeds
+	# its NEAREST cavern (deterministic tie-break by pid sort order).
+	var best := caverns[0]
+	var best_d := 1 << 30
+	for pid: String in caverns:
+		var d: Vector2i = (world.plants[pid]["tile"] as Vector2i) - tile
+		var manhattan := absi(d.x) + absi(d.y)
+		if manhattan < best_d:
+			best_d = manhattan
+			best = pid
+	return best
+
+
+## HVDC pass: flood-fill `hvdc` corridor components; a component with exactly
+## two stations becomes a point-to-point link (2 onshore converters) or an
+## offshore hub (platform + onshore converter) per §1.16. Everything else
+## warns and is dropped — never a half-registered link.
+static func _hvdc_devices(world: Node, hvdc_corridors: Dictionary,
+		farm_hub: Dictionary, device_bus: Dictionary, bus_rename: Dictionary,
+		warnings: Array[String]) -> Dictionary:
+	var devices: Array[Dictionary] = []
+	var hub_farms := {}
+	var used_stations := {}
+	var seen := {}
+	for start: Vector2i in _sorted_tiles(hvdc_corridors):
+		if seen.has(start):
+			continue
+		# flood-fill one component
+		var tiles: Array[Vector2i] = []
+		var stack: Array[Vector2i] = [start]
+		while not stack.is_empty():
+			var current: Vector2i = stack.pop_back()
+			if seen.has(current):
+				continue
+			seen[current] = true
+			tiles.append(current)
+			for offset: Vector2i in NEIGHBORS:
+				var n := current + offset
+				if hvdc_corridors.has(n) and not seen.has(n):
+					stack.append(n)
+		# stations adjacent to the component
+		var stations: Array[String] = []
+		for tile: Vector2i in tiles:
+			for offset: Vector2i in NEIGHBORS:
+				var pid := str(world.plant_at(tile + offset))
+				if pid == "" or stations.has(pid) or used_stations.has(pid):
+					continue
+				if str(world.plants[pid]["kind"]) in ["hvdc_converter", "offshore_platform"]:
+					stations.append(pid)
+		stations.sort()
+		if stations.size() != 2:
+			warnings.append("hvdc corridor (%d tiles) touches %d stations — needs exactly 2"
+				% [tiles.size(), stations.size()])
+			continue
+		var length_km := snappedf(tiles.size() * world.tile_km * SINUOSITY, 0.01)
+		var kinds: Array[String] = [str(world.plants[stations[0]]["kind"]),
+			str(world.plants[stations[1]]["kind"])]
+		if kinds[0] == "hvdc_converter" and kinds[1] == "hvdc_converter":
+			if not (device_bus.has(stations[0]) and device_bus.has(stations[1])):
+				warnings.append("hvdc link %s-%s: a terminal has no AC bus — dropped"
+					% [stations[0], stations[1]])
+				continue
+			var p_max := minf(float(world.plants[stations[0]]["p_max_mw"]),
+				float(world.plants[stations[1]]["p_max_mw"]))
+			var link_id := "link_%s_%s" % [stations[0], stations[1]]
+			for pid: String in stations:
+				devices.append({"id": pid, "kind": "hvdc",
+					"node": "b%d" % bus_rename[device_bus[pid]],
+					"params": {"link_id": link_id, "p_max_mw": p_max,
+						"length_km": length_km}})
+				used_stations[pid] = true
+		elif "offshore_platform" in kinds and "hvdc_converter" in kinds:
+			var platform: String = stations[0] if kinds[0] == "offshore_platform" else stations[1]
+			var onshore: String = stations[1] if kinds[0] == "offshore_platform" else stations[0]
+			if not device_bus.has(onshore):
+				warnings.append("hub %s: onshore converter %s has no AC bus — dropped"
+					% [platform, onshore])
+				continue
+			var farms: Array[String] = []
+			var farm_mw := 0.0
+			for farm_pid: String in farm_hub:
+				if str(farm_hub[farm_pid]) == platform:
+					farms.append(farm_pid)
+					farm_mw += float(world.plants[farm_pid]["p_max_mw"])
+			farms.sort()
+			var platform_mw := float(world.plants[platform]["p_max_mw"])
+			if farm_mw > platform_mw:
+				warnings.append("hub %s over-subscribed: %.0f MW farms on a %.0f MW platform"
+					% [platform, farm_mw, platform_mw])
+			devices.append({"id": platform, "kind": "offshore_hub",
+				"node": "b%d" % bus_rename[device_bus[onshore]],
+				"params": {"p_max_mw": minf(platform_mw,
+						float(world.plants[onshore]["p_max_mw"])),
+					"platform_mw": platform_mw, "cable_km": length_km}})
+			hub_farms[platform] = farms
+			used_stations[platform] = true
+			used_stations[onshore] = true
+		else:
+			warnings.append("hvdc corridor joins two platforms (%s, %s) — dropped"
+				% [stations[0], stations[1]])
+	for pid: String in world.plants:
+		var kind := str(world.plants[pid]["kind"])
+		if kind in ["hvdc_converter", "offshore_platform"] \
+				and not used_stations.has(pid):
+			warnings.append("%s %s is not part of any HVDC link or hub" % [kind, pid])
+	for farm_pid: String in farm_hub:
+		if not hub_farms.has(str(farm_hub[farm_pid])):
+			warnings.append("farm %s bound to %s which is not a working hub — idle"
+				% [farm_pid, farm_hub[farm_pid]])
+	return {"devices": devices, "hub_farms": hub_farms}
 
 
 static func _bus_islands(n_buses: int, branches: Array[Dictionary]) -> Array[int]:
@@ -328,7 +525,12 @@ static func _load_shape(step: int) -> float:
 		+ 0.38 * exp(-pow(h - 18.5, 2) / 5.0)
 
 
-static func _demand_profiles(world: Node, zone_ids: Array[String]) -> Dictionary:
+static func _demand_profiles(world: Node, zone_ids: Array[String],
+		demand_sampler: Callable = Callable()) -> Dictionary:
+	# With a sampler (gridco mode) the native profiles COME FROM the live
+	# demand model, so the backend resets onto the operating point the wire
+	# will actually send — a stub-vs-live mismatch at t=0 collapsed a
+	# winter grid before the first dispatch could ramp (found by probe).
 	var out := {"total": []}
 	var totals: Array[float] = []
 	totals.resize(STEPS)
@@ -337,7 +539,11 @@ static func _demand_profiles(world: Node, zone_ids: Array[String]) -> Dictionary
 		var peak: float = world.load_centers[lc_id]["peak_mw"]
 		var profile: Array[float] = []
 		for step in range(STEPS):
-			var value := snappedf(peak * _load_shape(step), 0.1)
+			var value: float
+			if demand_sampler.is_valid():
+				value = snappedf(demand_sampler.call(lc_id, step), 0.1)
+			else:
+				value = snappedf(peak * _load_shape(step), 0.1)
 			profile.append(value)
 			totals[step] += value
 		out[lc_id] = profile
