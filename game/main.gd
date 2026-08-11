@@ -8,6 +8,8 @@ const SMOKES := {
 	"trip_reaction": "res://smokes/trip_reaction.gd",
 	"sidecar_crash": "res://smokes/sidecar_crash.gd",
 	"trip_key": "res://smokes/trip_key.gd",
+	"build_and_supply": "res://smokes/build_and_supply.gd",
+	"island_cut": "res://smokes/island_cut.gd",
 }
 
 
@@ -29,8 +31,14 @@ func _run_smoke(smoke_name: String) -> void:
 
 
 func _boot_game() -> void:
-	var map := preload("res://views/map_view.gd").new()
-	add_child(map)
+	# P5 build mode: the player builds the grid; stepping starts after the
+	# first successful (debounced) build+register in BuildSession.
+	if not BuildSession.load_map():
+		push_error("map load failed — cannot boot")
+		return
+	BuildSession.enabled = true
+	var view := preload("res://views/build_view.gd").new()
+	add_child(view)
 	var hud := preload("res://views/hud.gd").new()
 	add_child(hud)
 	_boot_async()
@@ -41,13 +49,4 @@ func _boot_async() -> void:
 	SidecarManager.start_all()
 	while not SidecarManager.all_healthy():
 		await get_tree().create_timer(0.5).timeout
-	if not Boundary.load_bundle():
-		push_error("europe_mini bundle missing — cannot boot")
-		return
-	if not await CosimBridge.handshake(Orchestrator.ID):
-		push_error("handshake failed — backend contract mismatch")
-		return
-	if not await Orchestrator.register(Boundary.reset_doc()):
-		return
 	GameClock.speed = 60.0
-	Orchestrator.start()

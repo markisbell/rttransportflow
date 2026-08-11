@@ -33,6 +33,17 @@ func load_bundle() -> bool:
 	return true
 
 
+## P5 build mode: adopt a topology-builder native bundle (same shape as the
+## file bundle — every replay function below works unchanged on it).
+func set_native(native: Dictionary) -> void:
+	docs = {
+		"grid": native["grid"], "lines": native["lines"],
+		"plants": native["plants"], "load_centers": native["load_centers"],
+		"scenario": native["scenario"],
+	}
+	loaded = true
+
+
 func steps_per_day() -> int:
 	return int(docs["scenario"].get("steps_per_day", 96))
 

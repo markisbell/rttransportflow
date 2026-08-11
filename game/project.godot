@@ -15,6 +15,12 @@ SidecarManager="*res://autoloads/sidecar_manager.gd"
 CosimBridge="*res://autoloads/cosim_bridge.gd"
 Boundary="*res://autoloads/boundary.gd"
 Orchestrator="*res://autoloads/orchestrator.gd"
+World="*res://model/world_model.gd"
+BuildSession="*res://model/build_session.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 
 [display]
 

@@ -67,13 +67,21 @@ class IslandState:
         return self.p_l0 * self.w * (1.0 + self.d_pu * (f_eval - F0) / F0)
 
     def swing_update(self, dt_us: int, p_inj: np.ndarray) -> np.ndarray:
-        """Semi-implicit update; returns the new f (also stored)."""
+        """Semi-implicit update; returns the new f (also stored).
+
+        An island with E_k = 0 (every source gone) is BLACKED OUT: its
+        frequency freezes (never NaN on the wire — found when a collapsing
+        auto-built grid nulled f_min and crashed the game client)."""
         dt_s = dt_us / US
-        k_f = dt_s * F0 / (2.0 * self.e_k)
+        alive = self.e_k > 0.0
+        k_f = np.where(alive, dt_s * F0 / (2.0 * np.maximum(self.e_k, 1e-9)), 0.0)
         numer = self.f + k_f * (p_inj - self.p_loss - self.p_l0 * self.w * (1.0 - self.d_pu))
         denom = 1.0 + k_f * self.p_l0 * self.w * self.d_pu / F0
-        self.f = numer / denom
+        self.f = np.where(alive, numer / denom, self.f)
         return self.f
+
+    def blackout(self) -> np.ndarray:
+        return self.e_k <= 0.0
 
 
 @dataclass

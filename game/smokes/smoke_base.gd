@@ -85,3 +85,10 @@ func failed_checks() -> Array:
 
 func verdict() -> bool:
 	return failed_checks().is_empty()
+
+
+## Null-tolerant numeric getter: the wire nulls non-finite floats (`_r()`),
+## and GDScript float(null) is a hard script error.
+static func numf(data: Dictionary, key: String, default: float) -> float:
+	var value: Variant = data.get(key, default)
+	return default if value == null else float(value)

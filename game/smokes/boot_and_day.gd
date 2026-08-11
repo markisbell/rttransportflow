@@ -28,9 +28,9 @@ func run() -> void:
 		var status := str(result.get("status", "?"))
 		statuses[status] = statuses.get(status, 0) + 1
 		var island: Dictionary = result.get("islands", {}).get("0", {})
-		f_min = minf(f_min, float(island.get("f_min", 100.0)))
-		f_max = maxf(f_max, float(island.get("f_max", 0.0)))
-		dt_done_sum += float(result.get("dt_done_s", 0.0))
+		f_min = minf(f_min, numf(island, "f_min", 100.0))
+		f_max = maxf(f_max, numf(island, "f_max", 0.0))
+		dt_done_sum += numf(result, "dt_done_s", 0.0)
 		completed += 1
 
 	check("all_steps_completed", completed == N_STEPS)

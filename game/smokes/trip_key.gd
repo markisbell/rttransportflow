@@ -45,5 +45,5 @@ func run() -> void:
 				and str(event.get("element", "")) == element:
 			tripped = true
 	check("trip_event_fired", tripped)
-	check("early_return_at_injection", float(result.get("dt_done_s", 300.0)) < 5.0)
+	check("early_return_at_injection", numf(result, "dt_done_s", 300.0) < 5.0)
 	_finish(TAG, {"element": element})

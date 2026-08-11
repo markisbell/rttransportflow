@@ -32,9 +32,9 @@ func _on_step(_t: int, result: Dictionary) -> void:
 	while _points.size() > 0 and _points[0]["t"] < t_end - TRACE_WINDOW_S:
 		_points.pop_front()
 	var island: Dictionary = result.get("islands", {}).get("0", {})
-	_f_now = float(island.get("f_hz", 50.0))
-	_h_sys = float(island.get("h_sys_s", 0.0))
-	_e_k_gj = float(island.get("e_k_mj", 0.0)) / 1000.0
+	_f_now = _numf(island, "f_hz", 50.0)
+	_h_sys = _numf(island, "h_sys_s", 0.0)
+	_e_k_gj = _numf(island, "e_k_mj", 0.0) / 1000.0
 	_mode = str(result.get("mode", "calm"))
 	queue_redraw()
 
@@ -77,3 +77,9 @@ func _draw() -> void:
 
 func _f_to_y(f: float, plot: Rect2) -> float:
 	return remap(clampf(f, F_MIN, F_MAX), F_MAX, F_MIN, plot.position.y, plot.end.y)
+
+
+## Null-tolerant getter (the wire nulls non-finite floats).
+static func _numf(data: Dictionary, key: String, default: float) -> float:
+	var value: Variant = data.get(key, default)
+	return default if value == null else float(value)

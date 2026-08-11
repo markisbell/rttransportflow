@@ -149,3 +149,20 @@ def test_mode_controller_transitions() -> None:
     # QSS offset (-0.63 Hz) far exceeds the calm threshold — stays ALERT.
     integ.advance(s_to_us(60.0), interrupt_on_event=False)
     assert integ.mode == "alert"
+
+
+def test_total_source_loss_freezes_frequency_no_nan() -> None:
+    """E_k = 0 (every source tripped) is a blackout: frequency FREEZES —
+    the engine must never emit NaN (a collapsing player build nulled the
+    wire and crashed the game client; found in P5)."""
+    integ = make_fixture()
+    for i in range(4):
+        integ.queue.schedule(Event(s_to_us(1.0), "trip", f"g{i}"))
+    integ.advance(s_to_us(30.0), interrupt_on_event=False)
+    f_end = float(integ.islands.f[0])
+    assert np.isfinite(f_end)
+    assert integ.islands.e_k[0] == 0.0
+    assert bool(integ.islands.blackout()[0]) is True
+    f_frozen = float(integ.islands.f[0])
+    integ.advance(s_to_us(30.0), interrupt_on_event=False)
+    assert float(integ.islands.f[0]) == f_frozen  # frozen, still finite

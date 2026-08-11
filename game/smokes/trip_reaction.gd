@@ -24,7 +24,7 @@ func run() -> void:
 		_fail(TAG, "trip step transport failure: %s" % str(result))
 		return
 
-	var dt_done := float(result.get("dt_done_s", 600.0))
+	var dt_done := numf(result, "dt_done_s", 600.0)
 	var events: Array = result.get("events", [])
 	var tripped := false
 	for event: Dictionary in events:
@@ -43,7 +43,7 @@ func run() -> void:
 		if follow.get("_status", 0) != 200:
 			break
 		var island: Dictionary = follow.get("islands", {}).get("0", {})
-		f_min = minf(f_min, float(island.get("f_min", 100.0)))
+		f_min = minf(f_min, numf(island, "f_min", 100.0))
 	check("frequency_dove", f_min < 49.9)
 	check("frequency_not_collapsed", f_min > 47.5)
 	_finish(TAG, {"dt_done_s": dt_done, "f_min": f_min,

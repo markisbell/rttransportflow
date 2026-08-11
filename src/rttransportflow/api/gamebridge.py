@@ -269,7 +269,7 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
             "e_k_mj": e_k,
             "s_online_mva": s_online,
             "h_sys_s": e_k / s_online if s_online > 0 else 0.0,
-            "blackout": False,
+            "blackout": bool(sim.integrator.islands.blackout()[0]),
             "fcr_used_mw": fcr_used,
             "afrr_used_mw": 0.0,
         }},

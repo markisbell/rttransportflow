@@ -1,0 +1,24 @@
+{
+  "version": 1, "tile_km": 50.0, "width": 24, "height": 12,
+  "terrain_rows": [
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS",
+    "SScpppppppppppppppppppcS"
+  ],
+  "resources": [],
+  "load_centers": [
+    {"id": "west_city", "name": "West City", "tiles": [[4, 4], [5, 4], [4, 5], [5, 5]],
+     "peak_mw_2025": 1200.0, "season": "winter", "temp_coeff_pct_per_c": 1.8},
+    {"id": "east_city", "name": "East City", "tiles": [[18, 4], [19, 4], [18, 5], [19, 5]],
+     "peak_mw_2025": 800.0, "season": "winter", "temp_coeff_pct_per_c": 1.8}
+  ]
+}

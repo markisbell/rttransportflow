@@ -448,6 +448,52 @@ stepping).
 **Next:** P5 — tiles, building, topology builder (WorldModel, corridor
 drawing, golden-file pinned native bundles, debounced reset).
 
+### P5 — Tiles, building, topology builder (2026-08-11)
+
+**Built:** Europe map data (fork-authored): `tools/map_authoring/quantize.py`
+(deterministic polygon→raster generator, documented projection) +
+`data/map/europe_v1.json` (96×80, 3 797 land tiles, recognizable coastlines,
+all 25 GAME_DESIGN load centers, coal/cavern/PHS/wind/solar/river resources)
++ preview + 7 pytest validations. GAME: `model/world_model.gd` (WorldModel
+autoload — Vector2i-keyed source of truth, placement rules per GAME_DESIGN
+§1.3, versioned envelope), `model/grid_topology.gd` (bus formation/collapse,
+branch walking, island drop with warnings, node budget warn 120 / refuse 150,
+native-bundle synthesis incl. stub balanced dispatch), `model/build_session.gd`
+(2.5 s debounced rebuild→re-register; deferred status emissions),
+`model/demo_build.gd` (fixture build for the golden + BFS auto-build with
+trunk merging + foreign-city avoidance), `views/build_view.gd` (terrain/
+resource/corridor/plant/bus rendering, tool keys, ghost validity, camera),
+build-mode boot in main.gd; GdUnit4 6.2.0 vendored from infrastruct;
+smokes `build_and_supply` (real Europe map) + `island_cut` (fixture).
+BACKEND: E_k = 0 blackout guard (frequency freezes, never NaN) + island
+`blackout` flag on the wire.
+
+**Tests:** backend 103 (blackout-guard new), GdUnit 8 (byte-stable topology
+golden + re-baseline path, determinism, clean errors, unconnected-zone drop
++ warning, node-budget refusal on a synthetic 160-tap comb, sinuosity,
+debounce), 6/6 smokes green incl. the two new P5 gates.
+
+**Discoveries (each a real found bug):** (1) sync `build_status` emissions
+on fail paths deadlocked `rebuild_now(); await` callers — all emissions
+deferred now. (2) Corridor spaghetti from per-plant BFS routes exploded the
+junction count → bus-budget refusal; spurs now merge into existing trunks.
+(3) At 50 km tiles adjacent metros collapse into ONE bus (no branches) —
+the demo uses a spread trio. (4) A corridor brushing a foreign load center
+connects its load with zero generation → 47.4 Hz dive; router avoids
+foreign footprints, and corridors can no longer cross occupied tiles.
+(5) The dive exposed a REAL engine hole: total source loss divided by
+E_k = 0 → NaN → `_r()` nulled it → GDScript `float(null)` crash; the engine
+now freezes frequency at blackout and the game reads wire numerics
+null-tolerantly (`numf`).
+
+**Deviations (deliberate):** demo auto-build connects 2 of the 3 trio
+cities on the Europe map (avoidance rings pinch the Munich chain — demo
+polish, not a gate); per-corridor circuit upgrades + transformer bays
+deferred to P6 economy; `/gb/net/patch` add/remove_device still rejected
+(full debounced reset covers all edits).
+
+**Next:** P6 — demand, weather, dispatch, market, economy.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
