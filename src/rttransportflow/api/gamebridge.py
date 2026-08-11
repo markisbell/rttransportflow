@@ -26,7 +26,7 @@ from ..snapshot import model_hash
 CONTRACT = "2.0"
 NETWORK_KIND = "transmission"
 MIN_DT_S = 0.05
-SNAPSHOT_VERSION = 1
+SNAPSHOT_VERSION = 2
 
 router = APIRouter(prefix="/gb")
 
@@ -125,7 +125,7 @@ async def net_reset(request: Request) -> dict:
     if snapshot_blob is not None:
         if (snapshot_blob.get("model_hash") == hash_
                 and snapshot_blob.get("version") == SNAPSHOT_VERSION):
-            sim.integrator.restore_state(snapshot_blob["blob"])
+            sim.restore_blob(snapshot_blob["blob"])
         else:
             status = "refused_snapshot"  # applied WITHOUT it — game cold-starts
 
@@ -192,10 +192,11 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
             # zones map onto island 0 until the split/merge layer lands
             sim.integrator.defense.request_restore(0, float(restore))
     notes += sim.set_watch(body.get("watch", []))
+    line_events = sim.apply_line_commands(body.get("line_commands"))
     for ev in body.get("scheduled_events", []):
         kind = ev.get("kind")
-        if kind not in ("trip", "load_step"):
-            notes.append(f"scheduled_events: kind {kind!r} unsupported in P4")
+        if kind not in ("trip", "load_step", "line_trip", "line_close"):
+            notes.append(f"scheduled_events: unsupported kind {kind!r}")
             continue
         at_us = sim.integrator.t_us + s_to_us(float(ev.get("at_s_rel", 0.0)))
         data = {"island": 0, "delta_mw": float(ev.get("delta_mw", 0.0))} \
@@ -216,9 +217,9 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
     res = sim.integrator.advance(s_to_us(dt_s), interrupt_on_event=interrupt)
 
     island = sim.integrator.islands
-    e_k = float(island.e_k[0])
-    s_online = float(sim.fleet.s_online_per_island(1)[0])
-    fcr_used = float(getattr(sim.fleet, "fcr_used", [0.0])[0]) if s_online else 0.0
+    n_islands = island.n
+    s_online_arr = sim.fleet.s_online_per_island(n_islands)
+    fcr_arr = getattr(sim.fleet, "fcr_used", None)
 
     devices: dict[str, Any] = {}
     status_names = {0: "offline", 1: "starting", 2: "online"}
@@ -279,13 +280,14 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
 
     pf = sim._latest_pf
     zones = {}
-    island_black = bool(sim.integrator.islands.blackout()[0])
-    island_w = float(sim.integrator.islands.w[0])
+    blackout = sim.integrator.islands.blackout()
     for zone_id, bus in sim._zone_bus.items():
+        zone_island = sim._bus_island[sim.built.bus_index[bus]]
         detail = {}
         if pf.get("buses", {}).get(bus):
             detail["v_pu"] = pf["buses"][bus]["vm_pu"]
-        zones[zone_id] = {"supplied": 0.0 if island_black else island_w,
+        zones[zone_id] = {"supplied": (0.0 if blackout[zone_island]
+                                       else float(island.w[zone_island])),
                           "detail": detail}
 
     violations: list[dict[str, Any]] = []
@@ -316,19 +318,22 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
         "dt_done_s": res.dt_done_us / US,
         "t_sim_end": sim.integrator.t_us / US,
         "mode": res.mode,
-        "islands": {"0": {
-            "f_hz": float(res.f_end[0]),
-            "rocof_hz_s": float(sim.integrator.rings[0].rocof_window(sim.integrator.t_us)),
-            "f_min": float(res.f_min[0]),
-            "f_max": float(res.f_max[0]),
-            "rocof_max": float(res.rocof_max[0]),
-            "e_k_mj": e_k,
-            "s_online_mva": s_online,
-            "h_sys_s": e_k / s_online if s_online > 0 else 0.0,
-            "blackout": bool(sim.integrator.islands.blackout()[0]),
-            "fcr_used_mw": fcr_used,
+        "islands": {str(i): {
+            "f_hz": float(res.f_end[i]) if i < len(res.f_end) else float(island.f[i]),
+            "rocof_hz_s": float(sim.integrator.rings[i].rocof_window(sim.integrator.t_us)),
+            "f_min": float(res.f_min[i]) if i < len(res.f_min) else float(island.f[i]),
+            "f_max": float(res.f_max[i]) if i < len(res.f_max) else float(island.f[i]),
+            "rocof_max": float(res.rocof_max[i]) if i < len(res.rocof_max) else 0.0,
+            "e_k_mj": float(island.e_k[i]),
+            "s_online_mva": float(s_online_arr[i]),
+            "h_sys_s": (float(island.e_k[i] / s_online_arr[i])
+                        if s_online_arr[i] > 0 else 0.0),
+            "blackout": bool(island.blackout()[i]),
+            "fcr_used_mw": (float(fcr_arr[i])
+                            if fcr_arr is not None and i < len(fcr_arr) else 0.0),
             "afrr_used_mw": 0.0,
-        }},
+            "w": float(island.w[i]),
+        } for i in range(n_islands)},
         "trajectory": res.trajectory,
         "pf": {
             "latest": {k: v for k, v in pf.items()},
@@ -336,8 +341,11 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
         },
         "devices": devices,
         "zones": zones,
-        "events": [{"t_sim": e.t_us / US, "kind": e.kind, "element": e.element,
-                    "data": e.data} for e in res.events],
+        "events": ([{"t_sim": sim.integrator.t_us / US, "kind": k,
+                     "element": el, "data": d} for k, el, d in line_events]
+                   + [{"t_sim": e.t_us / US, "kind": e.kind,
+                       "element": e.element, "data": e.data}
+                      for e in res.events]),
         "violations": violations,
         "summary": {"balance_err": res.balance_err,
                     "pf_failures": sim._pf_fail_count},
@@ -395,7 +403,7 @@ def snapshot(request: Request) -> dict:
         "t_sim": gb.sim.integrator.t_us / US,
         "model_hash": gb.model_hash,
         "version": SNAPSHOT_VERSION,
-        "blob": gb.sim.integrator.state_dict(),  # repr floats — bit-exact
+        "blob": gb.sim.state_blob(),  # repr floats — bit-exact (v2: + topology)
     }
 
 

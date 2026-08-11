@@ -216,13 +216,42 @@ def test_hvdc_trip_is_not_an_infeed_loss(client) -> None:
 
 def test_hub_delivery_minus_losses(client) -> None:
     _reset(client, reset_with_devices())
-    # the hub SLEWS to its avail target (20 %/min front-crossing rate):
-    # 1.75 GW from cold needs ~260 s — step long enough to converge
-    _step(client, 0, dt_s=300.0, avail_mw={"hub_dogger": 1800.0})
-    res = _step(client, 1, dt_s=120.0, avail_mw={"hub_dogger": 1800.0})
+    # the hub SLEWS to its avail target (20 %/min front-crossing rate) —
+    # and 1.8 GW would overload the copenhagen corridor and TRIP it (the
+    # P8 duty layer; covered by test_hub_overload_islands_copenhagen), so
+    # the delivery check runs at a corridor-safe 900 MW
+    _step(client, 0, dt_s=300.0, avail_mw={"hub_dogger": 900.0})
+    res = _step(client, 1, dt_s=120.0, avail_mw={"hub_dogger": 900.0})
     hub = res["devices"]["hub_dogger"]
-    assert hub["p_mw"] == pytest.approx(1800.0 * (1.0 - HUB_LOSS), rel=0.02)
-    assert hub["avail_mw"] == pytest.approx(1800.0 * (1.0 - HUB_LOSS), rel=1e-6)
+    assert hub["p_mw"] == pytest.approx(900.0 * (1.0 - HUB_LOSS), rel=0.02)
+    assert hub["avail_mw"] == pytest.approx(900.0 * (1.0 - HUB_LOSS), rel=1e-6)
+
+
+def test_hub_overload_islands_copenhagen(client) -> None:
+    """P8 cascade, zero special code: 1.75 GW of hub delivery overloads the
+    copenhagen corridor -> duty/instant trip -> island_split; both islands
+    keep solving (per-island slack election)."""
+    _reset(client, reset_with_devices())
+    _step(client, 0, dt_s=300.0, avail_mw={"hub_dogger": 1800.0})
+    res = _step(client, 1, dt_s=300.0, avail_mw={"hub_dogger": 1800.0})
+    events = res["events"] + _step(client, 2, dt_s=300.0,
+                                   avail_mw={"hub_dogger": 1800.0})["events"]
+    kinds = {e["kind"] for e in events}
+    assert "line_trip" in kinds
+    assert "island_split" in kinds
+    final = _step(client, 3, dt_s=60.0, avail_mw={"hub_dogger": 1800.0})
+    assert len(final["islands"]) >= 2
+    # the islanded pocket carries a ~2 GW surplus: over-frequency outruns
+    # LFSM-O, its only sync unit f-window-trips at 51.5, the pocket dies —
+    # while the main island keeps solving with its own slack
+    islands = final["islands"]
+    assert not islands["0"]["blackout"]
+    assert any(islands[i]["blackout"] for i in islands if i != "0")
+    assert any(e["kind"] == "trip" and e["data"].get("cause") == "f_window"
+               for e in events)
+    assert final["zones"]["copenhagen"]["supplied"] == 0.0
+    assert final["zones"]["paris"]["supplied"] == 1.0
+    assert final["status"] == "converged"  # the surviving island still solves
 
 
 def test_hub_rating_clamps_avail(client) -> None:

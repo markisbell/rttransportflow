@@ -74,6 +74,12 @@ class TrajectoryBuffer:
 
     def emit(self, t0_us: int, max_samples: int) -> dict:
         n = len(self.t_us)
+        # an island born mid-step (split/merge) has a shorter series: pad
+        # the pre-birth stretch with nulls (wire-legal; the game reads
+        # trajectory numerics null-tolerantly)
+        for island, values in self.f.items():
+            if len(values) < n:
+                self.f[island] = [None] * (n - len(values)) + values
         if n == 0:
             return {"t_rel_s": [], "islands": {}, "watched": {}}
         keep = list(range(n))

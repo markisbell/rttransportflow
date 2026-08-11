@@ -127,6 +127,10 @@ class Integrator:
         self.trajectory_max_samples = trajectory_max_samples
         self.relays = FrequencyWindowRelays(fleet)
         self.defense = DefensePlan(islands.n, protection_seed)
+        # sim-layer topology callback: line_trip/line_close events land here
+        # (the integrator knows nothing about pandapower); returns follow-up
+        # (kind, element, data) events — island_split/island_merge
+        self.topology_hook: Callable[[str, str], list] | None = None
         # analytic fixtures pin the bare swing+FCR path (PHYSICS §6 runs
         # "with clamps disabled" — the defense layer counts as one)
         self.defense_enabled = True
@@ -137,6 +141,7 @@ class Integrator:
         # wire `watch` list: (label, block in {sync,inv,bat,ely}, row)
         self.watch_specs: list[tuple[str, str, int]] = []
         self.queue = EventQueue()
+        self._pending_topology_events: list[Event] = []
         self.rings = {i: FineRing() for i in range(islands.n)}
         self._rocof_inst = np.zeros(islands.n)
         self.energy_in_mj = 0.0  # ∫(P_inj − P_load − P_loss) dt
@@ -149,6 +154,22 @@ class Integrator:
 
     def refresh_e_k(self) -> None:
         self.islands.e_k = self.fleet.e_k_per_island(self.islands.n)
+
+    def replace_islands(self, islands: IslandState,
+                        parent_of_new: list[int]) -> None:
+        """Adopt a re-topologized island set (split/merge). Per-island state
+        inherits from the parent island; fresh rings start empty (windowed
+        RoCoF rebuilds within ~one ALERT sample). The energy-balance ledger
+        restarts — the identity is only meaningful within one topology."""
+        idx = np.array(parent_of_new, dtype=np.int64)
+        self.islands = islands
+        self.rings = {i: FineRing() for i in range(islands.n)}
+        self._rocof_inst = self._rocof_inst[idx].copy()
+        self.f_start = islands.f.copy()
+        self.energy_in_mj = 0.0
+        self.energy_load_mj = 0.0
+        self.defense.remap(parent_of_new)
+        self.refresh_e_k()
 
     @property
     def _dt_mode(self) -> int:
@@ -211,6 +232,13 @@ class Integrator:
             elif event.kind == "load_step":
                 island = int(event.data.get("island", 0))
                 self.islands.p_l0[island] += float(event.data["delta_mw"])
+            elif event.kind in ("line_trip", "line_close"):
+                if self.topology_hook is not None:
+                    for kind, element, data in self.topology_hook(
+                            event.kind, event.element):
+                        self._pending_topology_events.append(
+                            Event(self.t_us, kind, element, data,
+                                  significant=True))
             elif event.kind == "start_complete":
                 pass  # informational (commitment already applied)
             else:
@@ -316,6 +344,9 @@ class Integrator:
             if due:
                 self._apply_events(due)
                 fired.extend(due)
+                if self._pending_topology_events:
+                    fired.extend(self._pending_topology_events)
+                    self._pending_topology_events.clear()
                 buffer.mark_event(self.t_us)
                 self._sample(buffer)
                 if self.pf_hook is not None:
@@ -329,6 +360,13 @@ class Integrator:
             if interrupt_on_event and defense_early:
                 early = True
                 break
+
+            # a topology event may have re-shaped the island set mid-advance:
+            # the per-step min/max window restarts at the new topology
+            if len(f_min) != self.islands.n:
+                f_min = self.islands.f.copy()
+                f_max = self.islands.f.copy()
+                rocof_max = np.zeros(self.islands.n)
 
             if self.t_us == next_pf:
                 if self.pf_hook is not None:

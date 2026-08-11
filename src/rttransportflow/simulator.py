@@ -449,9 +449,26 @@ class DynSimulator:
         )
         self.integrator = Integrator(self.fleet, islands, pf_hook=self._run_pf,
                                      protection_seed=protection_seed)
+        self.integrator.topology_hook = self._on_line_event
 
         self._load_p_col = built.load_p[:, 0].copy()
         self._load_q_col = built.load_q[:, 0].copy()
+
+        # --- topology layer (P8): bus graph, island mapping, overload duty
+        net = built.net
+        self._line_in_service = {lid: True for lid in built.line_ids}
+        self._line_pp_idx = dict(zip(built.line_ids, built.line_idx))
+        self._line_duty: dict[str, float] = {}
+        self._trip_scheduled: set[str] = set()
+        self._last_pf_t_us = 0
+        self._gen_bus = [int(net.gen.bus.at[i]) for i in built.gen_idx]
+        self._nsgen_bus = [int(net.sgen.bus.at[i]) for i in built.sgen_idx]
+        self._load_bus = [int(net.load.bus.at[i]) for i in built.load_idx]
+        self._bat_bus = [int(net.sgen.bus.at[i]) for i in self._bat_sgen_idx]
+        self._ely_bus = [int(net.load.bus.at[i]) for i in self._ely_load_idx]
+        self._hub_bus = [int(net.sgen.bus.at[i]) for i in self._hub_sgen_idx]
+        self._term_bus = [int(net.sgen.bus.at[i]) for i in self._term_sgen_idx]
+        self._bus_island: dict[int, int] = {int(b): 0 for b in net.bus.index}
         self._latest_pf: dict[str, Any] = {}
         self._pf_ok = False
         self._pf_fail_count = 0
@@ -466,6 +483,171 @@ class DynSimulator:
         self._zone_bus = {z.id: z.bus for z in data.grid.zones}
         self._sync_row = {pid: i for i, pid in enumerate(self.fleet.ids)}
         self._inv_row = {pid: i for i, pid in enumerate(self.fleet.inv_ids)}
+
+    # -- topology layer (P8): components, split/merge, line switching -----
+
+    def _components(self) -> tuple[dict[int, int], int]:
+        """Connected components of the IN-SERVICE line graph; component ids
+        ordered by minimum bus index (deterministic across runs)."""
+        buses = [int(b) for b in self.built.net.bus.index]
+        parent = {b: b for b in buses}
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        net = self.built.net
+        for lid, idx in zip(self.built.line_ids, self.built.line_idx):
+            if not self._line_in_service[lid]:
+                continue
+            a = find(int(net.line.from_bus.at[idx]))
+            b = find(int(net.line.to_bus.at[idx]))
+            if a != b:
+                parent[max(a, b)] = min(a, b)
+        roots = sorted({find(b) for b in buses})
+        comp_of_root = {r: i for i, r in enumerate(roots)}
+        return {b: comp_of_root[find(b)] for b in buses}, len(roots)
+
+    def _refresh_p_l0(self) -> None:
+        np_ = self._np
+        islands = self.integrator.islands
+        p_l0 = np_.zeros(islands.n)
+        for row, bus in enumerate(self._load_bus):
+            p_l0[self._bus_island[bus]] += self._load_p_col[row]
+        islands.p_l0 = p_l0
+
+    def _retopologize(self) -> list[tuple[str, str, dict]]:
+        """Recompute islands after a line state change. New islands inherit
+        the parent's f/w/defense state (COI approximation, PHYSICS §2.7)."""
+        np_ = self._np
+        bus_comp, n = self._components()
+        old_map = self._bus_island
+        old = self.integrator.islands
+        if n == old.n and all(old_map[b] == c for b, c in bus_comp.items()):
+            return []
+        # parent of each new island = old island of its minimum member bus
+        rep: dict[int, int] = {}
+        for bus in sorted(bus_comp):
+            rep.setdefault(bus_comp[bus], bus)
+        parents = [old_map[rep[c]] for c in range(n)]
+        self._bus_island = bus_comp
+
+        fleet = self.fleet
+        fleet.island_of = np_.array(
+            [bus_comp[b] for b in self._gen_bus], dtype=np_.int64)             if self._gen_bus else np_.zeros(0, dtype=np_.int64)
+        inv_buses = self._nsgen_bus + self._hub_bus
+        fleet.inv_island = np_.array(
+            [bus_comp[b] for b in inv_buses], dtype=np_.int64)             if inv_buses else np_.zeros(0, dtype=np_.int64)
+        if len(fleet.bat_ids):
+            fleet.bat_island = np_.array(
+                [bus_comp[b] for b in self._bat_bus], dtype=np_.int64)
+        if len(fleet.ely_ids):
+            fleet.ely_island = np_.array(
+                [bus_comp[b] for b in self._ely_bus], dtype=np_.int64)
+        if fleet.hvdc is not None and len(self._term_bus):
+            term_islands = [bus_comp[b] for b in self._term_bus]
+            fleet.hvdc.island_a = np_.array(term_islands[0::2], dtype=np_.int64)
+            fleet.hvdc.island_b = np_.array(term_islands[1::2], dtype=np_.int64)
+        if fleet.h2 is not None and len(fleet.ely_ids):
+            # compressor aux follows each store's first bound electrolyzer
+            for store_row in range(fleet.h2.n):
+                bound = np_.nonzero(fleet.ely_store_row == store_row)[0]
+                if len(bound):
+                    fleet.h2.island[store_row] = fleet.ely_island[bound[0]]
+
+        from .dynamics.integrator import IslandState
+        idx = np_.array(parents, dtype=np_.int64)
+        # p_loss/p_extra: split by load share of the parent (PF refreshes
+        # p_loss at the very next event solve anyway)
+        p_l0_new = np_.zeros(n)
+        for row, bus in enumerate(self._load_bus):
+            p_l0_new[bus_comp[bus]] += self._load_p_col[row]
+        parent_l0 = np_.maximum(old.p_l0[idx], 1e-9)
+        share = np_.where(parent_l0 > 1e-6, p_l0_new / parent_l0, 1.0)
+        islands_new = IslandState(
+            f=old.f[idx].copy(), e_k=np_.zeros(n), p_l0=p_l0_new,
+            w=old.w[idx].copy(), p_loss=old.p_loss[idx] * share,
+            d_pu=old.d_pu, p_extra=old.p_extra[idx] * share)
+        old_n = old.n
+        self.integrator.replace_islands(islands_new, parents)
+        self._apply_pf_topology()
+        kind = "island_split" if n > old_n else "island_merge"
+        return [(kind, f"islands:{old_n}->{n}", {"n_islands": n})]
+
+    def _apply_pf_topology(self) -> None:
+        """Slack election + dead-island isolation for the AC solve: every
+        live island (>=1 online sync machine) gets exactly one reference;
+        islands without a source drop out of the PF entirely."""
+        np_ = self._np
+        net = self.built.net
+        fleet = self.fleet
+        n = self.integrator.islands.n
+        live = np_.zeros(n, dtype=bool)
+        for row in np_.nonzero(fleet.online)[0]:
+            live[fleet.island_of[row]] = True
+        ext_bus = int(net.ext_grid.bus.iat[0])
+        ext_island = self._bus_island[ext_bus]
+        net.ext_grid.loc[net.ext_grid.index, "in_service"] = bool(live[ext_island])
+        if "slack" in net.gen.columns:
+            net.gen.loc[net.gen.index, "slack"] = False
+        for island in np_.nonzero(live)[0]:
+            if island == ext_island:
+                continue
+            rows = np_.nonzero(fleet.online
+                               & (fleet.island_of == island))[0]
+            best = max(rows, key=lambda r: float(fleet.s_n[r]))
+            net.gen.at[self.built.gen_idx[best], "slack"] = True
+        for bus, comp in self._bus_island.items():
+            net.bus.at[bus, "in_service"] = bool(live[comp])
+
+    def _on_line_event(self, kind: str, line_id: str) -> list[tuple[str, str, dict]]:
+        """Integrator callback for line_trip / line_close events."""
+        if line_id not in self._line_in_service:
+            return [("line_reject", line_id, {"reason": "unknown line"})]
+        net = self.built.net
+        idx = self._line_pp_idx[line_id]
+        if kind == "line_trip":
+            if not self._line_in_service[line_id]:
+                return []
+            self._line_in_service[line_id] = False
+            net.line.at[idx, "in_service"] = False
+            self._trip_scheduled.discard(line_id)
+            self._line_duty.pop(line_id, None)
+        else:  # line_close — resync gate (PHYSICS §2.7): |Δf| < 200 mHz
+            if self._line_in_service[line_id]:
+                return []
+            fb = int(net.line.from_bus.at[idx])
+            tb = int(net.line.to_bus.at[idx])
+            ia, ib = self._bus_island[fb], self._bus_island[tb]
+            islands = self.integrator.islands
+            if ia != ib:
+                black = islands.blackout()
+                if not black[ia] and not black[ib]                         and abs(float(islands.f[ia] - islands.f[ib])) > 0.2:
+                    return [("resync_rejected", line_id,
+                             {"df_hz": float(islands.f[ia] - islands.f[ib])})]
+            self._line_in_service[line_id] = True
+            net.line.at[idx, "in_service"] = True
+        return self._retopologize()
+
+    def apply_line_commands(self, cmds: dict | None) -> list[tuple[str, str, dict]]:
+        """Wire `line_commands`: immediate state change (contract: a STATE
+        change, never a topology reset). Returns wire events."""
+        events: list[tuple[str, str, dict]] = []
+        for line_id, cmd in (cmds or {}).items():
+            breaker = (cmd or {}).get("breaker")
+            if breaker == "open":
+                events += self._on_line_event("line_trip", line_id)
+                events.append(("line_trip", line_id, {"cause": "breaker"}))
+            elif breaker == "close":
+                out = self._on_line_event("line_close", line_id)
+                events += out
+                if not any(k == "resync_rejected" for k, _, _ in out):
+                    events.append(("line_close", line_id, {}))
+        if events:
+            self._run_pf("line_command")
+        return events
 
     # -- PF hook (called by the integrator at mode cadence + on events) ---
 
@@ -485,12 +667,13 @@ class DynSimulator:
         np = self._np
 
         island = self.integrator.islands
-        damping_factor = float(
-            island.w[0] * (1.0 + island.d_pu * (island.f[0] - self._f0) / self._f0)
-        )
+        row_island = self._np.array(
+            [self._bus_island[bus] for bus in self._load_bus], dtype=self._np.int64)             if self._load_bus else self._np.zeros(0, dtype=self._np.int64)
+        factors = island.w * (1.0 + island.d_pu * (island.f - self._f0) / self._f0)
+        row_factor = factors[row_island] if len(row_island) else factors[:0]
         if b.load_idx:
-            net.load.loc[b.load_idx, "p_mw"] = self._load_p_col * damping_factor
-            net.load.loc[b.load_idx, "q_mvar"] = self._load_q_col * damping_factor
+            net.load.loc[b.load_idx, "p_mw"] = self._load_p_col * row_factor
+            net.load.loc[b.load_idx, "q_mvar"] = self._load_q_col * row_factor
         if b.gen_idx:
             net.gen.loc[b.gen_idx, "p_mw"] = self.fleet.y
         if b.sgen_idx:
@@ -529,11 +712,48 @@ class DynSimulator:
         self._last_converged = True
         self._pf_ok = True
         self._pf_count += 1
+        dt_pf = max((self.integrator.t_us - self._last_pf_t_us) / 1e6, 0.0)
+        self._last_pf_t_us = self.integrator.t_us
+        from .dynamics import QUANTUM_US
+        from .dynamics.events import Event
         for line_id, idx in zip(b.line_ids, b.line_idx):
+            if not self._line_in_service[line_id]:
+                continue
             loading = float(net.res_line.loading_percent.at[idx])
             if loading > self._pf_window_max.get(line_id, 0.0):
                 self._pf_window_max[line_id] = loading
-        island.p_loss[0] = float(net.res_line.pl_mw.sum())
+            # overload protection (PARAMETERS §2.2): instant at >=150 %,
+            # duty-integrated above 120 %, decay below 100 %
+            if line_id in self._trip_scheduled:
+                continue
+            if loading >= 150.0:
+                self.integrator.queue.schedule(Event(
+                    self.integrator.t_us + QUANTUM_US, "line_trip", line_id,
+                    {"cause": "overload_instant", "loading": loading}))
+                self._trip_scheduled.add(line_id)
+            elif loading > 120.0:
+                duty = self._line_duty.get(line_id, 0.0)                     + (loading - 100.0) * dt_pf
+                self._line_duty[line_id] = duty
+                if duty >= 3000.0:
+                    self.integrator.queue.schedule(Event(
+                        self.integrator.t_us + QUANTUM_US, "line_trip", line_id,
+                        {"cause": "overload_duty", "loading": loading}))
+                    self._trip_scheduled.add(line_id)
+            elif loading < 100.0 and line_id in self._line_duty:
+                duty = self._line_duty[line_id] - 50.0 * dt_pf
+                if duty <= 0.0:
+                    del self._line_duty[line_id]
+                else:
+                    self._line_duty[line_id] = duty
+        # per-island losses: attribute each in-service line to its from-bus island
+        loss = self._np.zeros(island.n)
+        for line_id, idx in zip(b.line_ids, b.line_idx):
+            if not self._line_in_service[line_id]:
+                continue
+            pl = float(net.res_line.pl_mw.at[idx])
+            if self._np.isfinite(pl):
+                loss[self._bus_island[int(net.line.from_bus.at[idx])]] += pl
+        island.p_loss = loss
         self._latest_pf = {
             "buses": {
                 name: {"vm_pu": float(net.res_bus.vm_pu.at[idx]),
@@ -543,12 +763,15 @@ class DynSimulator:
             "lines": {
                 line_id: {"loading_percent": float(net.res_line.loading_percent.at[idx]),
                           "p_from_mw": float(net.res_line.p_from_mw.at[idx]),
-                          "pl_mw": float(net.res_line.pl_mw.at[idx])}
+                          "pl_mw": float(net.res_line.pl_mw.at[idx]),
+                          "in_service": True}
                 for line_id, idx in zip(b.line_ids, b.line_idx)
+                if self._line_in_service[line_id]
             },
-            "slack_mw": float(net.res_ext_grid.p_mw.sum()),
-            "loss_mw": float(net.res_line.pl_mw.sum()),
-            "max_loading_pct": float(net.res_line.loading_percent.max()),
+            "slack_mw": float(net.res_ext_grid.p_mw.fillna(0.0).sum()),
+            "loss_mw": float(loss.sum()),
+            "max_loading_pct": float(self._np.nanmax(
+                net.res_line.loading_percent.values)) if len(net.res_line) else 0.0,
             "min_vm_pu": float(net.res_bus.vm_pu.min()),
             "max_vm_pu": float(net.res_bus.vm_pu.max()),
         }
@@ -563,7 +786,7 @@ class DynSimulator:
         self.fleet.inv_avail[:self._n_native_inv] = b.sgen_p[:, step]
         self._load_p_col = b.load_p[:, step].copy()
         self._load_q_col = b.load_q[:, step].copy()
-        self.integrator.islands.p_l0[0] = float(self._load_p_col.sum())
+        self._refresh_p_l0()
 
     def warmup(self) -> float:
         import time as _time
@@ -595,7 +818,7 @@ class DynSimulator:
             for row in rows:
                 self._load_p_col[row] = share
                 self._load_q_col[row] = share * DEFAULT_Q_FACTOR
-        self.integrator.islands.p_l0[0] = float(self._load_p_col.sum())
+        self._refresh_p_l0()
 
         for plant_id, value in (avail_mw or {}).items():
             hub_row = self._hub_row.get(plant_id)
@@ -716,6 +939,30 @@ class DynSimulator:
         elif breaker == "close":
             links.close(device_id)
         return []
+
+    # -- sim-level snapshot (v2): engine + topology state -----------------
+
+    def state_blob(self) -> dict:
+        return {
+            "version": 2,
+            "engine": self.integrator.state_dict(),
+            "line_in_service": {k: bool(v)
+                                for k, v in self._line_in_service.items()},
+            "line_duty": {k: repr(float(v)) for k, v in self._line_duty.items()},
+        }
+
+    def restore_blob(self, blob: dict) -> None:
+        net = self.built.net
+        for line_id, live in blob["line_in_service"].items():
+            if line_id in self._line_in_service:
+                self._line_in_service[line_id] = bool(live)
+                net.line.at[self._line_pp_idx[line_id], "in_service"] = bool(live)
+        self._line_duty = {k: float(v) for k, v in blob["line_duty"].items()}
+        self._trip_scheduled = set()
+        # islands must match the blob's shape BEFORE the engine restore
+        self._retopologize()
+        self.integrator.restore_state(blob["engine"])
+        self._apply_pf_topology()
 
     def set_watch(self, watch: list[str]) -> list[str]:
         specs: list[tuple[str, str, int]] = []

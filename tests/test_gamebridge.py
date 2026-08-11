@@ -242,7 +242,7 @@ def test_external_clock_equivalence() -> None:
         for step in range(8):
             do_step(client, step)
         snap = client.get("/gb/snapshot").json()
-        f_wire = float(snap["blob"]["f"][0])
+        f_wire = float(snap["blob"]["engine"]["f"][0])
         t_wire = snap["t_sim"]
 
     assert t_wire == pytest.approx(t_standalone / 1e6)
