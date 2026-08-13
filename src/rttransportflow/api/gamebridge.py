@@ -41,6 +41,11 @@ class GbState:
         self.last_t: int | None = None
         self.last_result: dict[str, Any] | None = None
         self.lock = asyncio.Lock()  # strictly sequential step channel
+        # reset ingredients — /gb/replay rebuilds a THROWAWAY sim from these
+        self.data: Any = None
+        self.wire_devices: list[dict] = []
+        self.protection_seed: int = 0
+        self.sim_kwargs: dict[str, Any] = {}
 
 
 def _gb(request_or_ws) -> GbState:
@@ -129,7 +134,18 @@ async def net_reset(request: Request) -> dict:
         else:
             status = "refused_snapshot"  # applied WITHOUT it — game cold-starts
 
-    request.app.state.gb = GbState(sim, body.get("name", "unnamed"), hash_)
+    gb = GbState(sim, body.get("name", "unnamed"), hash_)
+    gb.data = data
+    gb.wire_devices = wire_devices
+    gb.protection_seed = _as_int(body.get("protection_seed", 0.0))
+    gb.sim_kwargs = {
+        "steps_per_day": data.scenario.steps_per_day,
+        "d_load_pct_per_hz": container.settings.d_load_pct_per_hz,
+        "warm_start": container.settings.warm_start,
+        "catalog_path": container.settings.catalog_path,
+    }
+    sim.enable_snapshot_ring()
+    request.app.state.gb = gb
     island = sim.integrator.islands
     return _r({
         "status": status,
@@ -231,12 +247,16 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
                 and bool(sim.fleet.h2_starved[row]):
             state = "starved"
         devices[pid] = {
-            "p_mw": float(sim.fleet.y[row]),
+            "p_mw": float(sim.fleet.y[row] - sim.fleet.hy_pump_p[row]),
             "state": state,
             "headroom_mw": max(0.0, float(sim.fleet.p_max[row] - sim.fleet.y[row])),
             "energy_mwh_step": float(sim.fleet.energy_mwh[row] - e_before[row]),
             "fuel_mwh_th_step": float(sim.fleet.fuel_mwh_th[row] - fuel_before[row]),
         }
+        if bool(sim.fleet.is_hydro[row]) and float(sim.fleet.hy_e_mwh[row]) > 0:
+            devices[pid]["soc"] = float(sim.fleet.hy_soc_mwh[row]
+                                        / sim.fleet.hy_e_mwh[row])
+            devices[pid]["soc_mwh"] = float(sim.fleet.hy_soc_mwh[row])
     for pid, row in sim._inv_row.items():
         devices[pid] = {
             "p_mw": float(sim.fleet.inv_p[row]),
@@ -405,6 +425,73 @@ def snapshot(request: Request) -> dict:
         "version": SNAPSHOT_VERSION,
         "blob": gb.sim.state_blob(),  # repr floats — bit-exact (v2: + topology)
     }
+
+
+@router.post("/replay")
+async def replay(request: Request) -> dict:
+    """Counterfactual re-run of an event window (contract v2, ledger 23):
+    restore the newest ring snapshot at or before `t_sim`, apply overrides,
+    integrate forward on a THROWAWAY sim — the live state is never touched
+    and the physics runs exactly once (same engine code). The PF hook stays
+    off: losses ride sample-and-hold from the snapshot (documented). The ring
+    entry AT an event instant is captured post-application — a replay
+    anchored on the event t_sim replays the AFTERMATH, which is what the
+    ghost traces compare (GAME_DESIGN §4.5)."""
+    gb = _gb(request)
+    body = await request.json()
+    if "t_sim" not in body:
+        # wire events carry no ids — the game addresses windows by t_sim
+        raise HTTPException(status_code=400, detail="t_sim required")
+    t_sim = float(body["t_sim"])
+    window_s = min(float(body.get("window_s", 65.0)), 120.0)
+    hit = gb.sim.ring_lookup(s_to_us(t_sim))
+    if hit is None:
+        return {"status": "window_expired"}
+    t0_us, blob = hit
+    overrides = body.get("overrides") or {}
+
+    def run():
+        from ..network_builder import build_network
+
+        sim = DynSimulator(gb.data, build_network(gb.data),
+                           wire_devices=gb.wire_devices,
+                           protection_seed=gb.protection_seed,
+                           **gb.sim_kwargs)
+        sim.integrator.pf_hook = None  # replay: swing only, losses frozen
+        sim.restore_blob(blob)
+        notes: list[str] = []
+        for device_id in overrides.get("remove_devices", []) or []:
+            try:
+                sim.fleet.trip(str(device_id), sim.integrator.t_us)
+                sim.integrator.refresh_e_k()
+            except KeyError:
+                notes.append(f"remove_devices: unknown {device_id!r}")
+        for device_id, params in (overrides.get("set_params") or {}).items():
+            notes += sim.apply_wire_boundary(None, None, {device_id: params})
+        if overrides.get("add_devices"):
+            notes.append("add_devices: unsupported in replay")
+        horizon_us = s_to_us(t_sim + window_s) - sim.integrator.t_us
+        res = sim.integrator.advance(max(horizon_us, QUANTUM_US),
+                                     interrupt_on_event=False)
+        return sim, res, notes
+
+    sim2, res, notes = await asyncio.to_thread(run)
+    islands2 = sim2.integrator.islands
+    return _r({
+        "status": "ok",
+        "t_start": t0_us / US,
+        "t_end": sim2.integrator.t_us / US,
+        "trajectory": res.trajectory,
+        "islands": {str(i): {"f_hz": float(islands2.f[i]),
+                             "f_min": float(res.f_min[i]) if i < len(res.f_min)
+                             else float(islands2.f[i]),
+                             "blackout": bool(islands2.blackout()[i]),
+                             "w": float(islands2.w[i])}
+                    for i in range(islands2.n)},
+        "events": [{"t_sim": e.t_us / US, "kind": e.kind, "element": e.element,
+                    "data": e.data} for e in res.events],
+        "notes": notes,
+    })
 
 
 @router.get("/telemetry/ring")

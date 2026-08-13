@@ -85,6 +85,10 @@ def sync_spec(kind: str, params: dict, *, device_id: str, island: int,
         if model == "ccgt":
             spec.update(t_st=params["t_st_s"])
     elif model == "hydro":
+        spec.update(e_mwh=params.get("e_hours", 8.0) * p_max_mw,
+                    eta_pump=params.get("eta_pump", 0.88),
+                    eta_turbine=params.get("eta_turbine", 0.90),
+                    soc_frac=params.get("soc_frac", 0.5))
         spec.update(t_r=params["t_r_s"], r_t=params["r_t"],
                     t_servo=params["t_servo_s"],
                     gate_rate_pu_s=params["gate_rate_pu_s"], t_w=params["t_w_s"])

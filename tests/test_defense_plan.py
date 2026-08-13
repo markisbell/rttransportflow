@@ -160,3 +160,53 @@ def test_defense_state_snapshot_roundtrip() -> None:
     a = integ.advance(s_to_us(10.0), interrupt_on_event=False)
     b = twin.advance(s_to_us(10.0), interrupt_on_event=False)
     assert float(a.f_end[0]) == float(b.f_end[0])
+
+
+def test_black_start_reenergizes_a_dead_island() -> None:
+    """PHYSICS §2.7 restoration hook: a normal restart is HELD on a dead
+    island forever; `black_start` bypasses the hold and the first completed
+    machine re-energizes the island at 50 Hz (event `black_start`)."""
+    # engine envelope p_min is 0 (the catalog p_min informs the DISPATCHER,
+    # ledger/P3): a black-start unit runs at house load on the dead island —
+    # syncing at a forced P_min into zero load would over-frequency-trip it
+    sync = [{"id": "o", "island": 0, "s_n": 250.0, "h": 4.0, "r": 0.05,
+             "db": 0.010, "fcr_band": 50.0, "p_max": 200.0, "p_min": 0.0,
+             "t_g": 0.3, "t_ch": 0.8, "t_rh": 1e9, "f_hp": 1.0,
+             "ramp_mw_s": np.inf, "p_set": 150.0, "start_hot_s": 60.0}]
+    fleet = make_fleet(sync)
+    fleet.init_steady_state()
+    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
+                          p_l0=np.array([150.0]), w=np.ones(1),
+                          p_loss=np.zeros(1), d_pu=0.5)
+    integ = Integrator(fleet, islands)
+    integ.queue.schedule(Event(s_to_us(1.0), "trip", "o"))
+    integ.advance(s_to_us(5.0), interrupt_on_event=False)
+    assert bool(islands.blackout()[0])
+    f_frozen = float(islands.f[0])
+
+    # ordinary restart: held forever on the dead island
+    fleet.command_start("o", integ.t_us)
+    integ.advance(s_to_us(120.0), interrupt_on_event=False)
+    assert int(fleet.status[0]) != 2  # still not online
+    assert bool(islands.blackout()[0])
+    assert float(islands.f[0]) == f_frozen
+
+    # black start: completes onto the UNLOADED island (the collapse shed
+    # everything — w = 0) and re-energizes at 50 Hz
+    assert float(integ.islands.w[0]) == 0.0
+    fleet.black_start_rows = {0}
+    res = integ.advance(s_to_us(120.0), interrupt_on_event=False)
+    assert int(fleet.status[0]) == 2
+    assert not bool(integ.islands.blackout()[0])
+    assert any(e.kind == "black_start" for e in res.events)
+    assert float(res.f_end[0]) > 49.5  # holds at P_min, no load yet
+
+    # the game then re-picks load up in blocks, dispatching generation to
+    # match (restoration doctrine: load blocks + matching dispatch)
+    fleet.p_set[0] = 30.0
+    integ.advance(s_to_us(320.0), interrupt_on_event=False)
+    integ.defense.request_restore(0, 0.10)
+    integ.defense.request_restore(0, 0.10)
+    integ.advance(s_to_us(300.0), interrupt_on_event=False)
+    assert float(integ.islands.w[0]) > 0.15  # load coming back
+    assert not bool(integ.islands.blackout()[0])

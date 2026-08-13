@@ -69,6 +69,7 @@ UFLS_STAGES: list[tuple[float, float]] = [
     (48.4, 0.075), (48.2, 0.075), (48.0, 0.075),
 ]
 UFLS_PICKUP_US = 150_000
+PUMP_SHED_HZ = 49.7  # all PHS pumping trips (automatic load relief)
 ELY_SHED_HZ = 49.6  # interruptible tier (proportional shed is already full)
 RESTORE_F_OK_HZ = 49.8
 RESTORE_F_OK_US = 300_000_000  # 5 min above 49.8 before restoration may ramp
@@ -93,6 +94,7 @@ class DefensePlan:
         self.stage_armed = np.ones((k, n), dtype=bool)
         self.stage_timer_us = np.zeros((k, n), dtype=np.int64)
         self.ely_latched = np.zeros(n, dtype=bool)
+        self.pump_latched = np.zeros(n, dtype=bool)
         self.rocof_armed = np.ones((len(ROCOF_DG_ROWS), n), dtype=bool)
         self.pole_armed = np.ones(n, dtype=bool)
         self.restore_target_w = np.ones(n)
@@ -114,6 +116,20 @@ class DefensePlan:
         f = islands.f
         alive = ~islands.blackout()
         dt_s = dt_us / 1e6
+
+        # --- automatic load relief: PHS pumping trips at 49.7 -------------
+        for island in np.nonzero((f < PUMP_SHED_HZ) & alive
+                                 & ~self.pump_latched)[0]:
+            self.pump_latched[island] = True
+            rows = np.nonzero(fleet.is_hydro & (fleet.island_of == island)
+                              & (fleet.hy_pump_set > 0.0))[0]
+            shed_mw = float(fleet.hy_pump_p[rows].sum()) if len(rows) else 0.0
+            fleet.hy_pump_set[fleet.island_of == island] = 0.0
+            events.append(("pump_shed", f"island:{island}",
+                           {"f_hz": float(f[island]), "shed_mw": shed_mw}))
+        # while latched, dispatcher re-commands are overridden every tick
+        for island in np.nonzero(self.pump_latched)[0]:
+            fleet.hy_pump_set[fleet.island_of == island] = 0.0
 
         # --- interruptible tier: electrolyzers latch off at 49.6 ----------
         for island in np.nonzero((f < ELY_SHED_HZ) & alive & ~self.ely_latched)[0]:
@@ -178,6 +194,7 @@ class DefensePlan:
                 # full restoration re-arms the event latches (§2.2)
                 self.stage_armed[:, island] = True
                 self.ely_latched[island] = False
+                self.pump_latched[island] = False
                 islands.p_extra[island] = 0.0
                 if len(fleet.ely_ids):
                     rows = np.nonzero(fleet.ely_island == island)[0]
@@ -194,6 +211,7 @@ class DefensePlan:
         self.stage_armed = self.stage_armed[:, idx].copy()
         self.stage_timer_us = self.stage_timer_us[:, idx].copy()
         self.ely_latched = self.ely_latched[idx].copy()
+        self.pump_latched = self.pump_latched[idx].copy()
         self.rocof_armed = self.rocof_armed[:, idx].copy()
         self.pole_armed = self.pole_armed[idx].copy()
         self.restore_target_w = self.restore_target_w[idx].copy()
@@ -204,6 +222,7 @@ class DefensePlan:
             "stage_armed": self.stage_armed.tolist(),
             "stage_timer_us": self.stage_timer_us.tolist(),
             "ely_latched": self.ely_latched.tolist(),
+            "pump_latched": self.pump_latched.tolist(),
             "rocof_armed": self.rocof_armed.tolist(),
             "pole_armed": self.pole_armed.tolist(),
             "restore_target_w": [repr(float(v)) for v in self.restore_target_w],
@@ -215,6 +234,8 @@ class DefensePlan:
         self.stage_armed[:] = np.array(state["stage_armed"], dtype=bool)
         self.stage_timer_us[:] = np.array(state["stage_timer_us"], dtype=np.int64)
         self.ely_latched[:] = np.array(state["ely_latched"], dtype=bool)
+        self.pump_latched[:] = np.array(
+            state.get("pump_latched", self.pump_latched.tolist()), dtype=bool)
         self.rocof_armed[:] = np.array(state["rocof_armed"], dtype=bool)
         self.pole_armed[:] = np.array(state["pole_armed"], dtype=bool)
         self.restore_target_w[:] = np.array(

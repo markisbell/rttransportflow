@@ -131,6 +131,10 @@ class Integrator:
         # (the integrator knows nothing about pandapower); returns follow-up
         # (kind, element, data) events — island_split/island_merge
         self.topology_hook: Callable[[str, str], list] | None = None
+        # rolling-ring capture (ledger 23): called at 5 s sim marks — which
+        # already lie ON the tick grid (250 ms and 10 ms both divide 5 s),
+        # so arming it never changes the boundary sequence (slicing identity)
+        self.snapshot_hook: Callable[[int], None] | None = None
         # analytic fixtures pin the bare swing+FCR path (PHYSICS §6 runs
         # "with clamps disabled" — the defense layer counts as one)
         self.defense_enabled = True
@@ -225,6 +229,7 @@ class Integrator:
         self.energy_load_mj += float(np.sum(p_load)) * dt_s
 
     def _apply_events(self, events: list[Event]) -> None:
+        was_alive = ~self.islands.blackout()
         for event in events:
             if event.kind == "trip":
                 self.fleet.trip(event.element, self.t_us)
@@ -243,6 +248,17 @@ class Integrator:
                 pass  # informational (commitment already applied)
             else:
                 raise ValueError(f"unknown event kind {event.kind!r}")
+        # a COLLAPSE disconnects everything: a newly-dead island loses its
+        # load (w -> 0) so a later black start faces an unloaded system and
+        # the game re-picks demand up in restore_load blocks (PHYSICS §2.7)
+        newly_black = was_alive & self.islands.blackout()
+        for island in np.nonzero(newly_black)[0]:
+            self.islands.w[island] = 0.0
+            self.islands.p_extra[island] = 0.0
+            self.defense.restore_target_w[island] = 0.0
+            self._pending_topology_events.append(
+                Event(self.t_us, "blackout", f"island:{island}", {},
+                      significant=True))
 
     def balance_err(self) -> float:
         """|∫(P_inj−P_load−P_loss)dt − (2/f0)·Σ E_k·Δf| / ∫P_load dt."""
@@ -304,12 +320,26 @@ class Integrator:
                     break
 
             # commitment completions (informational events)
-            for device_id in self.fleet.poll_commitment(
-                    self.t_us, self.islands.f, self.islands.blackout()):
+            was_black = self.islands.blackout().copy()
+            completions = self.fleet.poll_commitment(
+                self.t_us, self.islands.f, self.islands.blackout())
+            for device_id in completions:
                 self.refresh_e_k()
                 completed = Event(self.t_us, "start_complete", device_id,
                                   significant=False)
                 fired.append(completed)
+            if completions:
+                # a black start into a dead island RE-ENERGIZES it: the
+                # first machine sets the reference frequency (PHYSICS §2.7
+                # scripted-restoration hook)
+                revived = was_black & ~self.islands.blackout()
+                for island in np.nonzero(revived)[0]:
+                    self.islands.f[island] = F0
+                    fired.append(Event(self.t_us, "black_start",
+                                       f"island:{island}", {},
+                                       significant=True))
+                    buffer.mark_event(self.t_us)
+                    self.enter_alert()
 
             # f-window self-protection: relay pickups become trip events NOW
             for device_id in self.relays.check(self.fleet, self.islands.f, dt):
@@ -382,6 +412,9 @@ class Integrator:
             if self.mode != mode_before:
                 next_pf = self._next_multiple(self.t_us, self._pf_interval)
                 next_sample = self._next_multiple(self.t_us, self._sample_interval)
+
+            if self.snapshot_hook is not None and self.t_us % 5_000_000 == 0:
+                self.snapshot_hook(self.t_us)
 
             for island in range(self.islands.n):
                 rocof_max[island] = max(

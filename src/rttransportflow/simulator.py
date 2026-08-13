@@ -675,7 +675,7 @@ class DynSimulator:
             net.load.loc[b.load_idx, "p_mw"] = self._load_p_col * row_factor
             net.load.loc[b.load_idx, "q_mvar"] = self._load_q_col * row_factor
         if b.gen_idx:
-            net.gen.loc[b.gen_idx, "p_mw"] = self.fleet.y
+            net.gen.loc[b.gen_idx, "p_mw"] = self.fleet.y - self.fleet.hy_pump_p
         if b.sgen_idx:
             native = self.fleet.inv_p[:self._n_native_inv]
             net.sgen.loc[b.sgen_idx, "p_mw"] = native
@@ -858,7 +858,20 @@ class DynSimulator:
         notes: list[str] = []
         row = self._sync_row[device_id]
         if cmd.get("dispatch_mw") is not None:
-            self.fleet.p_set[row] = float(cmd["dispatch_mw"])
+            value = float(cmd["dispatch_mw"])
+            if value < 0.0:
+                # pump mode (PHS): negative dispatch = pumping draw
+                if bool(self.fleet.is_hydro[row]):
+                    self.fleet.hy_pump_set[row] = min(
+                        -value, float(self.fleet.p_max[row]))
+                    self.fleet.p_set[row] = 0.0
+                else:
+                    notes.append(f"{device_id}: negative dispatch on a "
+                                 "non-hydro unit")
+            else:
+                self.fleet.p_set[row] = value
+                if bool(self.fleet.is_hydro[row]):
+                    self.fleet.hy_pump_set[row] = 0.0
         if cmd.get("curtail_to_mw") is not None:
             notes.append(f"{device_id}: curtail_to_mw on a synchronous plant")
         breaker = cmd.get("breaker")
@@ -868,6 +881,10 @@ class DynSimulator:
         elif breaker == "close":
             try:
                 self.fleet.command_start(device_id, self.integrator.t_us)
+                if cmd.get("black_start"):
+                    if self.fleet.black_start_rows is None:
+                        self.fleet.black_start_rows = set()
+                    self.fleet.black_start_rows.add(int(row))
             except RuntimeError as exc:
                 notes.append(str(exc))
         return notes
@@ -939,6 +956,32 @@ class DynSimulator:
         elif breaker == "close":
             links.close(device_id)
         return []
+
+    # -- rolling snapshot ring (ledger 23): 5 s cadence, 120 s retention --
+
+    RING_RETAIN_US = 120_000_000
+
+    def enable_snapshot_ring(self) -> None:
+        """Arm the /gb/replay state source (gamebridge mode only — the
+        standalone Grafana mode has no replay UI and skips the capture cost)."""
+        from collections import deque
+        self._snap_ring: object = deque()
+        self.integrator.snapshot_hook = self._ring_capture
+
+    def _ring_capture(self, t_us: int) -> None:
+        ring = self._snap_ring
+        ring.append((t_us, self.state_blob()))
+        while ring and ring[0][0] < t_us - self.RING_RETAIN_US:
+            ring.popleft()
+
+    def ring_lookup(self, t_us: int):
+        """Newest ring entry at or before t_us, or None (window expired)."""
+        ring = getattr(self, "_snap_ring", None)
+        best = None
+        for entry_t, blob in (ring or ()):
+            if entry_t <= t_us:
+                best = (entry_t, blob)
+        return best
 
     # -- sim-level snapshot (v2): engine + topology state -----------------
 

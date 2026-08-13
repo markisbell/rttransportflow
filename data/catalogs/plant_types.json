@@ -136,7 +136,12 @@
       "eta_full": 0.88,
       "eta_min": 0.88,
       "fuel": null,
-      "rationale": "PARAMETERS §1.10: transient-droop governor (T_r 6 s, r_t 0.4 → 60 s sustained lag) + non-minimum-phase water column (T_w 1.5 s) — the wrong-way kick is real physics the player sees; 30-100% generating range, 2-min start."
+      "rationale": "PARAMETERS §1.10: transient-droop governor (T_r 6 s, r_t 0.4 → 60 s sustained lag) + non-minimum-phase water column (T_w 1.5 s) — the wrong-way kick is real physics the player sees; 30-100% generating range, 2-min start.",
+      "e_hours": 8.0,
+      "eta_pump": 0.88,
+      "eta_turbine": 0.9,
+      "soc_frac": 0.5,
+      "_reservoir_rationale": "PARAMETERS 1.10: 300 MW / 8 h = 2400 MWh reference; pump/turbine efficiencies give the ~0.79 round trip; pumping is a motor load that keeps the machine's inertia in the pool (P8 pump mode)"
     },
     "wind_onshore": {
       "model": "inverter",

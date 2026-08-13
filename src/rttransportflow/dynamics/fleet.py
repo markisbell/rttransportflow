@@ -90,6 +90,10 @@ class Fleet:
     hy_t_srv: np.ndarray
     hy_rate_mw_s: np.ndarray
     hy_t_w2: np.ndarray  # 0.5·T_w
+    # PHS reservoir + pump mode (PARAMETERS §1.10; e_mwh 0 = unmodeled)
+    hy_e_mwh: np.ndarray
+    hy_eta_ch: np.ndarray
+    hy_eta_dis: np.ndarray
     # commitment
     status: np.ndarray  # int8: OFFLINE/STARTING/ONLINE
     start_done_us: np.ndarray  # int64
@@ -116,6 +120,10 @@ class Fleet:
     hy_g: np.ndarray
     hy_xh: np.ndarray
     y: np.ndarray
+    hy_soc_mwh: np.ndarray
+    hy_pump_set: np.ndarray  # commanded pumping draw [MW, >= 0]
+    hy_pump_p: np.ndarray  # actual pumping draw (slewed)
+    pump_energy_mwh: np.ndarray
 
     # --- inverter plants (wind/PV) ---
     inv_ids: list[str]
@@ -179,6 +187,9 @@ class Fleet:
     h2: object = None  # H2Stores (attach_h2)
     hvdc: object = None  # HVDCLinks (attach_hvdc)
     notices: list = None  # (kind, device_id) engine notices, polled per tick
+    # rows whose pending start is a BLACK START (bypasses the sick-island
+    # hold; the integrator re-energizes a dead island on completion)
+    black_start_rows: set = None
 
     _coeff_cache: dict[int, dict[str, np.ndarray]] = field(default_factory=dict, repr=False)
 
@@ -311,7 +322,8 @@ class Fleet:
         done: list[str] = []
         rows = np.nonzero((self.status == STARTING) & (self.start_done_us <= t_us))[0]
         for row in rows:
-            if f_island is not None:
+            if f_island is not None \
+                    and row not in (self.black_start_rows or ()):
                 island = int(self.island_of[row])
                 sick = abs(float(f_island[island]) - F0) > 1.0
                 if blackout is not None:
@@ -328,6 +340,8 @@ class Fleet:
             self.x_2[row] = self.c_2[row] * self.x_1[row]
             self.hy_xc[row] = self.hy_g[row] = self.hy_xh[row] = p0
             self.p_set[row] = max(self.p_set[row], p0)
+            if self.black_start_rows:
+                self.black_start_rows.discard(int(row))
             done.append(self.ids[row])
         return done
 
@@ -388,6 +402,24 @@ class Fleet:
         u = np.clip(self.p_disp + prim, self.p_min, self.p_max)
         u = np.where(online, u, 0.0)
 
+        # PHS pump mode: a pumping unit spins as a motor (inertia stays in
+        # the pool via ONLINE status) with the turbine path idle
+        pumping = self.is_hydro & (np.maximum(self.hy_pump_set,
+                                              self.hy_pump_p) > 0.0)
+        if pumping.any():
+            u = np.where(pumping, 0.0, u)
+            self.hy_pump_p += np.clip(self.hy_pump_set - self.hy_pump_p,
+                                      -self.ramp_mw_s * dt_s,
+                                      self.ramp_mw_s * dt_s)
+            self.hy_pump_p = np.where(online, self.hy_pump_p, 0.0)
+            has_res = self.hy_e_mwh > 0.0
+            ch_cap = np.where(
+                has_res,
+                (self.hy_e_mwh - self.hy_soc_mwh) / np.maximum(self.hy_eta_ch, 1e-9)
+                * (3600.0 / max(dt_s, 1e-9)),
+                np.inf)
+            self.hy_pump_p = np.minimum(self.hy_pump_p, np.maximum(ch_cap, 0.0))
+
         # unified chain (steam / ccgt / ocgt)
         self.x_g += (1.0 - cf["a"]) * (self.c_in * u - self.x_g)
         self.x_1 += (1.0 - cf["b"]) * (self.x_g - self.x_1)
@@ -408,6 +440,20 @@ class Fleet:
 
         y = np.where(self.is_hydro, y_hydro, y_chain)
         y = np.where(online, y, 0.0)
+
+        # PHS reservoir: pumped inflow, turbine outflow, hard energy bounds
+        res_rows = self.is_hydro & (self.hy_e_mwh > 0.0)
+        if res_rows.any():
+            dis_cap = self.hy_soc_mwh * self.hy_eta_dis * (3600.0 / max(dt_s, 1e-9))
+            y = np.where(res_rows, np.minimum(y, np.maximum(dis_cap, 0.0)), y)
+            dt_h = dt_s / 3600.0
+            self.hy_soc_mwh += np.where(
+                res_rows,
+                self.hy_pump_p * self.hy_eta_ch * dt_h
+                - y / np.maximum(self.hy_eta_dis, 1e-9) * dt_h, 0.0)
+            np.clip(self.hy_soc_mwh, 0.0, np.maximum(self.hy_e_mwh, 0.0),
+                    out=self.hy_soc_mwh)
+            self.pump_energy_mwh += self.hy_pump_p * dt_h
 
         # sync-side LFSM-O: continuous over-frequency curtailment (§2.7)
         over = np.maximum(df - (LFSM_O_FROM_HZ - F0), 0.0)
@@ -454,7 +500,7 @@ class Fleet:
             self.fuel_mwh_th[fueled] += (e_step[fueled] / np.maximum(eta[fueled], 1e-9))
 
         p_mech = np.zeros(n_islands)
-        np.add.at(p_mech, self.island_of, y)
+        np.add.at(p_mech, self.island_of, y - self.hy_pump_p)
         p_inv = np.zeros(n_islands)
 
         # --- inverter plants (wind/PV): lags + LFSM-O -------------------
@@ -547,6 +593,9 @@ class Fleet:
             "x_g": rf(self.x_g), "x_1": rf(self.x_1), "x_2": rf(self.x_2),
             "hy_xc": rf(self.hy_xc), "hy_g": rf(self.hy_g), "hy_xh": rf(self.hy_xh),
             "y": rf(self.y),
+            "hy_soc_mwh": rf(self.hy_soc_mwh),
+            "hy_pump_set": rf(self.hy_pump_set), "hy_pump_p": rf(self.hy_pump_p),
+            "pump_energy_mwh": rf(self.pump_energy_mwh),
             "energy_mwh": rf(self.energy_mwh), "fuel_mwh_th": rf(self.fuel_mwh_th),
             "inv_online": self.inv_online.tolist(),
             "inv_avail": rf(self.inv_avail), "inv_avail_eff": rf(self.inv_avail_eff),
@@ -558,6 +607,7 @@ class Fleet:
             "ely_online": self.ely_online.tolist(),
             "ely_p_set": rf(self.ely_p_set), "ely_p": rf(self.ely_p),
             "ely_energy_mwh": rf(self.ely_energy_mwh),
+            "black_start_rows": sorted(self.black_start_rows or []),
         }
 
     def restore_state(self, state: dict) -> None:
@@ -576,6 +626,11 @@ class Fleet:
         # pre-slew snapshots lack the field: converged fallback
         self.inv_avail_eff[:] = np.array(
             [float(v) for v in state.get("inv_avail_eff", state["inv_avail"])])
+        self.black_start_rows = set(state.get("black_start_rows", []))
+        for name in ("hy_soc_mwh", "hy_pump_set", "hy_pump_p", "pump_energy_mwh"):
+            if name in state:
+                getattr(self, name)[:] = np.array(
+                    [float(v) for v in state[name]])
 
 
 def make_fleet(
@@ -685,6 +740,9 @@ def make_fleet(
         w_a=w_a, w_b=w_b, w_c=w_c, is_hydro=is_hydro,
         hy_t_lag=hy_t_lag, hy_k_lead=hy_k_lead, hy_t_srv=hy_t_srv,
         hy_rate_mw_s=hy_rate, hy_t_w2=hy_t_w2,
+        hy_e_mwh=col("e_mwh", lambda s: 0.0),
+        hy_eta_ch=col("eta_pump", lambda s: 0.88),
+        hy_eta_dis=col("eta_turbine", lambda s: 0.90),
         status=status,
         start_done_us=np.zeros(n, dtype=np.int64),
         off_since_us=np.zeros(n, dtype=np.int64),
@@ -702,6 +760,11 @@ def make_fleet(
         p_set=col("p_set", lambda s: 0.0),
         p_disp=np.zeros(n), x_g=np.zeros(n), x_1=np.zeros(n), x_2=np.zeros(n),
         hy_xc=np.zeros(n), hy_g=np.zeros(n), hy_xh=np.zeros(n), y=np.zeros(n),
+        hy_soc_mwh=np.array([float(s.get("soc_frac", 0.5))
+                             * float(s.get("e_mwh", 0.0)) for s in sync])
+        if n else np.zeros(0),
+        hy_pump_set=np.zeros(n), hy_pump_p=np.zeros(n),
+        pump_energy_mwh=np.zeros(n),
         inv_ids=[i["id"] for i in inverters],
         inv_island=np.array([int(i.get("island", 0)) for i in inverters], dtype=np.int64),
         inv_p_rated=np.array([float(i.get("p_rated", i.get("p_target", 0.0))) for i in inverters]),

@@ -40,6 +40,7 @@ def model_hash(fleet) -> str:
                 fleet.t_a, fleet.t_b, fleet.t_c, fleet.c_in, fleet.c_2,
                 fleet.w_a, fleet.w_b, fleet.w_c,
                 fleet.hy_t_lag, fleet.hy_k_lead, fleet.hy_t_srv, fleet.hy_t_w2,
+                fleet.hy_e_mwh, fleet.hy_eta_ch, fleet.hy_eta_dis,
                 fleet.inv_t_up, fleet.inv_t_down, fleet.inv_p_rated,
                 fleet.inv_aux_mw, fleet.inv_slew_mw_s,
                 fleet.bat_p_max, fleet.bat_e_mwh, fleet.bat_h_v,

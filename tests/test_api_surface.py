@@ -21,6 +21,7 @@ EXPECTED_ROUTES = {
     ("WS", "/gb/ws"),
     ("GET", "/gb/result/latest"),
     ("GET", "/gb/snapshot"),
+    ("POST", "/gb/replay"),
     ("GET", "/gb/telemetry/ring"),
 }
 
