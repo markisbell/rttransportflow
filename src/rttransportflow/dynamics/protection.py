@@ -32,6 +32,13 @@ class FrequencyWindowRelays:
         trips: list[str] = []
         low, high, delay = self.cfg.low_hz, self.cfg.high_hz, self.cfg.delay_us
 
+        # fast path (ALERT runs this every 10 ms): no island near the window
+        # and no timer mid-pickup — nothing can possibly trip
+        if len(f_island) and float(f_island.min()) > low + 0.1 \
+                and float(f_island.max()) < high - 0.1 \
+                and not self.sync_timer_us.any() and not self.inv_timer_us.any():
+            return trips
+
         if fleet.n_sync:
             f_dev = f_island[fleet.island_of]
             out = ((f_dev < low) | (f_dev > high)) & fleet.online
@@ -116,6 +123,20 @@ class DefensePlan:
         f = islands.f
         alive = ~islands.blackout()
         dt_s = dt_us / 1e6
+
+        # fast path (every ALERT tick lands here): far from every threshold,
+        # nothing latched, nothing restoring — only the healthy-hold clock
+        # keeps ticking (restoration needs its 5-min history)
+        aro_max = float(np.max(np.abs(rocof_windowed))) if len(rocof_windowed) else 0.0
+        if float(f.min()) > PUMP_SHED_HZ and aro_max < ROCOF_DG_ROWS[0][0] \
+                and not self.ely_latched.any() and not self.pump_latched.any() \
+                and not (self.restore_target_w > islands.w).any() \
+                and not self.stage_timer_us.any():
+            f_ok = (f > RESTORE_F_OK_HZ) & alive
+            self.f_ok_since_us = np.where(
+                f_ok, np.where(self.f_ok_since_us < 0, t_us,
+                               self.f_ok_since_us), -1)
+            return trips, events
 
         # --- automatic load relief: PHS pumping trips at 49.7 -------------
         for island in np.nonzero((f < PUMP_SHED_HZ) & alive

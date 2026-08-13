@@ -214,6 +214,25 @@ docs/GAME_DESIGN.md.
     game truth: pre-aFRR, a small island survives sustained intra-block
     ramps only with the full stack — slew (physics) + must-run synchronous
     fleet (inertia) + batteries (FFR bridges the 15-min dispatch cadence).
+34. **Blackout & black-start doctrine** (P8, 2026-08-13): an island whose
+    E_k hits zero DISCONNECTS its load (w → 0, `blackout` wire event) — the
+    collapse itself is the disconnection; a later `black_start: true`
+    breaker-close bypasses the sick-island start hold and the first
+    completed machine re-energizes the island at 50 Hz onto the unloaded
+    system; demand returns only via `restore_load` blocks through the
+    5-min-healthy gate. Found the hard way twice: restarting into a loaded
+    dead island collapses again, and syncing at a forced P_min into ZERO
+    load over-frequency-trips — the engine envelope's p_min stays 0 (the
+    catalog p_min informs the dispatcher, P3 rule) and black-start units
+    run at house load.
+35. **§2.3 row-5 narrative refined + sync LFSM-O** (P8): with the defense
+    live, UFLS stage 1's 7.5 % shed (11.25 GW on the 150 GW island)
+    overcorrects the 3 GW reference loss — only stage 1 fires, the raw
+    "stages 1+2" reading described the unshedded nadir (the §2.3 raw pins
+    are untouched, fixtures run defense-off). Same hunt: sync-side LFSM-O
+    (40 % of current P per Hz above 50.2) was missing — an over-shed rode
+    f through 51.5 into a mass-disconnection cliff; PHYSICS §2.7 always
+    mandated it on ALL generation.
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -675,6 +694,72 @@ P7 "pumped hydro dispatchable + SoC on the wire" clause): catch up in P8
 with the 49.7 Hz pump-shed tier, which is a no-op until pumping exists.
 
 **Next:** P8 — protection, UFLS, cascades, replay, teaching UX.
+
+### P8 — Protection, UFLS, cascades, replay, teaching UX (2026-08-13)
+
+**Built:** BACKEND — DefensePlan (PARAMETERS §2.2: 6 UFLS stages, 150 ms
+pickups, per-event latching onto `islands.w`; 49.7 pump-shed + 49.6
+electrolyzer interruptible tiers, latched, dispatcher re-commands
+overridden; restoration ramp 1 %/10 s gated on 5 min > 49.8 Hz, re-gated on
+every dip, full restoration re-arms all latches; RoCoF feel table on the
+500 ms windowed value — embedded-DG trips as `p_extra` net load, pole-slip
+draws from the `protection_seed` PRNG in event order, PRNG state in the
+snapshot); sync-side LFSM-O; overload protection at PF instants (≥150 %
+instant, duty >120 % → 3000 %·s, decay <100 %); line_trip/line_close as
+wire state changes with the |Δf| < 200 mHz resync gate; island split/merge
+(components of the in-service graph, parent-inherited f/w/defense state,
+per-island p_l0/loss redistribution, per-island PF slack election, dead
+islands leave the AC solve; every island on the wire, zones supplied = its
+island's w); snapshot v2 (engine + line states + duty); rolling snapshot
+ring (5 s marks — already ON the tick grid, boundary sequence untouched) +
+`POST /gb/replay` (throwaway sim, counterfactual overrides, PF off/losses
+frozen, read-only-pinned); blackout w→0 doctrine + black start (ledger 34);
+PHS pump mode (P7 catch-up: negative dispatch = motor load at unit ramp,
+inertia stays in the pool, reservoir SoC η 0.88/0.90, hard bounds, soc on
+the wire). GAME (fork-built): `views/frequency_cluster.gd` (banded dial,
+RoCoF with §2.2 threshold colors + peak hold, H_sys gauge with 2.5 s
+warning, FCR deployed-vs-procured bar, UFLS shed line, per-island rows
+after splits, 120 s multi-island trace), `views/replay_panel.gd` (auto-
+fetches ≤2 counterfactuals per significant event via `/gb/replay`, caches
+3 events with ghost traces + stage chips + "removed device bought +X Hz",
+key R), `model/advisor.gd` (N-1 reference incident = max(largest unit,
+largest hub delivery) vs fleet FCR headroom — the P3 lesson — plus RoCoF
+projection), event-log vocabulary for every P8 event kind; ALERT hot-path
+fast-paths (defense + relays scalar guards: engine cost 13 → 7 s per 900 s
+ALERT block).
+
+**Tests:** backend 139 (defense gates, cascade acceptance, replay
+isolation/ghost pins, black start, PHS); GdUnit 25/25; smokes
+`cascade_low_inertia` + `ride_through` + `replay_panel` green (port 8034)
++ the full 8031 matrix rerun against the P8 engine.
+
+**Acceptance evidence:** the SAME scripted double trip: high-inertia fleet
+nadir 49.80, zero shed — low-inertia fleet 1.94× the RoCoF, dives to 47.94,
+**all 5 reachable UFLS stages fire (45 % shed, w = 0.55) and the island
+survives**; ride-through: largest-unit trip to 48.40 with UFLS 1+2 while
+all 10 wind farms ride through delivering (RfG); emergent cascade pinned
+backend-side: 1.75 GW hub delivery overloads the copenhagen corridor →
+duty trip → island split → the surplus pocket outruns LFSM-O and dies
+while the main island keeps solving — zero special code; replay: plain
+aftermath reproduces the live nadir within 0.07 Hz, removing the battery
+fleet deepens the ghost by +0.78 Hz, expiry honest after 120 s.
+
+**Discoveries:** (1) restart-into-load and sync-at-P_min-into-no-load both
+kill a black start — ledger 34's doctrine came from both failure modes.
+(2) UFLS stage 1 overcorrects the §2.3 reference loss — ledger 35. (3) The
+DefensePlan tick cost 25 % of the ALERT hot path before the scalar fast
+paths. (4) An islanded SURPLUS pocket usually dies (over-f cliff) — the
+honest counterpart to deficit collapse.
+
+**Deviations (deliberate):** replay resolves `t_sim` only (wire events
+carry no ids); ring entries at event instants are post-application —
+replays compare AFTERMATHS (GAME_DESIGN §4.5 reads unchanged); `auto` HVDC
+congestion relief still deferred (ledger 32); the §4.2 hum needs a headed
+run to tune; mode-hysteresis constants (ledger 5) untouched — permanent-
+ALERT islands remain slow-ish by design (7 s engine + PF per block), a
+P10 revisit.
+
+**Next:** P9 — campaign, scenarios, save/load, balancing.
 
 ## 7. Open questions for the project owner
 
