@@ -210,3 +210,14 @@ def test_black_start_reenergizes_a_dead_island() -> None:
     integ.advance(s_to_us(300.0), interrupt_on_event=False)
     assert float(integ.islands.w[0]) > 0.15  # load coming back
     assert not bool(integ.islands.blackout()[0])
+
+
+def test_trip_on_unknown_device_never_crashes() -> None:
+    """Never-crash rule: a scheduled trip on an unregistered id (a dropped
+    hub, a stale save) flows through as data, not an exception."""
+    integ = worked_example_island()
+    integ.queue.schedule(Event(s_to_us(1.0), "trip", "ghost_device_42"))
+    res = integ.advance(s_to_us(10.0), interrupt_on_event=False)
+    ghost = [e for e in res.events if e.element == "ghost_device_42"]
+    assert ghost and ghost[0].data.get("unknown_device") is True
+    assert not bool(integ.islands.blackout()[0])  # island untouched

@@ -232,7 +232,13 @@ class Integrator:
         was_alive = ~self.islands.blackout()
         for event in events:
             if event.kind == "trip":
-                self.fleet.trip(event.element, self.t_us)
+                try:
+                    self.fleet.trip(event.element, self.t_us)
+                except KeyError:
+                    # a trip on an id the reset never registered (e.g. a
+                    # dropped hub) must NOT crash the loop — never-crash rule
+                    event.data["unknown_device"] = True
+                    continue
                 self.refresh_e_k()
             elif event.kind == "load_step":
                 island = int(event.data.get("island", 0))
