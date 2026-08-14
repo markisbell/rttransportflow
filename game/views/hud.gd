@@ -40,6 +40,13 @@ func _ready() -> void:
 	var cluster := preload("res://views/frequency_cluster.gd").new()
 	add_child(cluster)
 
+	# menu-driven building (user direction): no build hotkeys anywhere
+	_build_menu = BuildMenu.new()
+	add_child(_build_menu)
+	_build_menu.tool_selected.connect(func(tool_id: String) -> void:
+		if view != null:
+			view.tool_id = tool_id)
+
 	# P8 replay panel: auto-fetches counterfactual ghosts after significant
 	# events (the ring only holds ~120 s — ledger 23); key R toggles it
 	var replay := preload("res://views/replay_panel.gd").new()
@@ -52,6 +59,9 @@ func _ready() -> void:
 
 var _latest_devices := {}
 var _advisor_label: Label
+var _build_menu: BuildMenu
+## the 3D map this HUD drives (set by main.gd after both exist)
+var view: WorldView3D
 
 
 func _on_step_completed(_t: int, result: Dictionary) -> void:

@@ -27,7 +27,11 @@ const SMOKES := {
 	"campaign_take_the_reins": "res://smokes/campaign_take_the_reins.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"start_check": "res://smokes/start_check.gd",
+	"model_gallery": "res://smokes/model_gallery.gd",
 }
+
+
+var _screenshot_path := ""
 
 
 func _ready() -> void:
@@ -38,10 +42,50 @@ func _ready() -> void:
 			smoke = arg.trim_prefix("--smoke=")
 		elif arg == "--campaign":
 			campaign = true
+		elif arg.begins_with("--screenshot="):
+			_screenshot_path = arg.trim_prefix("--screenshot=")
 	if SMOKES.has(smoke):
 		_run_smoke(smoke)
+	elif _screenshot_path != "":
+		_take_screenshot()
 	else:
 		_boot_game(campaign)
+
+
+## Look probe (the sibling's --screenshot pattern): builds the demo grid on
+## the real map, renders one frame and saves it. No sidecar, no stepping —
+## this exists so the LOOK can be reviewed without a human at the keyboard.
+func _take_screenshot() -> void:
+	if not BuildSession.load_map():
+		push_error("map load failed")
+		get_tree().quit(1)
+		return
+	Weather.setup(42)
+	Demand.setup(42)
+	Demand.weather = Weather
+	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
+		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
+	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
+	var view := WorldView3D.new()
+	add_child(view)
+	var hud := preload("res://views/hud.gd").new()
+	hud.view = view
+	add_child(hud)
+	DemoBuild.auto_build(World)
+	# a few of the P7 buildables so the palette's newer kinds appear on the map
+	var anchor: Vector2i = (World.load_centers["hamburg"]["tiles"] as Array)[0]
+	for kind: String in ["battery", "electrolyzer", "hvdc_converter"]:
+		var site := DemoBuild.find_site(World, kind, anchor, 8)
+		if site != Vector2i(-1, -1):
+			World.place_plant(kind, site)
+	view.redraw()
+	var focus: Vector2i = (World.load_centers["berlin"]["tiles"] as Array)[0]
+	view.focus_tile(focus, float(OS.get_environment("SHOT_ZOOM")) \
+		if OS.get_environment("SHOT_ZOOM") != "" else 17.0)
+	await get_tree().create_timer(1.5).timeout
+	get_viewport().get_texture().get_image().save_png(_screenshot_path)
+	print("SCREENSHOT saved to ", _screenshot_path)
+	get_tree().quit(0)
 
 
 func _run_smoke(smoke_name: String) -> void:
@@ -66,9 +110,10 @@ func _boot_game(campaign: bool = false) -> void:
 		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
 	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
 	BuildSession.use_gridco = true
-	var view := preload("res://views/build_view.gd").new()
+	var view := WorldView3D.new()
 	add_child(view)
 	var hud := preload("res://views/hud.gd").new()
+	hud.view = view
 	add_child(hud)
 	if campaign:
 		_boot_campaign()

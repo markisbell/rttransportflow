@@ -36,8 +36,8 @@ var _rocof_peak_wall := 0.0
 
 
 func _ready() -> void:
-	position = Vector2(790, 90)
-	size = Vector2(470, 470)
+	position = Vector2(798, 74)
+	size = Vector2(470, 322)
 	Orchestrator.step_completed.connect(_on_step)
 
 
