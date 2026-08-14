@@ -31,6 +31,7 @@ const SMOKES := {
 	"model_gallery": "res://smokes/model_gallery.gd",
 	"soak": "res://smokes/soak.gd",
 	"scenarios": "res://smokes/scenarios.gd",
+	"ui_boot": "res://smokes/ui_boot.gd",
 }
 
 

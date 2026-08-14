@@ -1063,10 +1063,13 @@ Run in order; every step is a gate, not a suggestion.
    parallel run — two runs on one port make the loser silently adopt the
    winner's backend and report someone else's grid):
    P4/P5 `boot_and_day`, `trip_reaction`, `trip_key`, `sidecar_crash`,
-   `island_cut`, `build_and_supply`; P6 `dispatch_day`, `economy`,
+   `island_cut`, `build_and_supply`, `ui_boot` (the only test that
+   constructs the HUD — model smokes never touch it); P6 `dispatch_day`,
+   `economy`,
    `calm_week`; P7 `hydrogen_chain`, `battery_response`, `hvdc_link`,
    `north_sea_hub`; P8 `ride_through`, `cascade_low_inertia`,
-   `replay_panel`; P9 `save_load_replay`, `campaign_take_the_reins`.
+   `replay_panel`; P9 `save_load_replay`, `campaign_take_the_reins`,
+   `scenarios`; P10 `soak`.
 4. `scripts/freeze_backend.sh` — frozen backend boots and answers `/health`.
 5. `scripts/package_game.sh linux` — assembles the bundle AND plays it
    (`boot_and_day` inside the bundle). A bundle that assembles but cannot

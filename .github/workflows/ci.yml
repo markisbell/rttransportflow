@@ -70,7 +70,7 @@ jobs:
       - name: Fast smokes
         run: |
           cd game
-          for s in scenarios boot_and_day trip_reaction island_cut; do
+          for s in scenarios ui_boot boot_and_day trip_reaction island_cut; do
             echo "::group::$s"
             timeout 900 "$GODOT_BIN" --headless --path . -- --smoke=$s | tee "/tmp/$s.log"
             grep -q '"ok":true' "/tmp/$s.log" || { echo "$s FAILED"; exit 1; }
