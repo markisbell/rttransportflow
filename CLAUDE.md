@@ -1024,10 +1024,13 @@ and hid it, bare `pytest` does not — `pythonpath = [".", "src"]` now), and
 the Godot job died before running a test (GdUnit's vendored `runtest.sh`
 passes `--headless` only to its log-copy pass, and GdUnit additionally
 refuses headless unless given `--ignoreHeadlessMode`; CI now calls
-`GdUnitCmdTool` directly rather than patching a vendored addon). The
-backend suite takes **over an hour** on a 2-core runner versus ~5 min on
-this 20-core box — numba compiles from cold in every process — so every job
-now carries a timeout sized to catch a hang, not to police runtime.
+`GdUnitCmdTool` directly rather than patching a vendored addon). Every job
+now also carries a timeout sized to catch a hang rather than police
+runtime; the ceilings are set from MEASURED durations on the runner —
+backend suite 8m 24s, game-tests 1m 52s, freeze-smoke 1m 56s, image 1m 13s.
+(An earlier reading of "over an hour" for the backend suite was me
+mistaking queue time for run time, and it briefly went into this log and a
+commit message before the completed run corrected it.)
 (1) `globalize_path("res://").get_base_dir()` is correct in
 the editor and WRONG in an export (res:// is the PCK) — the packaged game
 booted to an empty world looking for `/data/grids/...`. Caught only because

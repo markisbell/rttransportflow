@@ -8,12 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # The dynamics suite is ~5 min on a 20-core dev box but far slower on a
-    # 2-core runner (numba compiles from cold in every process, and there is
-    # no JIT cache to inherit). Measured: over an hour. This ceiling exists
-    # to catch a HANG, not to police runtime — tighten it once a green run
-    # has established the real number.
-    timeout-minutes: 90
+    # MEASURED on the runner: 8m 24s (the suite itself 7m 45s), against
+    # ~5 min on a 20-core dev box — the gap is smaller than it looks because
+    # the suite is mostly serial numba work. 30 min is ~3.5x that, which
+    # catches a hang without failing a merely slow run.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +47,9 @@ jobs:
     # them. `scenarios` needs no backend; the others spawn one, so the
     # sidecar's `.venv/bin/python` has to exist here too.
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # measured 1m 52s (Godot download + GdUnit + four smokes); 20 min is a
+    # hang guard, not a budget
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
