@@ -1,19 +1,22 @@
 class_name EuropeTerrain
 extends RefCounted
-## Terrain geometry for the Europe map (96 x 80 tiles at 50 km). Pure static
-## build over WorldModel's terrain dictionary — returns Packed arrays, so the
-## renderer owns meshes and materials and this stays headless-testable
-## (infrastruct's TerrainMeshBuilder pattern).
+## Terrain geometry for the Europe map. Pure static builders over WorldModel
+## — they return Packed arrays, so the renderer owns meshes and materials and
+## this stays headless-testable (infrastruct's TerrainMeshBuilder pattern).
 ##
-## Unlike the city-scale sibling there is no height field to smooth: a tile's
-## terrain CLASS sets both its colour and a small elevation lift, so the
+## A tile's terrain CLASS sets both its colour and an elevation lift, so the
 ## continent reads as sea -> shelf -> coast -> plain -> hills -> mountains
 ## from the isometric camera without any per-tile height data.
+##
+## The map is far too large to live in one mesh (960 x 804 = 772k tiles), so
+## the renderer streams it: `build_region()` returns ONE CHUNK of tiles and
+## `build_coarse()` returns a cheap whole-map backdrop that fills whatever
+## the streamer has not loaded. Both read one tile PAST their borders via
+## `terrain_at()`, which answers "S" outside the map — that is what makes
+## chunk seams invisible and the map edge fall away into deep sea.
 
-## One tile = 1.0 world unit (a tile is 50 km — the map is a symbol, not a
-## scale model). Sea sits at y = 0; land lifts by class.
-## Vertical exaggeration is deliberate: a 15 km tile is 1.0 unit wide, so
-## true relief (Mont Blanc ≈ 0.3 units) would be invisible from the
+## One tile = 1.0 world unit. Vertical exaggeration is deliberate: at 5 km
+## per tile true relief (Mont Blanc ≈ 0.1 units) would be invisible from the
 ## isometric camera. These lifts make ranges read as ranges.
 const LIFT := {
 	"S": -0.18,  # deep sea, dips well below the shelf so coastlines read
@@ -34,9 +37,11 @@ const COLORS := {
 	"h": Color(0.52, 0.55, 0.30),
 	"m": Color(0.55, 0.53, 0.51),
 }
-## Mountain tops get a snow cap above this share of the tile.
 const SNOW_COLOR := Color(0.92, 0.93, 0.95)
 const SKIRT_COLOR := Color(0.62, 0.50, 0.36)  # earthen sides of a lifted tile
+
+const NEIGHBOR_OFFSETS: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 
 
 static func height_of(kind: String) -> float:
@@ -47,43 +52,101 @@ static func color_of(kind: String) -> Color:
 	return COLORS.get(kind, Color.MAGENTA) as Color
 
 
-## Build the whole terrain as one vertex-coloured surface: a top quad per
-## tile plus skirt quads wherever a tile stands above its neighbour (the
-## visible cliff faces). Returns {vertices, normals, colors, indices}.
-static func build(world: Node) -> Dictionary:
+## Per-tile surface colour: the palette plus deterministic variation, so a
+## range reads as ridges and farmland as fields rather than billiard cloth.
+static func tile_color(kind: String, x: int, y: int) -> Color:
+	var color := color_of(kind)
+	if kind == "m":
+		return color.lerp(SNOW_COLOR, 0.35 if (x + y) % 3 == 0 else 0.1)
+	if kind == "p" or kind == "h":
+		return color.lerp(Color(0.58, 0.60, 0.28),
+			0.09 * float((x * 7 + y * 13) % 5) / 4.0)
+	return color
+
+
+## Build ONE rectangular region [x0, x1) x [y0, y1) of the map.
+## Returns {vertices, normals, colors, indices} in WORLD space (the caller
+## places the mesh at the origin, not at the chunk corner, so neighbouring
+## chunks share exact vertex positions and never crack).
+static func build_region(world: Node, x0: int, y0: int,
+		x1: int, y1: int) -> Dictionary:
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 
-	for y in range(world.height):
-		for x in range(world.width):
-			var tile := Vector2i(x, y)
-			var kind := str(world.terrain_at(tile))
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			var kind := world.terrain_at(Vector2i(x, y)) as String
 			var top := height_of(kind)
-			var color := color_of(kind)
-			if kind == "m":
-				# deterministic dusting so ranges read as ridges, not a slab
-				color = color.lerp(SNOW_COLOR, 0.35 if (x + y) % 3 == 0 else 0.1)
-			elif kind == "p" or kind == "h":
-				# gentle per-tile jitter toward hay: fields, not billiard cloth
-				color = color.lerp(Color(0.58, 0.60, 0.28),
-					0.09 * float((x * 7 + y * 13) % 5) / 4.0)
 			_quad(vertices, normals, colors, indices,
 				Vector3(x, top, y), Vector3(x + 1, top, y),
 				Vector3(x + 1, top, y + 1), Vector3(x, top, y + 1),
-				Vector3.UP, color)
+				Vector3.UP, tile_color(kind, x, y))
 
-			# skirts: only toward LOWER neighbours, so each face is drawn once
-			for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
-					Vector2i(0, 1), Vector2i(0, -1)]:
-				var n := tile + offset
-				var n_top := height_of(str(world.terrain_at(n))) \
-					if world.terrain.has(n) else LIFT["S"]
+			# Skirts face only DOWNHILL neighbours, so each cliff is drawn
+			# once. terrain_at() answers "S" outside the map, which is what
+			# lets a border chunk emit the same faces it would mid-map.
+			for offset: Vector2i in NEIGHBOR_OFFSETS:
+				var n_kind := world.terrain_at(Vector2i(x, y) + offset) as String
+				var n_top := height_of(n_kind)
 				if n_top >= top - 0.0001:
 					continue
 				_skirt(vertices, normals, colors, indices, x, y, offset,
 					top, n_top)
+	return {"vertices": vertices, "normals": normals, "colors": colors,
+		"indices": indices}
+
+
+## Whole-map build (small maps, tests). The renderer streams instead.
+static func build(world: Node) -> Dictionary:
+	return build_region(world, 0, 0, world.width, world.height)
+
+
+## A cheap whole-map backdrop: one quad per `step` x `step` block, coloured
+## by the majority class of a strided sample. This is always drawn UNDER the
+## streamed chunks, so anything not yet loaded still reads as continent
+## instead of a hole — the far distance simply loses its detail.
+static func build_coarse(world: Node, step: int) -> Dictionary:
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var sample_stride := maxi(1, step / 2)
+
+	var y := 0
+	while y < world.height:
+		var x := 0
+		while x < world.width:
+			var counts := {}
+			var sy := y
+			while sy < mini(y + step, world.height):
+				var sx := x
+				while sx < mini(x + step, world.width):
+					var k := world.terrain_at(Vector2i(sx, sy)) as String
+					counts[k] = int(counts.get(k, 0)) + 1
+					sx += sample_stride
+				sy += sample_stride
+			var kind := "S"
+			var best := -1
+			for k: String in counts:
+				var n := int(counts[k])
+				# ties resolve toward the LAND classes: a coarse cell that is
+				# half coastline should still read as coast, not as sea
+				if n > best or (n == best and height_of(k) > height_of(kind)):
+					best = n
+					kind = k
+			var x1 := mini(x + step, world.width)
+			var y1 := mini(y + step, world.height)
+			# a hair below the detailed surface so streamed chunks win the
+			# depth test wherever they exist
+			var top := height_of(kind) - 0.05
+			_quad(vertices, normals, colors, indices,
+				Vector3(x, top, y), Vector3(x1, top, y),
+				Vector3(x1, top, y1), Vector3(x, top, y1),
+				Vector3.UP, color_of(kind))
+			x += step
+		y += step
 	return {"vertices": vertices, "normals": normals, "colors": colors,
 		"indices": indices}
 

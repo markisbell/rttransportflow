@@ -36,9 +36,21 @@ func _ready() -> void:
 	_advisor_label.add_theme_color_override("font_color", Color(0.95, 0.75, 0.3))
 	add_child(_advisor_label)
 
+	# Navigation (top-right): the continent is far too big to pan across, so
+	# a minimap + jump list owns the corner. The instrument cluster moves
+	# BELOW it — set from here, so the cluster script stays untouched.
+	_nav_panel = NavPanel.new()
+	add_child(_nav_panel)
+	# main.gd assigns hud.view BEFORE add_child, so the setter ran while
+	# _nav_panel was still null — hand the view over now that it exists
+	_nav_panel.view = view
+
 	# P8 instrument cluster (dial, RoCoF, inertia gauge, reserve stack, UFLS)
 	var cluster := preload("res://views/frequency_cluster.gd").new()
 	add_child(cluster)
+	# AFTER add_child: the cluster sets its own position in _ready(), which
+	# runs on add_child and would overwrite an earlier assignment
+	cluster.position = Vector2(798, 356)  # clear of the nav panel above
 
 	# menu-driven building (user direction): no build hotkeys anywhere
 	_build_menu = BuildMenu.new()
@@ -58,10 +70,15 @@ func _ready() -> void:
 
 
 var _latest_devices := {}
+var _nav_panel: NavPanel
 var _advisor_label: Label
 var _build_menu: BuildMenu
 ## the 3D map this HUD drives (set by main.gd after both exist)
-var view: WorldView3D
+var view: WorldView3D:
+	set(value):
+		view = value
+		if _nav_panel != null:
+			_nav_panel.view = value
 
 
 func _on_step_completed(_t: int, result: Dictionary) -> void:

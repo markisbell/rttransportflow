@@ -40,8 +40,13 @@ from pathlib import Path
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "map"
 ## physical sizes that must stay constant as the tile shrinks
 FOOTHILL_KM = 50.0   # hill halo around a range
-METRO_BIG_KM = 60.0  # footprint of a >= 8 GW metro region
-METRO_KM = 45.0
+## Metro footprints. These are the tiles a city OCCUPIES (unbuildable, and
+## rendered as city blocks) — not the full conurbation. At 5 km tiles a
+## literal 60 km metro is a 12x12 slab that reads as a vast block grid and
+## walls off a third of a country, so the footprint is the dense CORE and
+## the surrounding demand is abstract.
+METRO_BIG_KM = 35.0  # >= 8 GW metro core (7 tiles at 5 km)
+METRO_KM = 20.0      # (4 tiles)
 PREVIEW = Path(__file__).resolve().parent / "preview.txt"
 
 WIDTH, HEIGHT, TILE_KM = 960, 804, 5
