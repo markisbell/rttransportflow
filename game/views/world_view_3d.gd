@@ -13,8 +13,8 @@ extends Node3D
 signal tile_clicked(tile: Vector2i)
 signal tile_hovered(tile: Vector2i)
 
-const MIN_ZOOM := 6.0
-const MAX_ZOOM := 90.0
+const MIN_ZOOM := 5.0
+const MAX_ZOOM := 400.0  # the whole continent fits at ~340
 
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
 ## drives the ghost preview and what a click builds.
@@ -26,8 +26,8 @@ var tool_id := "":
 var camera: Camera3D
 var hover_tile := Vector2i(-1, -1)
 
-var _zoom := 20.0
-var _focus := Vector3(48.0, 0, 44.0)  # central Europe
+var _zoom := 44.0
+var _focus := Vector3(160.0, 0, 140.0)  # central Europe on the 15 km grid
 var _yaw := 0.0
 var _yaw_target := 0.0
 var _sun: DirectionalLight3D
@@ -74,7 +74,7 @@ func _build_environment() -> void:
 	sun.light_energy = 1.45
 	sun.shadow_blur = 0.75
 	sun.shadow_normal_bias = 2.5  # the iGPU edge-sparkle guard from the sibling
-	sun.directional_shadow_max_distance = 260.0
+	sun.directional_shadow_max_distance = 420.0
 	add_child(sun)
 	_sun = sun
 
@@ -111,7 +111,7 @@ func _build_camera() -> void:
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = _zoom
 	camera.near = 0.1
-	camera.far = 800.0
+	camera.far = 2000.0
 	add_child(camera)
 	_apply_camera()
 
@@ -121,7 +121,7 @@ func _apply_camera() -> void:
 	var yaw := deg_to_rad(_yaw)
 	var direction := Vector3(sin(yaw), 0.92, cos(yaw)).normalized()
 	camera.size = _zoom
-	camera.position = _focus + direction * 240.0
+	camera.position = _focus + direction * 700.0
 	camera.look_at(_focus, Vector3.UP)
 
 

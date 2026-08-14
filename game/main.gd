@@ -115,9 +115,29 @@ func _boot_game(campaign: bool = false) -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
+	# You inherit a grid, you do not start on empty land (GAME_DESIGN §5.1).
+	# The demo build used to hide behind a hotkey; with the menu-driven UI
+	# the inherited 2025 world IS the opening state.
+	_load_start_world()
 	if campaign:
 		_boot_campaign()
 	_boot_async()
+
+
+func _load_start_world() -> void:
+	if not World.plants.is_empty() or not World.corridors.is_empty():
+		return
+	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var path := repo + "/data/campaign/start_2025.json"
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) \
+		if FileAccess.file_exists(path) else null
+	if parsed is Dictionary and World.restore(parsed):
+		BuildSession.rebuild_now()
+		return
+	# no authored start state: fall back to the scripted demo build so the
+	# map is never empty on first run
+	DemoBuild.auto_build(World)
+	BuildSession.rebuild_now()
 
 
 ## `--campaign` boots the inherited-2025 world and arms the milestone

@@ -1,4 +1,4 @@
-"""Generate data/map/europe_v1.json — the 96x80 stylized Europe tile map.
+"""Generate data/map/europe_v2.json — the 320x268 stylized Europe tile map.
 
 Deterministic (no RNG, no time): hand-authored lat/lon polygons are
 rasterized onto the 50 km tile grid (GAME_DESIGN SS1.7 format). Regenerate:
@@ -7,11 +7,17 @@ rasterized onto the 50 km tile grid (GAME_DESIGN SS1.7 format). Regenerate:
 
 Projection (documented, equirectangular at a fixed metric scale):
     1 deg lat = 111.32 km ; 1 deg lon = 111.32 * cos(52 deg) = 68.536 km
-    tile = 50 km  ->  DLAT = 0.449 deg/tile , DLON = 0.730 deg/tile
+    tile = 15 km  ->  DLAT = 0.135 deg/tile , DLON = 0.219 deg/tile
     row 0 center sits at LAT0 = 71 N (North Cape clipped), col 0 at LON0=-20.
     Content spans Lisbon-Helsinki / Ireland-Athens with sea margins.
 
-Deliberate 50 km-scale compressions (documented, not bugs):
+Resolution (ledger 38, user direction 2026-08-14): 15 km tiles over the same
+geographic span — countries need enough tiles to HAVE a shape, and mountain
+ranges/forests need room to be drawn into the terrain. The compressions below
+were 50 km-scale artifacts; at 15 km most resolve on their own (the Dover
+strait, the Oresund and small islands are all wider than a tile now).
+
+Deliberate scale compressions (documented, not bugs):
 - The Dover strait is carved as a one-tile sea channel (real width < 1 tile).
 - Copenhagen and Malmoe fuse into one land tile pair across the Oresund —
   it represents the fixed link (the load center IS "Oresund CPH-Malmoe");
@@ -26,14 +32,47 @@ import math
 from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "map"
+## physical sizes that must stay constant as the tile shrinks
+FOOTHILL_KM = 50.0   # hill halo around a range
+METRO_BIG_KM = 60.0  # footprint of a >= 8 GW metro region
+METRO_KM = 45.0
 PREVIEW = Path(__file__).resolve().parent / "preview.txt"
 
-WIDTH, HEIGHT, TILE_KM = 96, 80, 50
+WIDTH, HEIGHT, TILE_KM = 320, 268, 15
 LAT0, LON0 = 71.0, -20.0
 KM_PER_DEG_LAT = 111.32
 KM_PER_DEG_LON = 111.32 * math.cos(math.radians(52.0))  # 68.536
 DLAT = TILE_KM / KM_PER_DEG_LAT  # 0.44916 deg per tile
 DLON = TILE_KM / KM_PER_DEG_LON  # 0.72954 deg per tile
+
+
+def _value_noise(width: int, height: int, cells: int, seed: int
+                 ) -> list[list[float]]:
+    """Deterministic smooth noise in [0, 1]: a coarse hash lattice with
+    cosine interpolation. No RNG state, no numpy — same map every run."""
+
+    def lattice(ix: int, iy: int) -> float:
+        h = (ix * 374761393 + iy * 668265263 + seed * 1442695040888963407) & 0xFFFFFFFF
+        h = (h ^ (h >> 13)) * 1274126177 & 0xFFFFFFFF
+        return ((h ^ (h >> 16)) & 0xFFFF) / 65535.0
+
+    step_x = width / float(cells)
+    step_y = height / float(cells)
+    out: list[list[float]] = []
+    for y in range(height):
+        gy = y / step_y
+        iy, fy = int(gy), gy - int(gy)
+        wy = (1.0 - math.cos(fy * math.pi)) * 0.5
+        row: list[float] = []
+        for x in range(width):
+            gx = x / step_x
+            ix, fx = int(gx), gx - int(gx)
+            wx = (1.0 - math.cos(fx * math.pi)) * 0.5
+            top = lattice(ix, iy) * (1 - wx) + lattice(ix + 1, iy) * wx
+            bot = lattice(ix, iy + 1) * (1 - wx) + lattice(ix + 1, iy + 1) * wx
+            row.append(top * (1 - wy) + bot * wy)
+        out.append(row)
+    return out
 
 
 def tile_of(lon: float, lat: float) -> tuple[int, int]:
@@ -354,13 +393,35 @@ def build() -> dict:
             if grid[y][x] != "p":
                 continue
             lon, lat = center_of(x, y)
+            reach = max(1, int(round(FOOTHILL_KM / TILE_KM)))
             halo = any(
                 0 <= x + dx < WIDTH and 0 <= y + dy < HEIGHT
                 and grid[y + dy][x + dx] == "m"
-                for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                for dx in range(-reach, reach + 1)
+                for dy in range(-reach, reach + 1)
             )
             if halo or any(point_in_poly(lon, lat, poly) for poly in HILLS):
                 grid[y][x] = "h"
+
+    # Upland texture (ledger 38): the authored polygons carve the NAMED
+    # ranges; a deterministic low-frequency noise field then lifts coherent
+    # regions of plain into hill country, so 15 km tiles show the rolling
+    # relief Europe actually has instead of one flat green sheet.
+    upland = _value_noise(WIDTH, HEIGHT, cells=22, seed=7)
+    ridge = _value_noise(WIDTH, HEIGHT, cells=34, seed=11)
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            if grid[y][x] != "p":
+                continue
+            if upland[y][x] > 0.62:
+                grid[y][x] = "h"
+    # ridge crests inside big hill masses become low mountains
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            if grid[y][x] != "h":
+                continue
+            if upland[y][x] > 0.78 and ridge[y][x] > 0.72:
+                grid[y][x] = "m"
 
     # coasts (4-neighbor; mountains keep their kind)
     for y in range(HEIGHT):
@@ -477,7 +538,8 @@ def build() -> dict:
     taken: set[tuple[int, int]] = set()
     shifts = []
     for cid, name, lon, lat, peak, season, coeff in LOAD_CENTERS:
-        n = 3 if peak >= 8000.0 else 2
+        n = max(2, int(round(
+            (METRO_BIG_KM if peak >= 8000.0 else METRO_KM) / TILE_KM)))
         cx, cy = tile_of(lon, lat)
         x0, y0 = cx - n // 2, cy - n // 2
         placed = None
@@ -543,7 +605,7 @@ def render_preview(doc: dict) -> str:
 def main() -> None:
     doc, shifts = build()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "europe_v1.json").write_text(json.dumps(doc, indent=1) + "\n")
+    (OUT_DIR / "europe_v2.json").write_text(json.dumps(doc, indent=1) + "\n")
     PREVIEW.write_text(render_preview(doc))
     counts: dict[str, int] = {}
     for row in doc["terrain_rows"]:
@@ -552,7 +614,7 @@ def main() -> None:
     print("tile counts:", dict(sorted(counts.items())))
     if shifts:
         print("shifted load centers:", shifts)
-    print(f"wrote {OUT_DIR / 'europe_v1.json'} and {PREVIEW}")
+    print(f"wrote {OUT_DIR / 'europe_v2.json'} and {PREVIEW}")
 
 
 if __name__ == "__main__":

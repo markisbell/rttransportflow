@@ -43,9 +43,11 @@ func _ready() -> void:
 ## Map file: the real Europe map when present, the test fixture otherwise.
 static func map_path() -> String:
 	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
-	var europe := repo + "/data/map/europe_v1.json"
-	if FileAccess.file_exists(europe):
-		return europe
+	# v2 is the 15 km grid (ledger 38); v1 (50 km) stays a valid fallback
+	for name: String in ["europe_v2.json", "europe_v1.json"]:
+		var europe := repo + "/data/map/" + name
+		if FileAccess.file_exists(europe):
+			return europe
 	return ProjectSettings.globalize_path("res://testdata/mini_map.json")
 
 

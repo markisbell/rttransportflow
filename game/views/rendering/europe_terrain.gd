@@ -12,13 +12,16 @@ extends RefCounted
 
 ## One tile = 1.0 world unit (a tile is 50 km — the map is a symbol, not a
 ## scale model). Sea sits at y = 0; land lifts by class.
+## Vertical exaggeration is deliberate: a 15 km tile is 1.0 unit wide, so
+## true relief (Mont Blanc ≈ 0.3 units) would be invisible from the
+## isometric camera. These lifts make ranges read as ranges.
 const LIFT := {
-	"S": -0.06,  # deep sea, dips below the shelf so coastlines read
-	"s": -0.02,  # continental shelf
-	"c": 0.03,   # coast
-	"p": 0.06,   # plain
-	"h": 0.16,   # hills
-	"m": 0.30,   # mountains
+	"S": -0.18,  # deep sea, dips well below the shelf so coastlines read
+	"s": -0.06,  # continental shelf
+	"c": 0.05,   # coast
+	"p": 0.12,   # plain
+	"h": 0.46,   # hills
+	"m": 1.05,   # mountains
 }
 
 ## Saturated, slightly warm palette in the sibling's key: greens for the

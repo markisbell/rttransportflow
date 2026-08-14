@@ -11,11 +11,11 @@ extends RefCounted
 ## prop kind as ONE MultiMesh: thousands of trees, a handful of draw calls.
 
 const SEED := 1337
-const FOREST_LEVEL := 0.18   # noise above this = forest mass
+const FOREST_LEVEL := 0.15   # noise above this = forest mass
 const ROCK_LEVEL := 0.05     # on mountains, noise above this = stone field
-## props per member tile — a tile is 50 km, so these are symbols of cover
-const FOREST_DENSITY := 3
-const ROCK_DENSITY := 2
+## props per member tile — a tile is 15 km, so these are symbols of cover
+const FOREST_DENSITY := 5
+const ROCK_DENSITY := 3
 
 const MODELS := {
 	"tree": "res://assets/kenney/mini-forest/Models/GLB format/tree.glb",
@@ -27,7 +27,7 @@ const MODELS := {
 static func placements(world: Node) -> Dictionary:
 	var noise := FastNoiseLite.new()
 	noise.seed = SEED
-	noise.frequency = 0.055  # ~18-tile features: regions, not speckle
+	noise.frequency = 0.018  # ~18-tile features: regions, not speckle
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 
 	var out := {"tree": [] as Array[Transform3D], "rocks": [] as Array[Transform3D]}
@@ -59,7 +59,7 @@ static func placements(world: Node) -> Dictionary:
 				var ox := 0.16 + 0.68 * float(h % 1000) / 1000.0
 				var oz := 0.16 + 0.68 * float((h / 1000) % 1000) / 1000.0
 				var yaw := TAU * float((h / 7) % 360) / 360.0
-				var scale := 0.16 + 0.10 * float((h / 13) % 100) / 100.0
+				var scale := 0.30 + 0.16 * float((h / 13) % 100) / 100.0
 				var basis := Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale)
 				(out[prop] as Array[Transform3D]).append(Transform3D(basis,
 					Vector3(x + ox, base_y, y + oz)))

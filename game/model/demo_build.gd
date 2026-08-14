@@ -51,6 +51,12 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 
 ## Find a placeable tile for `kind` near `anchor` (ring search, deterministic).
 ## `banned`: sites that already failed routing — never offer them again.
+## Ring radii are given in TILES but tuned as distances: `tiles_for_km`
+## keeps them honest when the grid resolution changes (ledger 38).
+static func tiles_for_km(km: float, world: Node) -> int:
+	return maxi(1, int(round(km / maxf(world.tile_km, 1.0))))
+
+
 static func find_site(world: Node, kind: String, anchor: Vector2i, max_r: int = 8,
 		banned: Dictionary = {}) -> Vector2i:
 	for r in range(1, max_r + 1):
@@ -132,10 +138,12 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 	for lc_id: String in world.load_centers:
 		if lc_id in ids:
 			continue
+		# the ring must stay ~50 km wide however fine the grid is
+		var ring := tiles_for_km(50.0, world)
 		for tile: Vector2i in world.load_centers[lc_id]["tiles"]:
-			avoid[tile] = true
-			for offset: Vector2i in GridTopology.NEIGHBORS:
-				avoid[tile + offset] = true
+			for dx in range(-ring, ring + 1):
+				for dy in range(-ring, ring + 1):
+					avoid[tile + Vector2i(dx, dy)] = true
 
 	var taps: Array[Vector2i] = []
 	for lc_id: String in ids:
@@ -176,9 +184,11 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 			var site := Vector2i(-1, -1)
 			var kind := ""
 			for candidate: String in kinds:
-				site = find_site(world, candidate, anchor, 6, banned)
+				site = find_site(world, candidate, anchor,
+					tiles_for_km(300.0, world), banned)
 				if site == Vector2i(-1, -1):
-					site = find_site(world, candidate, anchor, 12, banned)
+					site = find_site(world, candidate, anchor,
+						tiles_for_km(600.0, world), banned)
 				if site != Vector2i(-1, -1):
 					kind = candidate
 					break
