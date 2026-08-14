@@ -32,5 +32,10 @@ rttransportflow = "rttransportflow.main:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# "." as well as "src": two test modules import helpers from sibling test
+# modules (`from tests.test_gamebridge import ...`), which only resolves
+# when the repo root is on sys.path. `python -m pytest` inserts the CWD and
+# hid this locally for weeks; CI runs bare `pytest` and does not, so main
+# was red on a green-looking local suite.
+pythonpath = [".", "src"]
 testpaths = ["tests"]

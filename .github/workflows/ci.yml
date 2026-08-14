@@ -64,9 +64,22 @@ jobs:
           cd game
           "$GODOT_BIN" --headless --import --path . || true
       - name: GdUnit suites
+        # GdUnitCmdTool directly, not runtest.sh: the vendored wrapper runs
+        # the suites WITHOUT --headless (it only passes the flag to its
+        # log-copy pass), so on a runner with no display Godot fails to
+        # create a DisplayServer and the job dies before a single test runs.
+        # Patching a vendored addon would be undone by the next upgrade.
+        # --remote-debug on an unbound port keeps Godot's interactive CLI
+        # debugger from looping on a parse error, exactly as the wrapper does.
+        # --ignoreHeadlessMode: GdUnit refuses headless by default because it
+        # breaks UI tests; these suites are pure logic (topology, demand,
+        # weather, campaign), so the check is not protecting anything here.
         run: |
           cd game
-          bash addons/gdUnit4/runtest.sh -a tests
+          "$GODOT_BIN" --headless --path . -s -d \
+            --remote-debug tcp://127.0.0.1:0 \
+            res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+            --ignoreHeadlessMode -a tests
       - name: Fast smokes
         run: |
           cd game
