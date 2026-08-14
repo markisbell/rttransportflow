@@ -254,6 +254,33 @@ docs/GAME_DESIGN.md.
     f through 51.5 into a mass-disconnection cliff; PHYSICS §2.7 always
     mandated it on ALL generation.
 
+38. **Map resolution and geometry source** (user direction, 2026-08-14):
+    the map is **960 × 804 tiles at 5 km** (771 840 tiles — 100× the
+    original 96 × 80 at 50 km). Two rounds of "bigger": at 50 km a country
+    was a handful of tiles, so nations had no shape and mountains/forests
+    had nowhere to live. Geometry now comes from **Natural Earth**
+    (`tools/map_authoring/natural_earth.py`), NOT OpenStreetMap: NE vector
+    data is explicitly public domain, whereas OSM is ODbL and the shipped
+    tile grid IS a derived database, which would attach share-alike. NE at
+    1:10 m resolves finer than a 5 km tile, so it is sufficient as well as
+    cleaner. Real coastlines + lakes, the 222 named `Range/mtn` polygons
+    (61 155 mountain / 150 050 hill tiles) and 55 real river courses.
+    Consequences made binding:
+    - **rasterise, never point-test**: per-tile point-in-polygon over
+      Eurasia's ~10 k-vertex ring is hours; the scanline even-odd fill is
+      3.4 s.
+    - **terrain lives in packed rows**, not a Vector2i Dictionary — 772 k
+      keys cost tens of MB; read via `terrain_at()` / `in_bounds()`.
+    - **every radius is a DISTANCE, not a tile count** (`tiles_for_km`):
+      metro footprints 60/45 km, PHS snap 40 km, load-centre search 150 km,
+      foothill halo 50 km. Tile-count constants silently shrink by the
+      resolution factor — this bit twice.
+    - a metro footprint may span water and keeps only its land tiles (a
+      solid-land square left Rome with nowhere to stand).
+    - the renderer MUST stream: the whole map cannot be resident (chunked
+      terrain/decoration/models around the camera + a coarse overview mesh),
+      and a navigation panel (minimap + jump list) replaces panning.
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
