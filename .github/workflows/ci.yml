@@ -8,9 +8,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # the dynamics suite is minutes on 20 cores and slower on a 2-core
-    # runner, but a HANG should fail here rather than burn the 6 h default
-    timeout-minutes: 45
+    # The dynamics suite is ~5 min on a 20-core dev box but far slower on a
+    # 2-core runner (numba compiles from cold in every process, and there is
+    # no JIT cache to inherit). Measured: over an hour. This ceiling exists
+    # to catch a HANG, not to police runtime — tighten it once a green run
+    # has established the real number.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
