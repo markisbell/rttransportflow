@@ -38,7 +38,17 @@ func run() -> void:
 		Weather.force_window("clearness_scale", region, 1.0, 2.0, 0.5)
 	var dark := await _run_day()
 
-	check("dark_day_scarce", dark["scarcity_blocks"] >= 4)
+	# NOT "the dark day is scarce". Scarcity means the fleet cannot cover
+	# demand — a CAPACITY verdict — and this fleet can: it burns 67 GWh of
+	# thermal and holds 49.82 Hz with nothing shed. Asserting scarcity here
+	# was asserting that the world is under-built, which is a property of
+	# the fixture, not the lesson. What a Dunkelflaute actually teaches is
+	# that the same demand now comes from the expensive end of the merit
+	# order, and THAT is what the cost and thermal-burn checks below
+	# measure. (Second retarget of this smoke: the first assumed a becalmed
+	# day sags deeper, but wind VARIABILITY moves frequency, not wind
+	# absence, so a calm day is frequency-quieter than a windy one.)
+	check("dark_day_priced_up", dark["cost_eur"] > normal["cost_eur"] * 5.0)
 	check("normal_day_holds", normal["f_min"] > 49.5)
 	check("dark_wind_really_calm", dark["renewable_mwh"] < normal["renewable_mwh"] * 0.6)
 	# The ADEQUACY signal, not a frequency one: the thermal fleet + storage

@@ -977,9 +977,18 @@ have erased.
 storm-correlated line trips, forecast busts) is NOT in v1 — campaign
 incidents are the scripted ones plus what the player's own grid does; the
 sandbox therefore ships without an `event_rate` knob rather than with a knob
-that scales nothing. The morning ramp still dips to 49.60 Hz (pump/ely shed
-fire, no UFLS): the dispatcher schedules against demand at the block START,
-so generation lags a steep ramp by one block — open, tracked.
+that scales nothing. The morning ramp dips to 49.60 Hz (pump and
+electrolyzer shed fire, no UFLS) when the smoke drives 900 s wire steps.
+Diagnosed twice: the first reading — "the schedule lags by a block" — was
+WRONG, and fixing it (the ramp is now sampled at the step midpoint, which
+was a real bug: a dt = 900 s step used to command the PREVIOUS block's
+schedule) left the dip exactly where it was, 49.699/49.599 to the mHz. The
+actual mechanism is coarser: `zone_demand` is sample-and-hold per wire
+step, so at dt = 900 s the whole morning ramp arrives as one instantaneous
+multi-GW jump while the fleet can only slew at a few %/min. It is an
+artifact of stepping coarsely, not of the dispatcher — the game steps at
+0.1-6 s, where the same ramp is smooth (P2 already logged the standalone
+version of this). Smokes that care step 3 x 300 s per block instead.
 
 **Next:** P10 — hardening, packaging, release.
 
