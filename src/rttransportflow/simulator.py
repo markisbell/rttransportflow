@@ -723,8 +723,13 @@ class DynSimulator:
             if loading > self._pf_window_max.get(line_id, 0.0):
                 self._pf_window_max[line_id] = loading
             # overload protection (PARAMETERS §2.2): instant at >=150 %,
-            # duty-integrated above 120 %, decay below 100 %
-            if line_id in self._trip_scheduled:
+            # duty-integrated above 120 %, decay below 100 %.
+            # NOT on the warmup solve: that operating point is the reset
+            # artifact (every unit still at its scheduled setpoint, nothing
+            # ramped, no dispatcher word yet), and tripping on it killed a
+            # freshly registered grid inside 10 ms. Real protection is armed
+            # on an energised, settled system.
+            if reason == "warmup" or line_id in self._trip_scheduled:
                 continue
             if loading >= 150.0:
                 self.integrator.queue.schedule(Event(

@@ -107,6 +107,21 @@ func enable_gridco() -> void:
 			"to": str(line["to_bus"])}
 	for plant: Dictionary in docs["plants"].get("plants", []):
 		_plant_bus[str(plant["id"])] = str(plant["bus"])
+	# nearest-metro assignment for locality-first dispatch
+	var home := {}
+	for plant: Dictionary in docs["plants"].get("plants", []):
+		var pid := str(plant["id"])
+		var tile: Vector2i = World.plants.get(pid, {}).get("tile", Vector2i.ZERO)
+		var best := ""
+		var best_d := 1 << 30
+		for lc_id: String in World.load_centers:
+			for lc_tile: Vector2i in World.load_centers[lc_id]["tiles"]:
+				var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
+				if d < best_d:
+					best_d = d
+					best = lc_id
+		home[pid] = best
+	Dispatch.home_zone = home
 	Dispatch.wire_devices = wire_devices
 	Dispatch.hub_farms = hub_farms
 	Economy.set_fleet(docs["plants"].get("plants", []), wire_devices)

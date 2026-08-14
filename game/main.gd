@@ -14,6 +14,7 @@ const SMOKES := {
 	"economy": "res://smokes/economy.gd",
 	"calm_week": "res://smokes/calm_week.gd",
 	"probe": "res://smokes/probe.gd",
+	"probe6": "res://smokes/probe6.gd",
 	"buildcheck": "res://smokes/buildcheck.gd",
 	"calm_probe": "res://smokes/calm_probe.gd",
 	"hydrogen_chain": "res://smokes/hydrogen_chain.gd",
@@ -115,10 +116,6 @@ func _boot_game(campaign: bool = false) -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
-	# You inherit a grid, you do not start on empty land (GAME_DESIGN §5.1).
-	# The demo build used to hide behind a hotkey; with the menu-driven UI
-	# the inherited 2025 world IS the opening state.
-	_load_start_world()
 	if campaign:
 		_boot_campaign()
 	_boot_async()
@@ -157,4 +154,49 @@ func _boot_async() -> void:
 	SidecarManager.start_all()
 	while not SidecarManager.all_healthy():
 		await get_tree().create_timer(0.5).timeout
+	# Only NOW build the opening world. Building first meant rebuild_now()
+	# called _register_async against a backend that did not exist yet, which
+	# then raced the debounce timer's second rebuild — two registrations
+	# interleaving while the clock ran. (You inherit a grid, you do not
+	# start on empty land — GAME_DESIGN §5.1.)
+	BuildSession.enabled = false  # the scripted build must not arm the debounce
+	_load_start_world()
+	var status: Array = await BuildSession.build_status
+	if OS.get_environment("BOOT_TRACE") != "":
+		print("TRACE build ok=", status[0], " msg=", status[1],
+			" plants=", World.plants.size(), " corridors=", World.corridors.size())
+	BuildSession.enabled = true
+	if OS.get_environment("BOOT_TRACE") != "":
+		var seen := [0]
+		Orchestrator.step_completed.connect(
+			func(t: int, result: Dictionary) -> void:
+				seen[0] += 1
+				if seen[0] > 40:
+					return
+				var isl: Dictionary = result.get("islands", {}).get("0", {})
+				if seen[0] == 1:
+					var lines: Dictionary = result.get("pf", {}).get("latest", {}).get("lines", {})
+					var ranked: Array = lines.keys()
+					ranked.sort_custom(func(a: String, b: String) -> bool:
+						return float(lines[a].get("loading_percent", 0.0)) \
+							> float(lines[b].get("loading_percent", 0.0)))
+					for lid: String in ranked.slice(0, 4):
+						var spec := {}
+						for l: Dictionary in Boundary.docs["lines"]["lines"]:
+							if str(l["id"]) == lid:
+								spec = l
+						print("TRACE line ", lid, " ", spec.get("from_bus"), "->",
+							spec.get("to_bus"), " km=", spec.get("length_km"),
+							" par=", spec.get("parallel"),
+							" load=", lines[lid].get("loading_percent"),
+							" p=", lines[lid].get("p_from_mw"))
+					for pid: String in result.get("devices", {}):
+						var d: Dictionary = result["devices"][pid]
+						if float(d.get("p_mw", 0.0) if d.get("p_mw") != null else 0.0) > 700.0:
+							print("TRACE big ", pid, " p=", d.get("p_mw"))
+				print("TRACE t=", t, " status=", result.get("status"),
+					" f=", isl.get("f_hz"), " n_isl=", (result.get("islands", {}) as Dictionary).size(),
+					" load=", result.get("pf", {}).get("latest", {}).get("max_loading_pct"),
+					" ev=", (result.get("events", []) as Array).map(
+						func(e: Dictionary) -> String: return str(e.get("kind")) + ":" + str(e.get("element")))))
 	GameClock.speed = 60.0

@@ -1,5 +1,5 @@
 extends SmokeBase
-const TAG := "SMOKE_PROBE"
+const TAG := "SMOKE_PROBE6"
 
 func run() -> void:
 	var boot := preload("res://smokes/dispatch_day.gd").new()
@@ -14,9 +14,9 @@ func run() -> void:
 	var status: Array = await BuildSession.build_status
 	print("PROBE register_ms=", Time.get_ticks_msec() - t0, " ok=", status[0], " msg=", status[1])
 	Orchestrator.stop()
-	for i in range(6):
+	for i in range(60):
 		t0 = Time.get_ticks_msec()
-		var result: Dictionary = await Orchestrator.step_once(900.0)
+		var result: Dictionary = await Orchestrator.step_once(6.0)
 		var gen_sum := 0.0
 		for pid: String in result.get("devices", {}):
 			gen_sum += numf(result["devices"][pid], "p_mw", 0.0)
@@ -32,7 +32,7 @@ func run() -> void:
 			" afrr=", isl0.get("afrr_used_mw"),
 			" room_up=", isl0.get("afrr_headroom_up_mw"),
 			" fcr=", isl0.get("fcr_used_mw"),
-			" mode=", result.get("mode"), " load=", result.get("pf",{}).get("latest",{}).get("max_loading_pct"),
+			" mode=", result.get("mode"),
 			" f_max=", isl0.get("f_max"),
 			" gen=", gen_sum, " demand=", demand_sum, " cmds=", cmd_sum,
 			" events=", (result.get("events", []) as Array).size())

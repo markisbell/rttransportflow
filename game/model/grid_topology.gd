@@ -300,7 +300,8 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 		return {"ok": false, "error": "no branches between buses", "warnings": warnings}
 
 	var demand := _demand_profiles(world, kept_zones, demand_sampler)
-	var dispatch := _dispatch_profiles(world, kept_plants, demand["total"])
+	var dispatch := _dispatch_profiles(world, kept_plants, demand["total"],
+		_home_zones(world, kept_plants, kept_zones), demand, kept_zones)
 
 	var plants_doc := {"plants": []}
 	for pid: String in kept_plants:
@@ -557,8 +558,30 @@ static func _demand_profiles(world: Node, zone_ids: Array[String],
 
 ## Stub balanced dispatch (real dispatch arrives in P6): must-take renewables
 ## + flat nuclear + dispatchables sharing the residual pro-rata (capped 92 %).
+## Nearest metro for each plant, by tile distance. The START-UP operating
+## point must be LOCAL: a global pro-rata split sends a city's supply across
+## the whole network, and the first power flow after a reset hit 221 % on a
+## trunk and instant-tripped it before the dispatcher had said a word.
+static func _home_zones(world: Node, plant_ids: Array[String],
+		zone_ids: Array[String]) -> Dictionary:
+	var home := {}
+	for pid: String in plant_ids:
+		var tile: Vector2i = world.plants[pid]["tile"]
+		var best := ""
+		var best_d := 1 << 30
+		for lc_id: String in zone_ids:
+			for lc_tile: Vector2i in world.load_centers[lc_id]["tiles"]:
+				var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
+				if d < best_d:
+					best_d = d
+					best = lc_id
+		home[pid] = best
+	return home
+
+
 static func _dispatch_profiles(world: Node, plant_ids: Array[String],
-		total_load: Array[float]) -> Dictionary:
+		total_load: Array[float], home_zones: Dictionary = {},
+		demand: Dictionary = {}, zone_ids: Array[String] = []) -> Dictionary:
 	var out := {}
 	for pid: String in plant_ids:
 		var profile: Array[float] = []
@@ -566,6 +589,36 @@ static func _dispatch_profiles(world: Node, plant_ids: Array[String],
 		profile.fill(0.0)
 		out[pid] = profile
 
+	if not zone_ids.is_empty() and not home_zones.is_empty():
+		for zone_id: String in zone_ids:
+			var local: Array[String] = []
+			for pid: String in plant_ids:
+				if str(home_zones.get(pid, "")) == zone_id:
+					local.append(pid)
+			if local.is_empty():
+				continue
+			var zone_load: Array = demand[zone_id]
+			var zone_total: Array[float] = []
+			zone_total.resize(STEPS)
+			for step in range(STEPS):
+				zone_total[step] = float(zone_load[step])
+			_fill_profiles(world, local, zone_total, out)
+		# any plant with no metro of its own still shares the system load
+		var orphans: Array[String] = []
+		for pid: String in plant_ids:
+			if not home_zones.has(pid):
+				orphans.append(pid)
+		if not orphans.is_empty():
+			_fill_profiles(world, orphans, total_load, out)
+		return out
+	_fill_profiles(world, plant_ids, total_load, out)
+	return out
+
+
+## Balance one group of plants against one load series (must-take renewables
+## + flat nuclear + dispatchables sharing the residual, capped at 92 %).
+static func _fill_profiles(world: Node, plant_ids: Array[String],
+		total_load: Array[float], out: Dictionary) -> void:
 	for step in range(STEPS):
 		var target: float = total_load[step] * 1.015
 		var fixed := 0.0
@@ -605,4 +658,3 @@ static func _dispatch_profiles(world: Node, plant_ids: Array[String],
 				var p: Dictionary = world.plants[pid]
 				if str(p["kind"]) in ["coal", "lignite", "gas_ccgt", "gas_ocgt", "hydro_ps"]:
 					out[pid][step] = snappedf(share * float(p["p_max_mw"]), 0.1)
-	return out

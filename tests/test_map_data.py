@@ -1,4 +1,4 @@
-"""Validate the shipped data/map/europe_v1.json (P5 map authority)."""
+"""Validate the shipped Europe map (ledger 38: europe_v3, 5 km grid)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-MAP_PATH = ROOT / "data" / "map" / "europe_v1.json"
+MAP_PATH = ROOT / "data" / "map" / "europe_v3.json"
 QUANTIZE = ROOT / "tools" / "map_authoring" / "quantize.py"
 
 # GAME_DESIGN §2.1 table: id -> (peak MW, season)

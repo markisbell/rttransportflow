@@ -87,6 +87,23 @@ static func tap_for(world: Node, tiles: Array, avoid: Dictionary = {}) -> Vector
 	return fallback
 
 
+## A tile ~60 km to the side of `from_tile`, used to start the alternate
+## trunk so the two routes do not immediately re-merge into one corridor.
+static func _detour_seed(world: Node, from_tile: Vector2i,
+		avoid: Dictionary) -> Vector2i:
+	var offset := tiles_for_km(60.0, world)
+	for candidate: Vector2i in [from_tile + Vector2i(0, offset),
+			from_tile + Vector2i(0, -offset), from_tile + Vector2i(offset, 0),
+			from_tile + Vector2i(-offset, 0)]:
+		if world.can_place_corridor(candidate) and not avoid.has(candidate):
+			var spur := route(world, from_tile, candidate, false, avoid)
+			if not spur.is_empty():
+				for tile: Vector2i in spur:
+					world.place_corridor(tile)
+				return candidate
+	return from_tile
+
+
 ## Up to four taps around a footprint, one per side where possible — the
 ## routes into a metro must not all converge on one tile.
 static func taps_around(world: Node, tiles: Array,
@@ -188,6 +205,18 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 				push_warning("auto_build: trunk to %s unroutable" % lc_id)
 			for tile: Vector2i in link:
 				world.place_corridor(tile)
+			# A SECOND path between the metros. One trunk carries every
+			# merit-order exchange between cities — the first 5 km build put
+			# 224 % on it and the duty protection cut the continent into
+			# three islands. Real backbones are meshed for exactly this
+			# reason; the alternate route also survives an outage on the first.
+			if here.size() > 1:
+				var alt_from: Vector2i = _detour_seed(world, trunk_from, avoid)
+				var alt_to: Vector2i = here[mini(1, here.size() - 1)]
+				world.place_corridor(alt_to)
+				var alt := route(world, alt_from, alt_to, false, avoid)
+				for tile: Vector2i in alt:
+					world.place_corridor(tile)
 		trunk_from = entry
 
 	var taps: Array[Vector2i] = []

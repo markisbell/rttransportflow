@@ -45,6 +45,13 @@ var _ely_on: Dictionary = {}
 var _bat_charging: Dictionary = {}
 
 var _mc_cache: Dictionary = {}
+## plant id -> the metro it sits next to. The merit order is location-blind:
+## on a continental map it will happily serve Hamburg from Munich and push
+## 6 GW down one corridor until the duty protection cuts the grid in three
+## (observed on the 5 km map). Real systems self-dispatch locally and trade
+## on the margin, so each zone's own fleet is committed to its own demand
+## first and only the RESIDUAL follows the merit order.
+var home_zone: Dictionary = {}
 
 
 func setup(economy: Dictionary, catalog: Dictionary) -> void:
@@ -173,6 +180,25 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		elif state == "online" and committed_cap > need * 1.15:
 			commands[pid] = {"breaker": "open", "dispatch_mw": 0.0}
 
+	# --- locality first: each metro's own plants cover their own demand ---
+	var local_target := {}  # pid -> MW already claimed by its own zone
+	if not home_zone.is_empty():
+		for zone_id: String in zone_ids:
+			var zone_need: float = Demand.zone_mw(zone_id, t_days) * LOSS_MARGIN
+			var mine: Array[Dictionary] = []
+			for entry: Dictionary in committed:
+				if str(home_zone.get(entry["id"], "")) == zone_id:
+					mine.append(entry)
+			for entry: Dictionary in mine:
+				if zone_need <= 0.0:
+					break
+				var state := str(device_states.get(entry["id"], {}).get("state", "online"))
+				if state != "online":
+					continue
+				var take: float = minf(zone_need, float(entry["p_max"]) * HEADROOM_FRAC)
+				local_target[entry["id"]] = take
+				zone_need -= take
+
 	# --- energy dispatch: merit order BETWEEN price tiers, PROPORTIONAL
 	# within a tier. Greedy fill-to-cap commanded 5 nuclear units up and the
 	# marginal one 611 MW down — the slew asymmetry (fast up, 19 min down)
@@ -205,7 +231,10 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		var share := take_tier / tier_cap if tier_cap > 0.0 else 0.0
 		for unit: Dictionary in tier:
 			var command: Dictionary = commands.get(unit["pid"], {})
-			command["dispatch_mw"] = snappedf(share * float(unit["cap"]), 0.1)
+			# never below what the unit's own metro needs from it
+			var value: float = maxf(share * float(unit["cap"]),
+				float(local_target.get(unit["pid"], 0.0)))
+			command["dispatch_mw"] = snappedf(minf(value, float(unit["cap"])), 0.1)
 			commands[unit["pid"]] = command
 		residual -= take_tier
 		if take_tier > 0.0:
