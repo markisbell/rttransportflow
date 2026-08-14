@@ -48,6 +48,7 @@ def build_case(h_sys: float, fcr_mw: float, battery_gw: float = 0.0) -> Integrat
     )
     integ = Integrator(fleet, islands)
     integ.defense_enabled = False  # §2.3 pins are PRE-shed numbers (fixture rule)
+    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
     return integ
 
 

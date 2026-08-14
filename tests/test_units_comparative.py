@@ -74,6 +74,7 @@ def run(which: str) -> dict:
     fleet = build_fleet(which)
     integ = Integrator(fleet, _island())
     integ.defense_enabled = False  # comparative pins predate the defense layer
+    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
     integ.queue.schedule(Event(s_to_us(1.0), "trip", "infeed"))
     integ.advance(s_to_us(1.0), interrupt_on_event=False)
     f_before = float(integ.islands.f[0])

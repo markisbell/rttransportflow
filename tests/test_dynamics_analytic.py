@@ -42,6 +42,7 @@ def make_fixture(h: float = 5.0, n_machines: int = 4, s_n: float = 2500.0,
     # the §6 pins predate the P8 defense layer and run with it OFF (the
     # fixture family's "clamps disabled" rule)
     integrator.defense_enabled = False
+    integrator.agc_enabled = False  # droop-only pins (PHYSICS §6)
     return integrator
 
 

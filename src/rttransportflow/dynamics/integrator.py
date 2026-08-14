@@ -45,6 +45,9 @@ class ModeConfig:
     calm_rocof_hz_s: float = 0.010
     calm_hold_us: int = 30_000_000
     event_horizon_us: int = 5_000_000
+    # AGC / aFRR (PHYSICS §2.8, ledger 19)
+    agc_k_p: float = 0.1
+    agc_k_i: float = 1.0 / 120.0
 
 
 @dataclass
@@ -138,6 +141,11 @@ class Integrator:
         # analytic fixtures pin the bare swing+FCR path (PHYSICS §6 runs
         # "with clamps disabled" — the defense layer counts as one)
         self.defense_enabled = True
+        # secondary control (aFRR): the §6 droop-only QSS pins run with it
+        # OFF — with AGC the frequency returns to 50 Hz by construction
+        self.agc_enabled = True
+        self.agc_mw = np.zeros(islands.n)  # commanded secondary correction
+        self.agc_int = np.zeros(islands.n)  # PI integral state [MW·? ]
 
         self.t_us = 0
         self.mode = "calm"
@@ -173,6 +181,10 @@ class Integrator:
         self.islands = islands
         self.rings = {i: FineRing() for i in range(islands.n)}
         self._rocof_inst = self._rocof_inst[idx].copy()
+        # control areas re-form with the islands: inherit the parent's
+        # secondary state rather than kicking every unit at the split
+        self.agc_mw = self.agc_mw[idx].copy()
+        self.agc_int = self.agc_int[idx].copy()
         self.f_start = islands.f.copy()
         self.energy_in_mj = 0.0
         self.energy_load_mj = 0.0
@@ -217,10 +229,39 @@ class Integrator:
 
     # ------------------------------------------------------------------
 
+    def _agc_update(self, dt_s: float) -> None:
+        """Secondary control per island (PHYSICS §2.8): ACE = ΔP_tie + B·Δf
+        with the textbook bias B = ΣK_i + D·P_L0/f0 (ledger 19); one
+        synchronous area means no tie flows. PI with anti-windup at the
+        participating headroom; the command reaches units through their own
+        dispatch slew, so restoration is only as fast as the fleet allows."""
+        islands = self.islands
+        alive = ~islands.blackout()
+        df = islands.f - F0
+        k_sum = np.zeros(islands.n)
+        online = self.fleet.online
+        if self.fleet.n_sync and online.any():
+            np.add.at(k_sum, self.fleet.island_of[online],
+                      self.fleet.k_droop[online])
+        bias = k_sum + islands.d_pu * islands.p_l0 * islands.w / F0
+        ace = bias * df  # MW: negative when the island is short
+        up, down = self.fleet.agc_headroom(islands.n)
+
+        integral = self.agc_int + ace * dt_s
+        command = -(self.cfg.agc_k_p * ace + self.cfg.agc_k_i * integral)
+        clamped = np.clip(command, -down, up)
+        # anti-windup: only integrate where the command is not railed
+        self.agc_int = np.where((command == clamped) & alive,
+                                integral, self.agc_int)
+        self.agc_mw = np.where(alive, clamped, 0.0)
+
     def _tick(self, dt_us: int) -> None:
-        """Tick order per PHYSICS §2.6 (H2 chain arrives in P7)."""
+        """Tick order per PHYSICS §2.6."""
+        if self.agc_enabled:
+            self._agc_update(dt_us / US)
         p_mech, p_inv = self.fleet.tick(
-            dt_us, self.islands.f, self.islands.n, self._rocof_inst
+            dt_us, self.islands.f, self.islands.n, self._rocof_inst,
+            self.agc_mw if self.agc_enabled else None
         )
         p_inj = p_mech + p_inv
         f_prev = self.islands.f
@@ -480,6 +521,8 @@ class Integrator:
             "w": [repr(float(v)) for v in self.islands.w],
             "p_loss": [repr(float(v)) for v in self.islands.p_loss],
             "rocof_inst": [repr(float(v)) for v in self._rocof_inst],
+            "agc_mw": [repr(float(v)) for v in self.agc_mw],
+            "agc_int": [repr(float(v)) for v in self.agc_int],
             "energy_in_mj": repr(self.energy_in_mj),
             "energy_load_mj": repr(self.energy_load_mj),
             "f_start": [repr(float(v)) for v in self.f_start],
@@ -506,6 +549,9 @@ class Integrator:
         self.islands.w = np.array([float(v) for v in state["w"]])
         self.islands.p_loss = np.array([float(v) for v in state["p_loss"]])
         self._rocof_inst = np.array([float(v) for v in state["rocof_inst"]])
+        if "agc_mw" in state:
+            self.agc_mw = np.array([float(v) for v in state["agc_mw"]])
+            self.agc_int = np.array([float(v) for v in state["agc_int"]])
         self.energy_in_mj = float(state["energy_in_mj"])
         self.energy_load_mj = float(state["energy_load_mj"])
         self.f_start = np.array([float(v) for v in state["f_start"]])

@@ -187,6 +187,10 @@ class Fleet:
     h2: object = None  # H2Stores (attach_h2)
     hvdc: object = None  # HVDCLinks (attach_hvdc)
     notices: list = None  # (kind, device_id) engine notices, polled per tick
+    # aFRR / AGC (PHYSICS §2.8, ledger 19): contracted secondary band and
+    # the participation weight (default ∝ band, `agc_participation` overrides)
+    afrr_band: np.ndarray = None
+    agc_part: np.ndarray = None
     # rows whose pending start is a BLACK START (bypasses the sick-island
     # hold; the integrator re-energizes a dead island on completion)
     black_start_rows: set = None
@@ -384,8 +388,25 @@ class Fleet:
 
     # ------------------------------------------------------------------
 
+    def agc_headroom(self, n_islands: int) -> tuple[np.ndarray, np.ndarray]:
+        """Per-island (up, down) MW available to secondary control — the
+        anti-windup bound (PHYSICS §2.8). Only ONLINE participants count."""
+        up = np.zeros(n_islands)
+        down = np.zeros(n_islands)
+        if not self.n_sync:
+            return up, down
+        take = self.online & (self.agc_part > 0.0)
+        if take.any():
+            band = np.minimum(self.afrr_band, self.p_max - self.p_min)
+            room_up = np.minimum(self.p_max - self.p_disp, band)
+            room_dn = np.minimum(self.p_disp - self.p_min, band)
+            np.add.at(up, self.island_of[take], np.maximum(room_up[take], 0.0))
+            np.add.at(down, self.island_of[take], np.maximum(room_dn[take], 0.0))
+        return up, down
+
     def tick(self, dt_us: int, f_island: np.ndarray, n_islands: int,
-             rocof_island: np.ndarray | None = None):
+             rocof_island: np.ndarray | None = None,
+             agc_mw: np.ndarray | None = None):
         """One tick. Returns (p_mech, p_inv) per island; p_inv includes
         wind/PV + battery discharge − electrolyzer consumption."""
         dt_s = dt_us / US
@@ -397,7 +418,20 @@ class Fleet:
         prim = np.clip(-self.k_droop * _soft_db(df, self.db), -self.fcr_band, self.fcr_band)
         self.fcr_used = np.zeros(n_islands)
         np.add.at(self.fcr_used, self.island_of[online], np.abs(prim[online]))
-        self.p_disp += np.clip(self.p_set - self.p_disp,
+        # secondary control rides the SAME dispatch slew as the schedule, so
+        # restoration is visibly slow when only sluggish units participate
+        target = self.p_set
+        if agc_mw is not None and self.n_sync:
+            take = self.online & (self.agc_part > 0.0)
+            share = np.zeros(self.n_sync)
+            if take.any():
+                total = np.zeros(n_islands)
+                np.add.at(total, self.island_of[take], self.agc_part[take])
+                denom = total[self.island_of]
+                share = np.where(take & (denom > 0.0),
+                                 self.agc_part / np.maximum(denom, 1e-9), 0.0)
+            target = self.p_set + agc_mw[self.island_of] * share
+        self.p_disp += np.clip(target - self.p_disp,
                                -self.ramp_mw_s * dt_s, self.ramp_mw_s * dt_s)
         u = np.clip(self.p_disp + prim, self.p_min, self.p_max)
         u = np.where(online, u, 0.0)
@@ -753,6 +787,8 @@ def make_fleet(
         warm_after_s=col("warm_after_s", lambda s: 28800.0),
         cold_after_s=col("cold_after_s", lambda s: 172800.0),
         trip_lockout_s=col("trip_lockout_s", lambda s: 0.0),
+        afrr_band=col("afrr_band", lambda s: 0.0),
+        agc_part=col("agc_part", lambda s: float(s.get("afrr_band", 0.0))),
         eta_full=col("eta_full", lambda s: 0.0),
         eta_min=col("eta_min", lambda s: s.get("eta_full", 0.0)),
         energy_mwh=np.zeros(n),

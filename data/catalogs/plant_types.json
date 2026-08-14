@@ -23,7 +23,8 @@
       "eta_full": 0.33,
       "eta_min": 0.32,
       "fuel": "uranium",
-      "rationale": "PARAMETERS §1.1 large PWR: H 6 s (big rotor), 8 s reheat lag = why steam cannot arrest a fast dip; FCR band ±2% P_n (French practice; game default participation OFF); xenon lockout 48 h after a trip."
+      "rationale": "PARAMETERS §1.1 large PWR: H 6 s (big rotor), 8 s reheat lag = why steam cannot arrest a fast dip; FCR band ±2% P_n (French practice; game default participation OFF); xenon lockout 48 h after a trip.",
+      "afrr_band_frac_pn": 0.0
     },
     "coal": {
       "model": "steam",
@@ -46,7 +47,8 @@
       "eta_full": 0.45,
       "eta_min": 0.41,
       "fuel": "coal",
-      "rationale": "PARAMETERS §1.2 supercritical hard coal: classic sluggish reheat (T_RH 10 s, F_HP 0.30); boiler-storage limits folded into the ±5% FCR band + 3%/min ramp."
+      "rationale": "PARAMETERS §1.2 supercritical hard coal: classic sluggish reheat (T_RH 10 s, F_HP 0.30); boiler-storage limits folded into the ±5% FCR band + 3%/min ramp.",
+      "afrr_band_frac_pn": 0.05
     },
     "lignite": {
       "model": "steam",
@@ -69,7 +71,8 @@
       "eta_full": 0.43,
       "eta_min": 0.39,
       "fuel": "lignite",
-      "rationale": "PARAMETERS §1.3: as coal but stiffer (P_min 40%, 2%/min) — mine-mouth baseload character."
+      "rationale": "PARAMETERS §1.3: as coal but stiffer (P_min 40%, 2%/min) — mine-mouth baseload character.",
+      "afrr_band_frac_pn": 0.05
     },
     "gas_ccgt": {
       "model": "ccgt",
@@ -91,7 +94,8 @@
       "eta_full": 0.59,
       "eta_min": 0.5,
       "fuel": "ng",
-      "rationale": "PARAMETERS §1.4 H-class single shaft: GT delivers 2/3 fast (~1-2 s), the HRSG steam tail (1/3) breathes over 2 min — 'fast, then breathes'."
+      "rationale": "PARAMETERS §1.4 H-class single shaft: GT delivers 2/3 fast (~1-2 s), the HRSG steam tail (1/3) breathes over 2 min — 'fast, then breathes'.",
+      "afrr_band_frac_pn": 0.1
     },
     "gas_ocgt": {
       "model": "ocgt",
@@ -112,7 +116,8 @@
       "eta_full": 0.4,
       "eta_min": 0.29,
       "fuel": "ng",
-      "rationale": "PARAMETERS §1.5: the fastest thermal responder (GAST T1 0.3/T2 0.8, ±10% FCR band, 15%/min, 15-min start any state); expensive fuel is the game-side counterweight."
+      "rationale": "PARAMETERS §1.5: the fastest thermal responder (GAST T1 0.3/T2 0.8, ±10% FCR band, 15%/min, 15-min start any state); expensive fuel is the game-side counterweight.",
+      "afrr_band_frac_pn": 0.15
     },
     "hydro_ps": {
       "model": "hydro",
@@ -141,7 +146,8 @@
       "eta_pump": 0.88,
       "eta_turbine": 0.9,
       "soc_frac": 0.5,
-      "_reservoir_rationale": "PARAMETERS 1.10: 300 MW / 8 h = 2400 MWh reference; pump/turbine efficiencies give the ~0.79 round trip; pumping is a motor load that keeps the machine's inertia in the pool (P8 pump mode)"
+      "_reservoir_rationale": "PARAMETERS 1.10: 300 MW / 8 h = 2400 MWh reference; pump/turbine efficiencies give the ~0.79 round trip; pumping is a motor load that keeps the machine's inertia in the pool (P8 pump mode)",
+      "afrr_band_frac_pn": 0.2
     },
     "wind_onshore": {
       "model": "inverter",
@@ -219,5 +225,6 @@
     "converter_trip_high_hz": 51.5,
     "converter_trip_delay_s": 0.1,
     "rationale": "PARAMETERS §2.2: synchronous machines trip outside [47.5, 51.5] Hz after 100 ms; converters ride through inside the same window (RfG) — LFSM-O handles the 50.2-51.5 band without disconnection cliffs."
-  }
+  },
+  "_afrr_rationale": "PARAMETERS §2.1 aFRR layer: the contracted secondary band as a fraction of P_n, and the default AGC participation weight (ledger 19). Nuclear 0 by default — must-run identity, ledger 9; hydro/OCGT lead because their ramps deliver within the 15-min restoration window."
 }

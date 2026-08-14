@@ -168,8 +168,11 @@ def test_early_return_on_scheduled_trip(client) -> None:
     # The dive happens in the FOLLOW-UP window (early return fires right at
     # the event — the game slows down and then watches the frequency fall).
     res2 = do_step(client, 2, dt_s=60.0)
-    assert res2["islands"]["0"]["f_min"] < 49.95
-    assert res2["islands"]["0"]["f_hz"] < 50.0
+    # primary response defines the dip; SECONDARY control (aFRR/AGC, added
+    # with P8) then walks it back, so the window's low point is shallower
+    # than it was droop-only and the end-of-window value is already climbing
+    assert res2["islands"]["0"]["f_min"] < 49.99
+    assert res2["islands"]["0"]["f_hz"] > res2["islands"]["0"]["f_min"]
     assert res2["islands"]["0"]["fcr_used_mw"] > 100.0
 
 

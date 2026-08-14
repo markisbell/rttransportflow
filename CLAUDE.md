@@ -225,6 +225,26 @@ docs/GAME_DESIGN.md.
     load over-frequency-trips — the engine envelope's p_min stays 0 (the
     catalog p_min informs the dispatcher, P3 rule) and black-start units
     run at house load.
+36. **Exceptions are data too** (P8 hardening, 2026-08-14): the never-crash
+    rule covered solver divergence but NOT engine exceptions — a raise inside
+    the step handler killed the WS channel while the process lived and
+    `/health` stayed green, so the game span forever against a **deaf**
+    backend (two smoke runs froze mid-flight; the autopsy found stale
+    adopted backends running pre-fix code). Now: the step body has a
+    catch-all returning a `failed` frame carrying the traceback, the WS loop
+    guards its own dispatch, and the game re-registers after
+    `TRANSPORT_FAILURES_BEFORE_RESET` consecutive transport failures.
+    Companion rule for dev loops: **always free the smoke port before a run**
+    (`fuser -k <port>/tcp`) — an adopted stale backend runs OLD code and
+    silently invalidates the result.
+37. **Island reshape mid-batch** (P8, 2026-08-14): a line event inside an
+    event batch re-topologizes the island set, so any per-island mask
+    captured before the loop must be remapped by parent island — a 2 → 3
+    split raised `ValueError` (1 → 2 had survived only by numpy
+    broadcasting). Consequence beyond the crash: an island BORN dead by a
+    split must read as newly-black (`w → 0`, `blackout` event), not keep its
+    load.
+
 35. **§2.3 row-5 narrative refined + sync LFSM-O** (P8): with the defense
     live, UFLS stage 1's 7.5 % shed (11.25 GW on the 150 GW island)
     overcorrects the 3 GW reference loss — only stage 1 fires, the raw

@@ -127,6 +127,7 @@ def battery_fixture(extra_batteries=None, h: float = 5.0):
                               p_loss=np.zeros(1), d_pu=1.0)
         integ = Integrator(fleet, islands)
         integ.defense_enabled = False  # pinned pre-defense dynamics
+        integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
     return integ
 
 
@@ -354,6 +355,7 @@ def test_h2_starvation_chain() -> None:
                           p_loss=np.zeros(1), d_pu=0.5)
     integ = Integrator(fleet, islands)
     integ.defense_enabled = False  # pinned pre-defense dynamics
+    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
 
     # Draw at 200 MW: ~10.2 t/h; the 400 kg above the floor lasts ~2.4 min
     # -> starvation, early return, ALERT; the coal FCR arrests the loss.

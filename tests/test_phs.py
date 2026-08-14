@@ -30,6 +30,7 @@ def phs_island(pump_mw: float = 0.0, soc_frac: float = 0.5,
                           p_loss=np.zeros(1), d_pu=0.5)
     integ = Integrator(fleet, islands)
     integ.defense_enabled = False
+    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
     return fleet, integ
 
 
