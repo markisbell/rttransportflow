@@ -175,17 +175,22 @@ func _build() -> Dictionary:
 	var cavern: String = World.place_plant("h2_cavern", cavern_tile)
 
 	var elys: Array[String] = place_ring("electrolyzer", 2, anchor, lc_tap, avoid)
-	# plain thermal is ONE tier (coal) sized so coal + H2 covers the calm
-	# peak WITHOUT storage: the battery arbitrage policy discharges into a
-	# sustained expensive tier until SoC-empty and then vanishes as a
-	# ~480 MW cliff that trips the gas fleet (found the hard way here —
-	# SoC-aware dispatch is a P8+ refinement, noted in the report)
-	var coal: Array[String] = place_ring("coal", 5, anchor, lc_tap, avoid)
+	# Plain thermal is ONE tier (coal) sized DELIBERATELY SHORT of the calm
+	# day, because the whole point of the fixture is that the expensive H2
+	# tier has to be dispatched. Five 800 MW units (4.0 GW) covered Hamburg's
+	# ~2.7 GW calm island by themselves, so the H2 CCGTs sat online at 0 MW,
+	# the cavern never drew down, and phase 2 could not finish. Three deliver
+	# 3 x 800 x 0.92 = 2.21 GW, leaving ~0.5 GW for H2 to cover — enough to
+	# exercise the burn, still enough firm capacity that the day survives
+	# without storage (the battery arbitrage policy drains into a sustained
+	# expensive tier and then vanishes as a ~480 MW cliff that trips the gas
+	# fleet — SoC-aware dispatch is a P8+ refinement).
+	var coal: Array[String] = place_ring("coal", 3, anchor, lc_tap, avoid)
 	var ccgt: Array[String] = place_ring("gas_ccgt", 2, anchor, lc_tap, avoid)
 	# batteries eat the per-block wind steps (FFR); the scarcity-only
 	# discharge policy keeps their SoC intact through the H2-tier burn
 	var bats: Array[String] = place_ring("battery", 2, anchor, lc_tap, avoid)
-	if elys.size() < 2 or coal.size() < 5 or ccgt.size() < 2 or bats.size() < 2:
+	if elys.size() < 2 or coal.size() < 3 or ccgt.size() < 2 or bats.size() < 2:
 		_fail(TAG, "site exhaustion: ely=%d coal=%d ccgt=%d bat=%d"
 			% [elys.size(), coal.size(), ccgt.size(), bats.size()])
 		return {}

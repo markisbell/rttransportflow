@@ -1015,7 +1015,20 @@ source.
 **Acceptance evidence:** `build/dist/rttransportflow-0.0.1-linux-x86_64.tar.gz`,
 self-contained, no Python required on the player's machine.
 
-**Discoveries:** (1) `globalize_path("res://").get_base_dir()` is correct in
+**Discoveries:** (0) **CI had been red for twelve consecutive runs** and
+nobody had looked — a local suite that passes for a reason CI does not
+share is not a green suite. Two independent breakages: `pytest` could not
+import two test modules (three tests import helpers from a sibling module,
+which needs the repo root on `sys.path`; `python -m pytest` inserts the CWD
+and hid it, bare `pytest` does not — `pythonpath = [".", "src"]` now), and
+the Godot job died before running a test (GdUnit's vendored `runtest.sh`
+passes `--headless` only to its log-copy pass, and GdUnit additionally
+refuses headless unless given `--ignoreHeadlessMode`; CI now calls
+`GdUnitCmdTool` directly rather than patching a vendored addon). The
+backend suite takes **over an hour** on a 2-core runner versus ~5 min on
+this 20-core box — numba compiles from cold in every process — so every job
+now carries a timeout sized to catch a hang, not to police runtime.
+(1) `globalize_path("res://").get_base_dir()` is correct in
 the editor and WRONG in an export (res:// is the PCK) — the packaged game
 booted to an empty world looking for `/data/grids/...`. Caught only because
 the packaging script plays the bundle instead of listing its files; that is
