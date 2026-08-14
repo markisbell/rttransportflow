@@ -1041,19 +1041,23 @@ so the game sustains ~180-450x real time rather than the 900x the top speed
 button requests — the orchestrator's skip-never-stall absorbs it. The number
 belongs in the log, not behind a loose threshold.
 
-**Open at hand-off (two smoke-level items, both diagnosed, neither a model
+**Open at hand-off (ONE smoke-level item, diagnosed, not a model
 defect):** `hvdc_link` is 8/9 — the netting fix works (measured terminal
 power reaches the ledger and the schedule moves), but the converter's AC
 spur is routed with `stop_at_existing` and ends at the FIRST corridor tile
 it meets, so the receiving terminal injects halfway down a corridor instead
 of at the metro's bus; giving each converter the city tap needs the DC
-exit tile reserved before the AC web goes down. `hydrogen_chain` phase 2
-(burn to the 5 % floor + the ≈35 % round trip) still has not completed a
-run: the fleet-sizing fix is in (5 coal units covered the island alone, so
-the H2 tier was never called — now 3), but the burn cannot begin until the
-fixture's 24-block wind down-ramp finishes, and at ~35 s per block that is
-over an hour of uninterrupted wall time. Phase 1 (cavern 280 → 414 t,
-electrolyzers ran) is verified.
+exit tile reserved before the AC web goes down. `hydrogen_chain` is **GREEN 7/7** once
+the machine is quiet enough to give it an uninterrupted run (every earlier
+attempt died to a wall-clock cap while the campaign/soak runs competed for
+cores): cavern 280 → 411 t while power is cheap (10 920 MWh into the
+electrolyzers), forced calm burns it to the 5 % floor at 200 t delivering
+5 110 MWh, the plants starve there, and the **round trip measures 0.3645**
+against the ≈35 % §1.14 prediction — a number nobody tuned, it falls out of
+electrolyser specific energy × compression aux × turbine efficiency
+composing. The fleet-sizing fix is what unblocked it: five 800 MW coal
+units covered the island alone so the expensive H2 tier was never called;
+three leave ~0.5 GW for it.
 
 **Deviations (deliberate):** the heavy smokes (campaign, soak, calm_week)
 stay local rather than in CI — minutes each, and CI is not where you want to
