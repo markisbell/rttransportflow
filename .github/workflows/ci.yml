@@ -8,6 +8,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # the dynamics suite is minutes on 20 cores and slower on a 2-core
+    # runner, but a HANG should fail here rather than burn the 6 h default
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,6 +25,7 @@ jobs:
     # Family lesson: the PyInstaller freeze smoke lives in P4 CI, not P10.
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,6 +45,7 @@ jobs:
     # them. `scenarios` needs no backend; the others spawn one, so the
     # sidecar's `.venv/bin/python` has to exist here too.
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -97,6 +102,7 @@ jobs:
     needs: [test, game-tests]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
