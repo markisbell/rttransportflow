@@ -10,6 +10,7 @@ const TAG := "SMOKE_RIDE_THROUGH"
 
 
 func run() -> void:
+	p7_port = 8038
 	if not await p7_boot(TAG):
 		return
 	# wind lull so the gas fleet carries real load (and the trip removes it)
@@ -18,11 +19,13 @@ func run() -> void:
 			0.0, 3.0, 0.7)
 	if not _build():
 		return
-	if (await p7_register(TAG)).is_empty():
+	var registered := await p7_register(TAG)
+	if registered.is_empty():
 		return
+	p7_report(registered)
 	var settle: Dictionary = {}
 	for _i in range(2):
-		settle = await Orchestrator.step_once(900.0)
+		settle = await p7_step(900.0, "settle")
 	if settle.get("_status", 0) != 200:
 		_fail(TAG, "settle step failed")
 		return
@@ -30,9 +33,11 @@ func run() -> void:
 	var victim := _largest_sync(settle.get("devices", {}))
 	var wind_pids := _wind_pids(settle.get("devices", {}))
 	if victim == "" or wind_pids.is_empty():
+		print("RIDE devices=", (settle.get("devices", {}) as Dictionary).keys())
 		_fail(TAG, "no victim / no wind on the island")
 		return
-	print("RIDE victim=", victim, " wind_units=", wind_pids.size())
+	print("RIDE victim=", victim, " wind_units=", wind_pids.size(),
+		" devices=", (settle.get("devices", {}) as Dictionary).keys().size())
 	Orchestrator.inject([{"at_s_rel": 20.0, "kind": "trip", "element": victim}])
 
 	var f_min := 100.0

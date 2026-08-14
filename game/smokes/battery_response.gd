@@ -7,10 +7,10 @@ extends P7SmokeBase
 ## trip, record f_min again. Deterministic: same seed, same pids.
 
 const TAG := "SMOKE_BATTERY_RESPONSE"
-const SOC_START := 0.55
 
 
 func run() -> void:
+	p7_port = 8035
 	if not await p7_boot(TAG):
 		return
 
@@ -18,32 +18,56 @@ func run() -> void:
 	var built_a := _build(false)
 	if built_a.is_empty():
 		return
-	var victim: String = built_a["coal"][0]
-	if (await p7_register(TAG)).is_empty():
+	var reg_a := await p7_register(TAG)
+	if reg_a.is_empty():
 		return
+	p7_report(reg_a)
 	check("single_zone",
 		(BuildSession.last_build["native"]["load_centers"]["items"] as Array).size() == 1)
-	var nadir_without := await _settle_trip_measure(victim, [])
-	print("BATRESP nadir_without=", nadir_without)
+	# The victim is whatever the DISPATCHER actually put online, not a fixed
+	# pid: with 7 identical units it commits only as many as the night needs,
+	# and tripping an idle one removes nothing (the pids stay deterministic,
+	# so run B can insist on the same machine).
+	var settle_a := await _settle()
+	var victim := _largest_online(settle_a)
+	if victim == "":
+		_fail(TAG, "no online unit to trip")
+		return
+	var nadir_without := await _trip_measure(victim, [])
+	print("BATRESP victim=", victim, " f_pre=", settle_a.get("islands", {}).get("0", {}).get("f_hz"),
+		" nadir_without=", nadir_without)
 
 	# --- run B: same island + battery fleet (fresh reset, t continues) ----
 	var built_b := _build(true)
 	if built_b.is_empty():
 		return
-	check("same_victim_pid", str(built_b["coal"][0]) == victim)
-	if (await p7_register(TAG)).is_empty():
+	var reg_b := await p7_register(TAG)
+	if reg_b.is_empty():
 		return
+	p7_report(reg_b)
 	var bats: Array = built_b["bats"]
-	var nadir_with := await _settle_trip_measure(victim, bats)
+	var settle_b := await _settle()
+	# SoC baseline at the trip instant, not the authored start: the fleet
+	# spends the settle blocks doing ordinary arbitrage/FFR, so "did the
+	# battery pay energy for this nadir" is only visible as a DROP from where
+	# it stood when the unit fell over (it had charged to 0.664 by then).
+	var soc_pre := 0.0
+	for pid: String in bats:
+		soc_pre = maxf(soc_pre,
+			numf(settle_b.get("devices", {}).get(pid, {}), "soc", 0.0))
+	check("same_victim_pid",
+		str(settle_b.get("devices", {}).get(victim, {}).get("state", "")) == "online")
+	var nadir_with := await _trip_measure(victim, bats)
 	print("BATRESP nadir_with=", nadir_with, " delta=", nadir_with - nadir_without)
 
 	check("both_dipped", nadir_without < 49.99 and nadir_with < 49.99)
 	check("battery_arrests_nadir", nadir_with > nadir_without + 0.03)
 	check("battery_discharged", _bat_discharged)
-	check("battery_soc_drained", _bat_soc_min < SOC_START - 0.0005)
+	check("battery_soc_drained", soc_pre > 0.0 and _bat_soc_min < soc_pre - 0.0005)
 	_finish(TAG, {"nadir_without": nadir_without, "nadir_with": nadir_with,
 		"delta_hz": nadir_with - nadir_without,
-		"bat_p_peak": _bat_p_peak, "bat_soc_min": _bat_soc_min})
+		"bat_p_peak": _bat_p_peak, "bat_soc_min": _bat_soc_min,
+		"bat_soc_pre": soc_pre})
 
 
 var _bat_discharged := false
@@ -51,11 +75,29 @@ var _bat_p_peak := 0.0
 var _bat_soc_min := 1.0
 
 
-## Settle two blocks, inject the trip, then chase the nadir through 30 s of
-## 1 s steps (trip_reaction pattern — the dip lives AFTER the early return).
-func _settle_trip_measure(victim: String, bats: Array) -> float:
+## Two settled blocks (sliced, so the schedule ramp actually runs).
+func _settle() -> Dictionary:
+	var result: Dictionary = {}
 	for _i in range(2):
-		await Orchestrator.step_once(900.0)
+		result = await p7_block("settle")
+	return result
+
+
+func _largest_online(result: Dictionary) -> String:
+	var best := ""
+	var best_p := 0.0
+	for pid: String in result.get("devices", {}):
+		var device: Dictionary = result["devices"][pid]
+		if str(device.get("state", "")) == "online" \
+				and numf(device, "p_mw", 0.0) > best_p:
+			best_p = numf(device, "p_mw", 0.0)
+			best = pid
+	return best
+
+
+## Inject the trip, then chase the nadir through 30 s of 1 s steps
+## (trip_reaction pattern — the dip lives AFTER the early return).
+func _trip_measure(victim: String, bats: Array) -> float:
 	Orchestrator.inject([{"at_s_rel": 30.0, "kind": "trip", "element": victim}])
 	var f_min := 100.0
 	var result: Dictionary = await Orchestrator.step_once(600.0)

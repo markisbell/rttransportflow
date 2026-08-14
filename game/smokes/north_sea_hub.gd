@@ -10,6 +10,7 @@ const TAG := "SMOKE_NORTH_SEA_HUB"
 
 
 func run() -> void:
+	p7_port = 8037
 	if not await p7_boot(TAG):
 		return
 	var built := _build()
@@ -20,8 +21,7 @@ func run() -> void:
 	if registered.is_empty():
 		return
 
-	for warning: String in registered.get("warnings", []):
-		print("HUB build warn: ", warning)
+	p7_report(registered)
 	var hub_params := {}
 	for dev: Dictionary in registered.get("devices", []):
 		if str(dev.get("kind", "")) == "offshore_hub":
@@ -31,19 +31,20 @@ func run() -> void:
 	check("farms_bound", farms.size() == 3)
 	var loss_frac := 0.02 + 0.003 * float(hub_params.get("cable_km", 0.0)) / 100.0
 
-	# strong wind so the delivery is non-trivial — ramped GENTLY (the CF
-	# curve is steep in lambda: a coarse ramp still out-stepped the coal
-	# slew and LFSM-O shed the hub on the resulting over-frequency)
+	# NO wind force. The platform lands in the southern North Sea, whose
+	# region already draws ~17.7 m/s offshore — above rated, so the farms sit
+	# at full output on their own. The old x1.5 ramp pushed that draw to
+	# 26.6 m/s, past the 25 m/s STORM CUTOUT, and the hub delivered exactly
+	# zero: the smoke was testing a gale, not a windy day (PARAMETERS §1.9
+	# cutout; the same trap the x1.8 comment warned about, reached at x1.5
+	# once the 5 km map moved the platform into british_isles).
 	var t0_days := GameClock.t_sim / 86400.0
-	for i in range(8):
-		Weather.force_window("wind_lambda_scale", "",
-			t0_days + i / 96.0, t0_days + (i + 1) / 96.0, 1.0 + 0.0625 * (i + 1))
-	Weather.force_window("wind_lambda_scale", "", t0_days + 8 / 96.0,
-		t0_days + 2.0, 1.5)
+	Weather.force_window("wind_lambda_scale", "", t0_days, t0_days + 2.0, 1.0)
 
 	for _i in range(10):
-		await Orchestrator.step_once(900.0)
-	var steady: Dictionary = await Orchestrator.step_once(900.0)
+		await p7_block("warmup")
+	var steady: Dictionary = await p7_block("steady")
+	_report_wind(platform)
 	if steady.get("_status", 0) != 200:
 		_fail(TAG, "steady step failed")
 		return
@@ -59,7 +60,7 @@ func run() -> void:
 	# --- hub trip: ONE infeed-loss ΔP event ------------------------------
 	Orchestrator.inject([{"at_s_rel": 30.0, "kind": "trip", "element": platform}])
 	var f_min := 100.0
-	var trip_step: Dictionary = await Orchestrator.step_once(600.0)
+	var trip_step: Dictionary = await p7_step(600.0, "trip")
 	if trip_step.get("_status", 0) == 200:
 		f_min = minf(f_min, numf(trip_step.get("islands", {}).get("0", {}),
 			"f_min", 100.0))
@@ -84,6 +85,22 @@ func run() -> void:
 ## Hamburg + thermal anchor; platform on the nearest DEEP-sea tile with
 ## 3 bound farms; onshore converter spurred into the city trunk; DC export
 ## corridor from the platform down to it.
+## Why the hub is (or is not) delivering: bound farms, their weather region
+## and its offshore CF — a storm CUTOUT and an unbound farm both read as
+## "avail 0" on the wire and are otherwise indistinguishable.
+func _report_wind(platform: String) -> void:
+	var projection: Dictionary = BuildSession.map_projection()
+	print("HUB farms=", Dispatch.hub_farms.get(platform, []),
+		" avail=", Dispatch.last_avail.get(platform, "missing"))
+	for farm_pid: String in Dispatch.hub_farms.get(platform, []):
+		var farm: Dictionary = World.plants.get(farm_pid, {})
+		var region := Weather.region_of_tile(farm.get("tile", Vector2i.ZERO),
+			projection)
+		print("HUB   ", farm_pid, " tile=", farm.get("tile"), " region=", region,
+			" v_off=", Weather.wind_speed(region, true),
+			" cf_off=", Weather.wind_cf(region, true))
+
+
 func _build() -> Dictionary:
 	World.clear_build()
 	if not World.load_centers.has("hamburg"):

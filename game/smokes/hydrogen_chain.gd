@@ -10,6 +10,7 @@ const TAG := "SMOKE_HYDROGEN_CHAIN"
 
 
 func run() -> void:
+	p7_port = 8034
 	if not await p7_boot(TAG):
 		return
 	var built := _build()
@@ -21,6 +22,7 @@ func run() -> void:
 	var registered := await p7_register(TAG)
 	if registered.is_empty():
 		return
+	p7_report(registered)
 	var native_ids := {}
 	for plant: Dictionary in registered["native"]["plants"]["plants"]:
 		native_ids[str(plant["id"])] = str(plant.get("fuel", ""))
@@ -49,7 +51,7 @@ func run() -> void:
 	var cheap_price_sum := 0.0
 	var cheap_blocks := 0
 	for block in range(96):
-		var result: Dictionary = await Orchestrator.step_once(900.0)
+		var result: Dictionary = await p7_step(900.0, "fill")
 		if result.get("_status", 0) != 200:
 			continue
 		var store: Dictionary = result.get("devices", {}).get(cavern, {})
@@ -94,7 +96,7 @@ func run() -> void:
 	var level_end := level_after_fill
 	var starved_seen := false
 	for block in range(140):
-		var result: Dictionary = await Orchestrator.step_once(900.0)
+		var result: Dictionary = await p7_step(900.0, "burn")
 		if result.get("_status", 0) != 200:
 			continue
 		var store: Dictionary = result.get("devices", {}).get(cavern, {})
