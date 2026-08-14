@@ -26,9 +26,14 @@ func run() -> void:
 		var cmd_sum := 0.0
 		for pid: String in Dispatch.last_commands:
 			cmd_sum += float(Dispatch.last_commands[pid].get("dispatch_mw", 0.0))
+		var isl0: Dictionary = result.get("islands", {}).get("0", {})
 		print("PROBE step=", i, " wall_ms=", Time.get_ticks_msec() - t0,
-			" f=", result.get("islands", {}).get("0", {}).get("f_hz"),
-			" f_max=", result.get("islands", {}).get("0", {}).get("f_max"),
+			" f=", isl0.get("f_hz"),
+			" afrr=", isl0.get("afrr_used_mw"),
+			" room_up=", isl0.get("afrr_headroom_up_mw"),
+			" fcr=", isl0.get("fcr_used_mw"),
+			" mode=", result.get("mode"),
+			" f_max=", isl0.get("f_max"),
 			" gen=", gen_sum, " demand=", demand_sum, " cmds=", cmd_sum,
 			" events=", (result.get("events", []) as Array).size())
 		for event: Dictionary in result.get("events", []):

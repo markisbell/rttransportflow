@@ -72,6 +72,13 @@ func snapshot(id: String) -> Dictionary:
 	return await _http(id, HTTPClient.METHOD_GET, "/gb/snapshot", "", 30.0)
 
 
+## POST /gb/replay — counterfactual re-run of an event window (read-only,
+## off the step path; contract §replay). Body: {t_sim, window_s, overrides}.
+func replay(id: String, body: Dictionary) -> Dictionary:
+	return await _http(id, HTTPClient.METHOD_POST, "/gb/replay",
+		JSON.stringify(body), 60.0)
+
+
 ## Step the backend: WS when open, HTTP fallback otherwise.
 ## Returns the contract step-result; {"_status": 0, ...} on transport failure.
 func step(id: String, request: Dictionary) -> Dictionary:

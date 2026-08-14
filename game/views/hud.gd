@@ -30,8 +30,20 @@ func _ready() -> void:
 	_event_label.add_theme_font_size_override("font_size", 13)
 	add_child(_event_label)
 
-	var freq_panel := preload("res://views/frequency_panel.gd").new()
-	add_child(freq_panel)
+	_advisor_label = Label.new()
+	_advisor_label.position = Vector2(40, 700)
+	_advisor_label.add_theme_font_size_override("font_size", 13)
+	_advisor_label.add_theme_color_override("font_color", Color(0.95, 0.75, 0.3))
+	add_child(_advisor_label)
+
+	# P8 instrument cluster (dial, RoCoF, inertia gauge, reserve stack, UFLS)
+	var cluster := preload("res://views/frequency_cluster.gd").new()
+	add_child(cluster)
+
+	# P8 replay panel: auto-fetches counterfactual ghosts after significant
+	# events (the ring only holds ~120 s — ledger 23); key R toggles it
+	var replay := preload("res://views/replay_panel.gd").new()
+	add_child(replay)
 
 	Orchestrator.events_received.connect(_on_events)
 	Orchestrator.supply_event.connect(_on_supply_event)
@@ -39,16 +51,28 @@ func _ready() -> void:
 
 
 var _latest_devices := {}
+var _advisor_label: Label
 
 
 func _on_step_completed(_t: int, result: Dictionary) -> void:
 	_latest_devices = result.get("devices", {})
+	if BuildSession.use_gridco:
+		_advisor_label.text = "\n".join(Advisor.assess(result))
 
 
 ## Debug key (P4 testing aid): T trips the largest online synchronous unit.
+## F5 saves, F9 loads (P9 — the save enforces the SPEC §4.2 quiesce rule).
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key == null or not key.pressed or key.echo or key.keycode != KEY_T:
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_F5:
+		_do_save()
+		return
+	if key.keycode == KEY_F9:
+		_do_load()
+		return
+	if key.keycode != KEY_T:
 		return
 	var best_id := ""
 	var best_p := 0.0
@@ -64,6 +88,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_push("[debug] tripping %s (%.0f MW) in 1 s" % [best_id, best_p])
 
 
+func _do_save() -> void:
+	var out: Dictionary = await SaveLoad.save_game()
+	_push("[save] %s" % ("saved" if bool(out["ok"])
+		else "FAILED: %s" % str(out["reason"])))
+
+
+func _do_load() -> void:
+	var out: Dictionary = await SaveLoad.load_game()
+	var note := "loaded"
+	if bool(out.get("refused_snapshot", false)):
+		note = "loaded (snapshot refused — cold start)"
+	elif not bool(out["ok"]):
+		note = "load FAILED: %s" % str(out["reason"])
+	_push("[save] %s" % note)
+
+
 func _process(_delta: float) -> void:
 	var economy_line := ""
 	if BuildSession.use_gridco:
@@ -72,10 +112,18 @@ func _process(_delta: float) -> void:
 			" (SCARCITY)" if Dispatch.scarcity else "",
 			Economy.g_co2_per_kwh(), _flex_line(),
 		]
-	_time_label.text = "day %d  %s   speed %s   t=%d%s" % [
+	var campaign_line := ""
+	if Campaign.active:
+		var milestone: Dictionary = Campaign.current_milestone()
+		campaign_line = "   %s %d  M%d %s" % [Campaign.month_name(),
+			Campaign.year(), Campaign.milestone_index + 1,
+			str(milestone.get("id", "done"))]
+		if Campaign.failed_reason != "":
+			campaign_line += "  CAMPAIGN FAILED: " + Campaign.failed_reason
+	_time_label.text = "day %d  %s   speed %s   t=%d%s%s   [F5 save · F9 load]" % [
 		GameClock.day(), GameClock.time_of_day_string(),
 		("%.0f×" % GameClock.speed) if GameClock.speed > 0.0 else "paused",
-		Orchestrator.last_t, economy_line,
+		Orchestrator.last_t, economy_line, campaign_line,
 	]
 
 
@@ -106,7 +154,58 @@ func _flex_line() -> String:
 
 func _on_events(events: Array) -> void:
 	for event: Dictionary in events:
-		_push("%s %s" % [event.get("kind", "?"), event.get("element", "")])
+		_push(_format_event(event))
+
+
+## Wire events → readable log lines (P8 vocabulary: PARAMETERS §2.2 events).
+func _format_event(event: Dictionary) -> String:
+	var kind := str(event.get("kind", "?"))
+	var element := str(event.get("element", ""))
+	var data: Dictionary = event.get("data", {}) if event.get("data") is Dictionary else {}
+	match kind:
+		"ufls_stage":
+			return "UFLS stage %d — shed %.1f%% (%s, load now %.0f%%)" % [
+				int(data.get("stage", 0)), float(data.get("shed_frac", 0.0)) * 100.0,
+				element, float(data.get("w", 1.0)) * 100.0]
+		"island_split":
+			return "GRID SPLIT — %d islands (%s)" % [int(data.get("n_islands", 2)), element]
+		"island_merge":
+			return "islands resynchronized — %d (%s)" % [int(data.get("n_islands", 1)), element]
+		"rocof_dg_trip":
+			return "RoCoF %.2f Hz/s — %.0f MW embedded DG tripped (%s)" % [
+				float(data.get("rocof_hz_s", 0.0)), float(data.get("dg_mw", 0.0)), element]
+		"ely_shed":
+			return "electrolyzers shed — interruptible tier at %.2f Hz (%s)" % [
+				float(data.get("f_hz", 0.0)), element]
+		"line_trip":
+			var cause := str(data.get("cause", ""))
+			var why: String = str({"overload_duty": "overload duty",
+				"overload_instant": "instant overload",
+				"breaker": "breaker opened"}.get(cause, cause))
+			return "line %s TRIPPED%s" % [element, (" (%s)" % why) if why else ""]
+		"line_close":
+			return "line %s closed" % element
+		"resync_rejected":
+			return "resync %s REJECTED — Δf %.2f Hz across the breaker" % [
+				element, absf(float(data.get("df_hz", 0.0)))]
+		"load_restored":
+			return "load fully restored (%s) — defense re-armed" % element
+		"trip":
+			var cause := str(data.get("cause", ""))
+			var why: String = str({"f_window": "f-window relay", "pole_slip": "pole slip",
+				"interruptible": "interruptible tier",
+				"defense_plan": "defense plan"}.get(cause, cause))
+			return "%s TRIPPED%s" % [element, (" (%s)" % why) if why else ""]
+		"fuel_starved":
+			return "%s FUEL-STARVED (H2 cushion floor)" % element
+		"fuel_recovered":
+			return "%s fuel recovered" % element
+		"start_complete":
+			return "%s synchronized" % element
+		"blackout":
+			return "BLACKOUT (%s)" % element
+		_:
+			return "%s %s" % [kind, element]
 
 
 func _on_supply_event(kind: String, severity: String, _data: Dictionary) -> void:

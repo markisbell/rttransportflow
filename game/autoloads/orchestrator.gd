@@ -27,9 +27,13 @@ const DT_MIN := 0.05
 const DT_MAX := 900.0
 const AUTO_SLOW_COOLDOWN := 3
 const FAILED_ESCALATION_STEPS := 3
+## consecutive transport failures before we assume a DEAF backend and
+## force a re-register (a live process with a dead step channel)
+const TRANSPORT_FAILURES_BEFORE_RESET := 5
 
 var running := false
 var in_flight := false
+var last_reset_status := ""
 var last_t := -1
 var last_result := {}
 var topology := {}
@@ -37,6 +41,7 @@ var needs_reset := false
 var resetting := false
 var down_since_sim := -1.0
 var consecutive_failed := 0
+var consecutive_transport_failed := 0
 var pending_events: Array = []  # scheduled_events queued for the next request
 var watch: Array = []
 var auto_slow_cooldown := 0
@@ -78,8 +83,13 @@ func register(topology_doc: Dictionary) -> bool:
 	resetting = true
 	var response: Dictionary = await _bridge().net_reset(ID, topology)
 	resetting = false
+	last_reset_status = str(response.get("status", ""))
+	# refused_snapshot is a LEGAL cold start (contract reset semantics /
+	# SPEC §4.2): the reset applied, only the exact-state restore didn't
 	var ok: bool = response.get("_status", 0) == 200 \
-		and str(response.get("status", "")) == "ok"
+		and (last_reset_status == "ok" or last_reset_status == "refused_snapshot")
+	if ok and last_reset_status == "refused_snapshot":
+		supply_event.emit("snapshot_refused", "warning", response)
 	if ok:
 		last_t = -1
 		# a reset invalidates every prior wire result: serving a stale one
@@ -165,9 +175,22 @@ func _apply_result(t: int, result: Dictionary) -> Dictionary:
 		supply_event.emit("step_rejected", "warning", result)
 		return result
 	if result.get("_status", 0) != 200:
+		consecutive_transport_failed += 1
 		supply_event.emit("step_transport_failed", "warning",
-			{"t": t, "error": result.get("_error", "?")})
+			{"t": t, "error": result.get("_error", "?"),
+			"consecutive": consecutive_transport_failed})
+		# A backend can go DEAF without going down: an exception inside the
+		# step handler killed the WS while /health stayed green, and the game
+		# then span forever on a dead channel (found when two smokes froze
+		# mid-run). Repeated transport failures now force a re-register —
+		# skip-never-stall, but never spin silently either.
+		if consecutive_transport_failed >= TRANSPORT_FAILURES_BEFORE_RESET:
+			consecutive_transport_failed = 0
+			needs_reset = true
+			supply_event.emit("backend_deaf", "critical",
+				{"t": t, "action": "re-register"})
 		return result
+	consecutive_transport_failed = 0
 
 	last_result = result
 	last_t = t

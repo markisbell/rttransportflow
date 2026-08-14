@@ -20,18 +20,28 @@ const SMOKES := {
 	"battery_response": "res://smokes/battery_response.gd",
 	"hvdc_link": "res://smokes/hvdc_link.gd",
 	"north_sea_hub": "res://smokes/north_sea_hub.gd",
+	"cascade_low_inertia": "res://smokes/cascade_low_inertia.gd",
+	"ride_through": "res://smokes/ride_through.gd",
+	"replay_panel": "res://smokes/replay_panel.gd",
+	"author_start": "res://smokes/author_start.gd",
+	"campaign_take_the_reins": "res://smokes/campaign_take_the_reins.gd",
+	"save_load_replay": "res://smokes/save_load_replay.gd",
+	"start_check": "res://smokes/start_check.gd",
 }
 
 
 func _ready() -> void:
 	var smoke := ""
+	var campaign := false
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--smoke="):
 			smoke = arg.trim_prefix("--smoke=")
+		elif arg == "--campaign":
+			campaign = true
 	if SMOKES.has(smoke):
 		_run_smoke(smoke)
 	else:
-		_boot_game()
+		_boot_game(campaign)
 
 
 func _run_smoke(smoke_name: String) -> void:
@@ -40,7 +50,7 @@ func _run_smoke(smoke_name: String) -> void:
 	runner.run()
 
 
-func _boot_game() -> void:
+func _boot_game(campaign: bool = false) -> void:
 	# P5 build mode: the player builds the grid; stepping starts after the
 	# first successful (debounced) build+register in BuildSession.
 	if not BuildSession.load_map():
@@ -60,7 +70,21 @@ func _boot_game() -> void:
 	add_child(view)
 	var hud := preload("res://views/hud.gd").new()
 	add_child(hud)
+	if campaign:
+		_boot_campaign()
 	_boot_async()
+
+
+## `--campaign` boots the inherited-2025 world and arms the milestone
+## tracker (sandbox — the default — leaves everything open, §5.4).
+func _boot_campaign() -> void:
+	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+		repo + "/" + Campaign.START_STATE_PATH))
+	if parsed is Dictionary and World.restore(parsed):
+		Campaign.start_campaign()
+	else:
+		push_error("campaign start state missing/invalid — sandbox boot")
 
 
 func _boot_async() -> void:

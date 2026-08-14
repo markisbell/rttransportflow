@@ -55,7 +55,10 @@ func _ready() -> void:
 	_legend.add_theme_font_size_override("font_size", 12)
 	var lines: Array[String] = []
 	for tool_def: Array in TOOLS:
-		lines.append("%s  %s" % [tool_def[1], tool_def[2]])
+		var label := "%s  %s" % [tool_def[1], tool_def[2]]
+		if not Campaign.unlocked(str(tool_def[0])):
+			label += "  (locked until %d)" % Campaign.unlock_year(str(tool_def[0]))
+		lines.append(label)
 	lines.append("B demo build · X clear · right-click delete · wheel zoom · arrows pan")
 	_legend.text = "\n".join(lines)
 	var canvas := CanvasLayer.new()
@@ -126,6 +129,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _apply_tool(tile: Vector2i) -> void:
 	var tool_id: String = TOOLS[tool_index][0]
+	if not Campaign.unlocked(tool_id):
+		return
 	match tool_id:
 		"corridor_400":
 			World.place_corridor(tile, "line_400")
@@ -152,6 +157,8 @@ func _delete_at(tile: Vector2i) -> void:
 
 func _tool_valid(tile: Vector2i) -> bool:
 	var tool_id: String = TOOLS[tool_index][0]
+	if not Campaign.unlocked(tool_id):
+		return false  # era-locked (campaign mode; sandbox opens everything)
 	if tool_id == "corridor_hvdc":
 		return World.can_place_corridor(tile, "hvdc")
 	if tool_id.begins_with("corridor"):

@@ -265,6 +265,7 @@ def _step_body(gb: GbState, body: dict, t: int, dt_s: float, interrupt: bool,
     island = sim.integrator.islands
     n_islands = island.n
     s_online_arr = sim.fleet.s_online_per_island(n_islands)
+    agc_up, _agc_dn = sim.fleet.agc_headroom(n_islands)
     fcr_arr = getattr(sim.fleet, "fcr_used", None)
 
     devices: dict[str, Any] = {}
@@ -381,7 +382,9 @@ def _step_body(gb: GbState, body: dict, t: int, dt_s: float, interrupt: bool,
             "blackout": bool(island.blackout()[i]),
             "fcr_used_mw": (float(fcr_arr[i])
                             if fcr_arr is not None and i < len(fcr_arr) else 0.0),
-            "afrr_used_mw": 0.0,
+            "afrr_used_mw": (float(sim.integrator.agc_mw[i])
+                             if i < len(sim.integrator.agc_mw) else 0.0),
+            "afrr_headroom_up_mw": float(agc_up[i]) if i < len(agc_up) else 0.0,
             "w": float(island.w[i]),
         } for i in range(n_islands)},
         "trajectory": res.trajectory,

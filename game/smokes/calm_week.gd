@@ -39,32 +39,55 @@ func run() -> void:
 	var dark := await _run_day()
 
 	check("dark_day_scarce", dark["scarcity_blocks"] >= 4)
-	check("dark_day_sags", dark["f_min"] < normal["f_min"] - 0.05)
 	check("normal_day_holds", normal["f_min"] > 49.5)
 	check("dark_wind_really_calm", dark["renewable_mwh"] < normal["renewable_mwh"] * 0.6)
+	# The ADEQUACY signal, not a frequency one: the thermal fleet + storage
+	# carry the calm day. (Asserting "the dark day sags deeper" was wrong —
+	# wind VARIABILITY is what moves frequency, so a becalmed day is
+	# frequency-QUIETER than a windy one. The Dunkelflaute costs energy and
+	# money, not stability, once the must-run fleet is spinning.)
+	check("dark_day_burns_thermal", dark["thermal_mwh"] > normal["thermal_mwh"] * 1.2)
+	check("dark_day_costlier", dark["cost_eur"] > normal["cost_eur"] * 1.2)
+	# and it stays a SURVIVABLE day: no island collapse either way
+	check("no_blackout", not dark["blackout"] and not normal["blackout"])
 	_finish(TAG, {"dark_f_min": dark["f_min"], "normal_f_min": normal["f_min"],
-		"dark_scarcity_blocks": dark["scarcity_blocks"]})
+		"dark_scarcity_blocks": dark["scarcity_blocks"],
+		"dark_thermal_gwh": dark["thermal_mwh"] / 1000.0,
+		"normal_thermal_gwh": normal["thermal_mwh"] / 1000.0,
+		"dark_cost_meur": dark["cost_eur"] / 1e6,
+		"normal_cost_meur": normal["cost_eur"] / 1e6})
 
 
 func _run_day() -> Dictionary:
 	var f_min := 100.0
 	var scarcity_blocks := 0
 	var renewable_mwh := 0.0
+	var thermal_mwh := 0.0
+	var blackout := false
+	var cost_start: float = Economy.fuel_cost + Economy.co2_cost + Economy.vom_cost
 	for _block in range(96):
 		if _block % 16 == 0:
 			print("CALM_WEEK block ", _block)  # progress: ALERT days run slow
 		var result: Dictionary = await Orchestrator.step_once(900.0)
 		if result.get("_status", 0) != 200:
 			continue
-		var island: Dictionary = result.get("islands", {}).get("0", {})
-		f_min = minf(f_min, numf(island, "f_min", 100.0))
+		for island_id: String in result.get("islands", {}):
+			var island: Dictionary = result["islands"][island_id]
+			f_min = minf(f_min, numf(island, "f_min", 100.0))
+			blackout = blackout or bool(island.get("blackout", false))
 		if Dispatch.scarcity:
 			scarcity_blocks += 1
 		for pid: String in result.get("devices", {}):
+			var energy := numf(result["devices"][pid], "energy_mwh_step", 0.0)
 			if pid.begins_with("wind") or pid.begins_with("solar"):
-				renewable_mwh += numf(result["devices"][pid], "energy_mwh_step", 0.0)
+				renewable_mwh += energy
+			elif pid.begins_with("gas") or pid.begins_with("coal") \
+					or pid.begins_with("nuclear") or pid.begins_with("lignite"):
+				thermal_mwh += energy
+	var cost_end: float = Economy.fuel_cost + Economy.co2_cost + Economy.vom_cost
 	return {"f_min": f_min, "scarcity_blocks": scarcity_blocks,
-		"renewable_mwh": renewable_mwh}
+		"renewable_mwh": renewable_mwh, "thermal_mwh": thermal_mwh,
+		"cost_eur": cost_end - cost_start, "blackout": blackout}
 
 
 ## Hamburg-anchored: lots of wind + a little gas — deliberately calm-fragile.

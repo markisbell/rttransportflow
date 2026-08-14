@@ -1,0 +1,402 @@
+{
+    "version": 1,
+    "_authority": "docs/GAME_DESIGN.md §5 (premise, milestones, failure states) + §3.4 (tariff script) + §4.3 (unlock years). Family rule: every number carries a rationale. Star convention (noted per §4.7 'thresholds authored in the campaign script'): where §5 gives a single pass number, ★★ = pass, ★★★ = pass with ~20 % margin, ★ = near-miss within ~10 % — encoded explicitly per milestone below.",
+    "calendar": {
+        "start_year": 2025,
+        "days_per_year": 12,
+        "_rationale": "ledger 15: 12 representative epoch-days per year (one per month, mid-month doy). Campaign year Y = start_year + floor(sim_day / 12); month = sim_day % 12 (0 = January). '2 months' in §5 milestone text = 2 sim-days, '5-day episode' = 5 sim-days spanning ~5 game-months compressed — episode durations keep §5's day COUNTS (they are felt durations, not calendar spans)."
+    },
+    "eras": [
+        {
+            "id": "inheritance",
+            "from_day": 0,
+            "co2_eur_per_t": 30.0,
+            "tariff_eur_per_mwh": 95.0,
+            "_rationale": "§5.1 start: CO2 30 €/t (PARAMETERS §4 campaign start), tariff 95 (§3.4)."
+        },
+        {
+            "id": "first_ratchet",
+            "from_day": 18,
+            "co2_eur_per_t": 60.0,
+            "tariff_eur_per_mwh": 95.0,
+            "_rationale": "§5.2 milestone 2: 'CO2 jumps to 60 €/t mid-year' — mid-2026 = day 18. Coal/gas swap in the merit order at ~55-65 €/t with the PARAMETERS §4 fuel prices."
+        },
+        {
+            "id": "green_push",
+            "from_day": 48,
+            "co2_eur_per_t": 100.0,
+            "tariff_eur_per_mwh": 100.0,
+            "_rationale": "2029: the §5.1 ratchet's third step lands with the Dunkelflaute era; tariff to 100 (§3.4 script's second value)."
+        },
+        {
+            "id": "coal_exit",
+            "from_day": 96,
+            "co2_eur_per_t": 160.0,
+            "tariff_eur_per_mwh": 100.0,
+            "_rationale": "2033: fourth ratchet step pressing the coal deadline."
+        },
+        {
+            "id": "endgame",
+            "from_day": 144,
+            "co2_eur_per_t": 250.0,
+            "tariff_eur_per_mwh": 105.0,
+            "_rationale": "2037: final ratchet (§5.1 'by era' terminal value); tariff 105 (§3.4 third value)."
+        }
+    ],
+    "unlocks": {
+        "battery": 2027,
+        "hvdc_converter": 2028,
+        "offshore_platform": 2028,
+        "corridor_hvdc": 2028,
+        "electrolyzer": 2029,
+        "h2_cavern": 2029,
+        "h2_retrofit": 2033,
+        "wind_synthetic_inertia": 2035,
+        "_rationale": "GAME_DESIGN §4.3 unlock table verbatim: battery 2027 (before milestone 4, per §5.2), HVDC + offshore platforms 2028 (mid-milestone-3), electrolyzer + cavern 2029, H2-fired retrofits 2033, wind synthetic inertia 2035 (open-question 7 default). Grid-forming firmware and syncon conversion (2031) are listed for completeness but have no buildable yet — they gate nothing until their tools exist.",
+        "grid_forming": 2031,
+        "syncon": 2031
+    },
+    "milestones": [
+        {
+            "id": "take_the_reins",
+            "title": "Take the Reins (2025)",
+            "window_days": [
+                1.5,
+                2.0
+            ],
+            "pass": {
+                "max_ufls_events": 0,
+                "replay_viewed": true
+            },
+            "stars": {
+                "reliability": {
+                    "three": {
+                        "trip_f_min_at_least": 49.5,
+                        "max_ufls_events": 0
+                    },
+                    "two": {
+                        "max_ufls_events": 0
+                    },
+                    "one": {
+                        "max_ufls_events": 1
+                    }
+                },
+                "_rationale": "§5.2.1 'no UFLS, replay viewed' = pass = ★★; ★★★ additionally holds the scripted trip's nadir above 49.5 (comfortable FCR margin — the trip_reaction pin shows 49.56 on the healthy inherited fleet); ★ tolerates one shed stage (near-miss)."
+            },
+            "scripted": [
+                "m1_trip"
+            ],
+            "_window_rationale": "The tutorial's GRADED exam is the scripted trip (§5.2.1 'survive the scripted 1.2 GW trip... no UFLS'): the pass window brackets it (day 1.5-2.0). The first 1.5 free-play days are ungraded — the inherited world's organic morning-ramp dip (a real pre-aFRR artifact: nuclear-heavy fleet, 19-min ramps, 15-min dispatch cadence, thin FCR with nuclear participation OFF per ledger 9) sheds UFLS stage 1 around 06:45 and is itself a teaching moment, not a milestone fail."
+        },
+        {
+            "id": "merit_order",
+            "title": "The Merit Order (2026)",
+            "window_days": [
+                12,
+                24
+            ],
+            "cost_window_days": [
+                18,
+                24
+            ],
+            "pass": {
+                "avg_cost_below_eur_mwh": 90.0,
+                "max_ufls_events": 2,
+                "max_blackouts": 0
+            },
+            "stars": {
+                "cost": {
+                    "three": {
+                        "avg_cost_below_eur_mwh": 72.0
+                    },
+                    "two": {
+                        "avg_cost_below_eur_mwh": 90.0
+                    },
+                    "one": {
+                        "avg_cost_below_eur_mwh": 99.0
+                    }
+                },
+                "reliability": {
+                    "three": {
+                        "max_ufls_events": 0
+                    },
+                    "two": {
+                        "max_ufls_events": 2
+                    },
+                    "one": {
+                        "max_ufls_events": 4
+                    }
+                },
+                "_rationale": "§5.2.2 'average cost < 90 €/MWh for 6 months at ★★+ reliability': the 6 cost months are the post-ratchet half-year (days 18-24); ★★★ cost = 20 % under, ★ = 10 % over; reliability ★★ = the §5.2.5 '≤ 2 UFLS' yardstick applied to the window."
+            },
+            "scripted": []
+        },
+        {
+            "id": "green_gigawatts",
+            "title": "First Green Gigawatts (2027–28)",
+            "window_days": [
+                24,
+                48
+            ],
+            "pass": {
+                "re_capacity_at_least_mw": 20000.0,
+                "hub_offshore_at_least_mw": 4000.0,
+                "redispatch_per_year_below_eur": 200000000.0,
+                "max_ufls_events": 0
+            },
+            "stars": {
+                "clean": {
+                    "three": {
+                        "re_capacity_at_least_mw": 24000.0
+                    },
+                    "two": {
+                        "re_capacity_at_least_mw": 20000.0
+                    },
+                    "one": {
+                        "re_capacity_at_least_mw": 18000.0
+                    }
+                },
+                "cost": {
+                    "three": {
+                        "redispatch_per_year_below_eur": 160000000.0
+                    },
+                    "two": {
+                        "redispatch_per_year_below_eur": 200000000.0
+                    },
+                    "one": {
+                        "redispatch_per_year_below_eur": 220000000.0
+                    }
+                },
+                "_rationale": "§5.2.3 verbatim: RE ≥ 20 GW, ≥ 4 GW hub-connected offshore committed (committed = platforms placed — the 42-month build makes delivery early-2030s, ledger 28), redispatch < 200 M€/yr, zero UFLS. ±20 %/10 % star convention."
+            },
+            "scripted": [
+                "m3_congestion"
+            ]
+        },
+        {
+            "id": "dunkelflaute",
+            "title": "The Dunkelflaute (2029)",
+            "window_days": [
+                48,
+                60
+            ],
+            "episode_days": [
+                49,
+                54
+            ],
+            "pass": {
+                "episode_saidi_below_min": 30.0
+            },
+            "stars": {
+                "reliability": {
+                    "three": {
+                        "episode_saidi_below_min": 5.0
+                    },
+                    "two": {
+                        "episode_saidi_below_min": 30.0
+                    },
+                    "one": {
+                        "episode_saidi_below_min": 33.0
+                    }
+                },
+                "_rationale": "§5.2.4 'SAIDI < 30 min across the episode'. SAIDI here = Σ_blocks (1 − mean zone supplied) × 15 min (the wire's supplied fraction IS the served-load share — UFLS w and blackout both land in it). ★★★ = essentially uninterrupted (< 5 min)."
+            },
+            "scripted": [
+                "m4_dunkelflaute"
+            ]
+        },
+        {
+            "id": "coal_exit",
+            "title": "Coal Exit (2031–35)",
+            "window_days": [
+                72,
+                120
+            ],
+            "final_year_days": [
+                108,
+                120
+            ],
+            "pass": {
+                "coal_mw_at_most": 0.0,
+                "final_year_max_ufls_events": 2
+            },
+            "stars": {
+                "reliability": {
+                    "three": {
+                        "final_year_max_ufls_events": 0
+                    },
+                    "two": {
+                        "final_year_max_ufls_events": 2
+                    },
+                    "one": {
+                        "final_year_max_ufls_events": 4
+                    }
+                },
+                "_rationale": "§5.2.5 verbatim: 0 MW coal by Jan 2035 (day 120), ≤ 2 UFLS events in the final year (days 108-120)."
+            },
+            "scripted": []
+        },
+        {
+            "id": "hydrogen_loop",
+            "title": "The Hydrogen Loop (2033–36)",
+            "window_days": [
+                96,
+                132
+            ],
+            "episode_days": [
+                126,
+                131
+            ],
+            "pass": {
+                "electrolysis_at_least_mw": 5000.0,
+                "cavern_at_least_gwh_th": 400.0,
+                "h2_converted_at_least_mw": 4000.0,
+                "episode_saidi_below_min": 30.0
+            },
+            "stars": {
+                "clean": {
+                    "three": {
+                        "cavern_at_least_gwh_th": 480.0
+                    },
+                    "two": {
+                        "cavern_at_least_gwh_th": 400.0
+                    },
+                    "one": {
+                        "cavern_at_least_gwh_th": 360.0
+                    }
+                },
+                "reliability": {
+                    "three": {
+                        "episode_saidi_below_min": 5.0
+                    },
+                    "two": {
+                        "episode_saidi_below_min": 30.0
+                    },
+                    "one": {
+                        "episode_saidi_below_min": 33.0
+                    }
+                },
+                "_rationale": "§5.2.6 verbatim: ≥ 5 GW electrolysis, ≥ 400 GWh_th cavern (≈ 3 four-kiloton caverns at 133 GWh_th each, PARAMETERS §1.14), ≥ 4 GW converted gas; Dunkelflaute II survived on H2 + residual gas."
+            },
+            "scripted": [
+                "m6_dunkelflaute_ii"
+            ]
+        },
+        {
+            "id": "inverter_grid",
+            "title": "The Inverter Grid (2037–40, finale)",
+            "window_days": [
+                144,
+                180
+            ],
+            "final_year_days": [
+                168,
+                180
+            ],
+            "pass": {
+                "inverter_share_at_least": 0.7,
+                "gco2_per_kwh_below": 50.0,
+                "final_year_max_ufls_events": 0,
+                "final_year_max_blackouts": 0,
+                "double_contingency_survived": true
+            },
+            "stars": {
+                "clean": {
+                    "three": {
+                        "gco2_per_kwh_below": 40.0
+                    },
+                    "two": {
+                        "gco2_per_kwh_below": 50.0
+                    },
+                    "one": {
+                        "gco2_per_kwh_below": 55.0
+                    }
+                },
+                "reliability": {
+                    "three": {
+                        "final_year_max_ufls_events": 0
+                    },
+                    "two": {
+                        "final_year_max_ufls_events": 1
+                    },
+                    "one": {
+                        "final_year_max_ufls_events": 2
+                    }
+                },
+                "_rationale": "§5.2.7 verbatim: ≥ 70 % inverter energy share + ★★★ reliability + < 50 gCO2/kWh over the final year; the scripted double contingency (largest hub + largest unit within 10 s, ledger 28's matched pair) must be survived — its passed replay is the closing screen."
+            },
+            "scripted": [
+                "m7_double_contingency"
+            ]
+        }
+    ],
+    "failure_states": {
+        "insolvency": {
+            "treasury_below_eur": -2000000000.0,
+            "for_days": 3,
+            "_rationale": "§5.3: treasury < −2 B€ for 90 real days = 3 representative days (a month per day)."
+        },
+        "dismissed_blackouts": {
+            "count": 3,
+            "within_days": 12,
+            "_rationale": "§5.3: 3 area blackouts within 12 months = 12 sim-days."
+        },
+        "dismissed_ufls": {
+            "count": 12,
+            "within_days": 12,
+            "_rationale": "§5.3: > 12 UFLS events in a year."
+        },
+        "coal_deadline": {
+            "day": 120,
+            "fine_eur_per_month": 100000000.0,
+            "_rationale": "§5.3: coal past Jan 2035 (day 120) → 100 M€/month fines, milestone failed — painful, not instant fail."
+        }
+    },
+    "scripted_events": [
+        {
+            "id": "m1_trip",
+            "at_day": 1.583,
+            "kind": "trip_nearest_mw",
+            "mw": 1200.0,
+            "_rationale": "§5.2.1 'the scripted 1.2 GW trip', afternoon of the second inherited month (day 1, 14:00). trip_nearest_mw picks the ONLINE sync unit closest to 1.2 GW output (ties → larger) — deterministic against any inherited fleet."
+        },
+        {
+            "id": "m3_congestion",
+            "at_day": 30.0,
+            "kind": "weather_force",
+            "field": "wind_lambda_scale",
+            "region": "de_north_benelux",
+            "to_day": 31.0,
+            "value": 1.35,
+            "staircase_blocks": 8,
+            "_rationale": "§5.2.3 'scripted congestion on the North Sea → Ruhr axis': a strong-wind day (+35 % λ) over the German Bight saturates the near-shore AC export corridors — congestion, not a frequency event. Staircased over 8 blocks (2 h): instant λ steps relay out wind fleets (P7/P8 hard lesson)."
+        },
+        {
+            "id": "m4_dunkelflaute",
+            "at_day": 49.0,
+            "kind": "dunkelflaute_scripted",
+            "days": 5.0,
+            "wind_scale": 0.35,
+            "clearness_scale": 0.5,
+            "staircase_blocks": 8,
+            "_rationale": "§5.2.4 scripted 5-day calm-cold episode over NW Europe; scales per PARAMETERS §3.4 Dunkelflaute regime (λ × 0.35, clearness × 0.6 tightened to 0.5 for the scripted teaching instance); entry AND exit staircased."
+        },
+        {
+            "id": "m6_dunkelflaute_ii",
+            "at_day": 126.0,
+            "kind": "dunkelflaute_scripted",
+            "days": 5.0,
+            "wind_scale": 0.3,
+            "clearness_scale": 0.5,
+            "staircase_blocks": 8,
+            "_rationale": "§5.2.6 Dunkelflaute II — slightly harsher (λ × 0.30): by 2035 the fleet leans harder on wind, the test must still bite."
+        },
+        {
+            "id": "m7_double_contingency",
+            "at_day": 174.5,
+            "kind": "double_contingency",
+            "gap_s": 10.0,
+            "_rationale": "§5.2.7 finale: largest offshore hub + largest online unit within 10 s — both genuine infeed losses (ledger 28). Survivable only with grid-forming + FFR + syncon sizing."
+        }
+    ]
+}

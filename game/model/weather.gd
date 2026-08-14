@@ -449,3 +449,31 @@ func _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 ## Correlation sanity hook for tests: rebuild Σ_wind and return (Σ, L).
 func correlation_and_factor_wind() -> Array:
 	return [_correlation(L_WIND_KM), _l_wind]
+
+
+# ---------------------------------------------------------------- save/load
+
+## Full stochastic state (P9 save): the RNG state rides as a STRING —
+## Godot's JSON parse floats every number and a uint64 state would lose
+## precision. from_dict presumes setup() ran (factors are derived).
+func to_dict() -> Dictionary:
+	return {
+		"rng_state": str(_rng.state),
+		"z_wind": _z_wind.duplicate(), "y_solar": _y_solar.duplicate(),
+		"u_temp": _u_temp.duplicate(),
+		"cutout_on": _cutout_on.duplicate(), "cutout_off": _cutout_off.duplicate(),
+		"dunkelflaute": _dunkelflaute, "last_step": _last_step,
+		"forces": _forces.duplicate(true),
+	}
+
+
+func from_dict(state: Dictionary) -> void:
+	_rng.state = int(str(state.get("rng_state", "0")))
+	_z_wind.assign(state.get("z_wind", []))
+	_y_solar.assign(state.get("y_solar", []))
+	_u_temp.assign(state.get("u_temp", []))
+	_cutout_on.assign(state.get("cutout_on", []))
+	_cutout_off.assign(state.get("cutout_off", []))
+	_dunkelflaute = bool(state.get("dunkelflaute", false))
+	_last_step = int(state.get("last_step", 0))
+	_forces.assign(state.get("forces", []))

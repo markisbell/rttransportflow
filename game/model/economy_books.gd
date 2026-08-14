@@ -192,3 +192,37 @@ func g_co2_per_kwh() -> float:
 	if delivered_mwh <= 0.0:
 		return 0.0
 	return co2_t * 1e6 / (delivered_mwh * 1000.0)
+
+
+# ---------------------------------------------------------------- save/load
+
+func to_dict() -> Dictionary:
+	return {
+		"treasury_eur": treasury_eur, "loan_eur": loan_eur,
+		"revenue": revenue, "fuel_cost": fuel_cost, "co2_cost": co2_cost,
+		"vom_cost": vom_cost, "fom_cost": fom_cost, "capex_spent": capex_spent,
+		"voll_penalty": voll_penalty, "reserve_income": reserve_income,
+		"redispatch_cost": redispatch_cost, "delivered_mwh": delivered_mwh,
+		"unserved_mwh": unserved_mwh, "co2_t": co2_t,
+		"fom_billed_days": _fom_billed_days,
+		"last_redispatch_seen": _last_redispatch_seen,
+	}
+
+
+func from_dict(state: Dictionary) -> void:
+	treasury_eur = float(state.get("treasury_eur", treasury_eur))
+	loan_eur = float(state.get("loan_eur", 0.0))
+	revenue = float(state.get("revenue", 0.0))
+	fuel_cost = float(state.get("fuel_cost", 0.0))
+	co2_cost = float(state.get("co2_cost", 0.0))
+	vom_cost = float(state.get("vom_cost", 0.0))
+	fom_cost = float(state.get("fom_cost", 0.0))
+	capex_spent = float(state.get("capex_spent", 0.0))
+	voll_penalty = float(state.get("voll_penalty", 0.0))
+	reserve_income = float(state.get("reserve_income", 0.0))
+	redispatch_cost = float(state.get("redispatch_cost", 0.0))
+	delivered_mwh = float(state.get("delivered_mwh", 0.0))
+	unserved_mwh = float(state.get("unserved_mwh", 0.0))
+	co2_t = float(state.get("co2_t", 0.0))
+	_fom_billed_days = int(state.get("fom_billed_days", 0))
+	_last_redispatch_seen = float(state.get("last_redispatch_seen", 0.0))

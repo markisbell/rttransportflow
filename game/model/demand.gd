@@ -192,3 +192,30 @@ func _noise_value(lc_id: String, t_days: float) -> float:
 		state["x"] = a * float(state["x"]) \
 			+ s * NOISE_SIGMA * (state["rng"] as RandomNumberGenerator).randfn()
 	return clampf(float(state["x"]), -NOISE_CLAMP, NOISE_CLAMP)
+
+
+# ---------------------------------------------------------------- save/load
+
+## Per-zone AR(1) noise state (P9 save); RNG states as strings (JSON floats
+## every number — a uint64 would lose precision).
+func to_dict() -> Dictionary:
+	var noise := {}
+	for lc_id: String in _noise:
+		var state: Dictionary = _noise[lc_id]
+		noise[lc_id] = {"rng_state": str((state["rng"] as RandomNumberGenerator).state),
+			"x": float(state["x"]), "last_step": int(state["last_step"])}
+	return {"seed": _seed, "noise": noise}
+
+
+func from_dict(state: Dictionary) -> void:
+	_seed = int(state.get("seed", 0))
+	_noise.clear()
+	_region_cache.clear()
+	var noise: Dictionary = state.get("noise", {})
+	for lc_id: String in noise:
+		var entry: Dictionary = noise[lc_id]
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("%d:%s" % [_seed, lc_id])
+		rng.state = int(str(entry.get("rng_state", "0")))
+		_noise[lc_id] = {"rng": rng, "x": float(entry.get("x", 0.0)),
+			"last_step": int(entry.get("last_step", 0))}

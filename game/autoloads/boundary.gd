@@ -62,8 +62,12 @@ func _step_index(t_sim: float) -> int:
 
 ## Contract reset document: native bundle VERBATIM + zones (+ no device
 ## overrides at P4 — the backend derives the fleet from native).
+## Set by SaveLoad before the load's re-register; consumed by ONE reset.
+var pending_snapshot: Dictionary = {}
+
+
 func reset_doc() -> Dictionary:
-	return {
+	var doc := {
 		"contract": CosimBridge.EXPECTED_CONTRACT,
 		"network_kind": "transmission",
 		"name": str(docs["scenario"].get("name", "europe_mini")),
@@ -77,6 +81,10 @@ func reset_doc() -> Dictionary:
 				return {"id": zone["id"], "node": zone["bus"]}),
 		"devices": wire_devices,
 	}
+	if not pending_snapshot.is_empty():
+		doc["snapshot"] = pending_snapshot
+		pending_snapshot = {}  # one-shot: only the load's reset restores
+	return doc
 
 
 ## "profiles": replay the bundle's authored profiles (P4 smokes, standalone
