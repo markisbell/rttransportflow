@@ -21,6 +21,14 @@ const BUS_REFUSE := 150
 ## single 1.6 GW nuclear unit, which is how the first 5 km build tripped
 ## three lines at 165-222 % loading within 10 ms of registering.
 const DEFAULT_PARALLEL := 4
+## One 380 kV circuit of the shipped std_type, and the share of it a planner
+## actually schedules against (the rest is N-1 margin). Used to size a
+## branch's circuit count from the capacity it joins.
+const CIRCUIT_MVA := 625.0
+const CIRCUIT_UTILISATION := 0.9
+## A corridor tile stands for a bundle of rights-of-way, not an unbounded
+## one: past this the answer is another corridor, not a wider one.
+const MAX_PARALLEL := 12
 const STEPS := 96
 
 const NEIGHBORS: Array[Vector2i] = [
@@ -281,19 +289,48 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	for lc_id: String in kept_zones:
 		grid["zones"].append({"id": lc_id, "bus": "b%d" % bus_rename[zone_bus[lc_id]]})
 
+	# Circuits per branch are sized to what the branch has to move, not to a
+	# constant. A right-of-way into a 12 GW metro is not the same asset as a
+	# tie between two villages, and a flat 4 circuits (~2.5 GVA) put the
+	# continental build's metro spurs at 157-211 % within 10 ms of
+	# registering — five instant trips, the grid in eight pieces, UFLS
+	# everywhere before the player had touched anything.
+	#
+	# Estimate: a branch can never be asked to carry more than the SMALLER of
+	# the two capacities it joins (generation parked behind it, or load in
+	# front of it), so that minimum is the sizing figure. On a leaf spur it
+	# is exact; on a meshed trunk it is an over-estimate, which is why it is
+	# capped — a corridor tile aggregates a real bundle of rights-of-way, but
+	# not an unlimited one.
+	var gen_mva := {}   # bus index -> generation capacity at that bus
+	var load_mva := {}  # bus index -> peak load at that bus
+	for pid: String in kept_plants:
+		var bus: int = plant_bus[pid]
+		gen_mva[bus] = float(gen_mva.get(bus, 0.0)) \
+			+ float(world.plants[pid]["p_max_mw"])
+	for lc_id: String in kept_zones:
+		var bus: int = zone_bus[lc_id]
+		load_mva[bus] = float(load_mva.get(bus, 0.0)) \
+			+ float(world.load_centers[lc_id].get("peak_mw", 0.0))
+	var kept_branches: Array[Dictionary] = []
+	for branch: Dictionary in branches:
+		if kept_bus.has(branch["from"]) and kept_bus.has(branch["to"]):
+			kept_branches.append(branch)
+	var needs := _branch_needs(kept_branches, gen_mva, load_mva)
+
 	var lines := {"lines": []}
 	var line_seq := 0
-	for branch: Dictionary in branches:
-		if not (kept_bus.has(branch["from"]) and kept_bus.has(branch["to"])):
-			continue
-		var vn: float = 380.0 if branch["kind"] == "line_400" else 220.0
+	for branch: Dictionary in kept_branches:
+		var circuits: int = clampi(
+			int(ceil(needs[line_seq] / (CIRCUIT_MVA * CIRCUIT_UTILISATION))),
+			DEFAULT_PARALLEL, MAX_PARALLEL)
 		lines["lines"].append({
 			"id": "L%d" % line_seq,
 			"from_bus": "b%d" % bus_rename[branch["from"]],
 			"to_bus": "b%d" % bus_rename[branch["to"]],
 			"length_km": snappedf(int(branch["steps"]) * world.tile_km * SINUOSITY, 0.01),
 			"std_type": "490-AL1/64-ST1A 380.0",
-			"parallel": DEFAULT_PARALLEL,
+			"parallel": circuits,
 		})
 		line_seq += 1
 	if lines["lines"].is_empty():
@@ -500,6 +537,63 @@ static func _hvdc_devices(world: Node, hvdc_corridors: Dictionary,
 			warnings.append("farm %s bound to %s which is not a working hub — idle"
 				% [farm_pid, farm_hub[farm_pid]])
 	return {"devices": devices, "hub_farms": hub_farms}
+
+
+## MVA each branch may be asked to carry, one entry per branch in order.
+##
+## A branch whose removal SPLITS the network is a bridge, and power balance
+## pins its flow exactly: everything one side generates and does not consume
+## has to cross it. So the bound is max(gen, load) on the smaller-capability
+## side — the spur out of a 4.8 GW nuclear cluster must be able to evacuate
+## 4.8 GW whatever the metro beyond it is doing. Meshed branches share their
+## flow with the parallel path and keep the default.
+##
+## Sizing this from bus-local capacity instead was the obvious first try and
+## silently did nothing: every spur runs plant bus -> junction -> ... ->
+## metro bus, and a junction has no capacity of its own, so `min()` over the
+## two ends was zero for exactly the branches that were overloading.
+static func _branch_needs(branches: Array[Dictionary], gen_mva: Dictionary,
+		load_mva: Dictionary) -> Array[float]:
+	var needs: Array[float] = []
+	var adjacency := {}  # bus -> Array of [branch index, other bus]
+	for i in range(branches.size()):
+		var u: int = branches[i]["from"]
+		var v: int = branches[i]["to"]
+		if not adjacency.has(u):
+			adjacency[u] = []
+		if not adjacency.has(v):
+			adjacency[v] = []
+		(adjacency[u] as Array).append([i, v])
+		(adjacency[v] as Array).append([i, u])
+	for i in range(branches.size()):
+		# reachable from `from` without using branch i
+		var start: int = branches[i]["from"]
+		var target: int = branches[i]["to"]
+		var seen := {start: true}
+		var stack: Array[int] = [start]
+		while not stack.is_empty():
+			var bus: int = stack.pop_back()
+			for edge: Array in adjacency.get(bus, []):
+				if int(edge[0]) == i or seen.has(int(edge[1])):
+					continue
+				seen[int(edge[1])] = true
+				stack.append(int(edge[1]))
+		if seen.has(target):
+			needs.append(0.0)  # meshed — the parallel path shares the flow
+			continue
+		var gen_near := 0.0
+		var load_near := 0.0
+		var gen_far := 0.0
+		var load_far := 0.0
+		for bus: int in adjacency:
+			if seen.has(bus):
+				gen_near += float(gen_mva.get(bus, 0.0))
+				load_near += float(load_mva.get(bus, 0.0))
+			else:
+				gen_far += float(gen_mva.get(bus, 0.0))
+				load_far += float(load_mva.get(bus, 0.0))
+		needs.append(minf(maxf(gen_near, load_near), maxf(gen_far, load_far)))
+	return needs
 
 
 static func _bus_islands(n_buses: int, branches: Array[Dictionary]) -> Array[int]:

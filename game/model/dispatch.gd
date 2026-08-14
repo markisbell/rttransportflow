@@ -11,6 +11,9 @@ extends Node
 signal dispatched(t_block: int, price: float, commands: Dictionary)
 
 const BLOCK_S := 900.0
+## How long a new schedule takes to replace the old one. Real dispatch ramps
+## across the boundary; a step change made the whole fleet move at once.
+const RAMP_S := 300.0
 const HEADROOM_FRAC := 0.92  # committed thermal capped here (reserve withheld)
 const LOSS_MARGIN := 1.015
 
@@ -89,13 +92,35 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		zone_ids: Array, pf_lines: Dictionary, line_buses: Dictionary,
 		plant_bus: Dictionary) -> Dictionary:
 	var t_days := t_sim / 86400.0
+	var zone_need := {}  # zone -> MW its own fleet has to cover
 	var demand_now := 0.0
 	for zone_id: String in zone_ids:
-		demand_now += Demand.zone_mw(zone_id, t_days)
+		var mw: float = Demand.zone_mw(zone_id, t_days)
+		zone_need[zone_id] = mw
+		demand_now += mw
 	# fold in last block's flexibility loads (sample-and-hold, same pattern
 	# as the PF loss feedback) so the merit order generates for them and
 	# renewable curtailment leaves them room
 	demand_now += _flex_load_mw
+	# HVDC terminals are engine-side power the zone ledger cannot see — the
+	# same blind spot `_flex_load_mw` covers for electrolyzers. The sending
+	# end is extra LOAD in its metro, the receiving end is generation in
+	# its. Without netting both, an active bipole is ADDITIVE instead of a
+	# substitution: the dispatcher keeps scheduling the exporting metro's
+	# coal to cover the importing metro's full demand, so an 800 MW link
+	# added ~1.1 GW of surplus (+0.29 Hz) and relieved only ~72 MW of the AC
+	# transit it exists to unload. MEASURED terminal power is used, not the
+	# setpoint, so the DC path losses are counted by the engine exactly once
+	# and the link's net effect on the island is just those losses.
+	var latest_devices: Dictionary = Orchestrator.latest().get("devices", {})
+	for term_id: String in link_setpoints:
+		var raw: Variant = (latest_devices.get(term_id, {}) as Dictionary).get("p_mw")
+		# p < 0 draws from its bus, p > 0 injects into it
+		var p: float = float(link_setpoints[term_id]) if raw == null else float(raw)
+		var zone := str(home_zone.get(term_id, ""))
+		if zone_need.has(zone):
+			zone_need[zone] = float(zone_need[zone]) - p
+		demand_now -= p
 
 	# --- renewables: availability from weather, must-take -----------------
 	var avail := {}
@@ -135,12 +160,20 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 
 	# --- thermal merit order ---------------------------------------------
 	var thermal: Array[Dictionary] = []
+	var mothballed: Array[String] = []
 	for plant: Dictionary in plants:
 		var kind := str(plant["kind"])
-		if kind in World.SYNC_KINDS and plant_mode.get(str(plant["id"]), "auto") != "mothballed":
-			thermal.append({"id": str(plant["id"]), "kind": kind,
-				"p_max": float(plant["p_max_mw"]),
-				"mc": marginal_cost(kind, str(plant.get("fuel", "")))})
+		if not (kind in World.SYNC_KINDS):
+			continue
+		if plant_mode.get(str(plant["id"]), "auto") == "mothballed":
+			# a mothballed plant leaves the merit order entirely, so nothing
+			# below would ever command it — and the engine holds the last
+			# setpoint it was given, which would leave it generating
+			mothballed.append(str(plant["id"]))
+			continue
+		thermal.append({"id": str(plant["id"]), "kind": kind,
+			"p_max": float(plant["p_max_mw"]),
+			"mc": marginal_cost(kind, str(plant.get("fuel", "")))})
 	thermal.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return a["mc"] < b["mc"] or (a["mc"] == b["mc"] and a["id"] < b["id"]))
 
@@ -162,6 +195,8 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	var reserve: float = maxf(largest_infeed, float(economy_cfg["reserve_margin_mw_min"]))
 	var need := forecast_peak * LOSS_MARGIN + reserve - renewable_mw * 0.5
 	var commands := {}
+	for pid: String in mothballed:
+		commands[pid] = {"dispatch_mw": 0.0, "breaker": "open"}
 	var committed_cap := 0.0
 	var committed: Array[Dictionary] = []
 	for entry: Dictionary in thermal:
@@ -177,69 +212,112 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 			committed.append(entry)
 			if state == "offline" or state == "tripped":
 				commands[pid] = {"breaker": "close"}
-		elif state == "online" and committed_cap > need * 1.15:
-			commands[pid] = {"breaker": "open", "dispatch_mw": 0.0}
+		else:
+			# A unit the merit order did not commit must be told to stop
+			# generating. Silence is NOT zero: the engine holds the last
+			# setpoint it was given, so an uncommitted plant kept producing
+			# at whatever the bundle's startup profile put it at. On the
+			# 3-city world every unit was committed and this never showed;
+			# on the 142-plant continental world it left ~5 GW of unasked-for
+			# generation in the island, which parked frequency at +0.24 Hz
+			# and pinned the engine in ALERT.
+			commands[pid] = {"dispatch_mw": 0.0}
+			# only pull the breaker on a real surplus of committed capacity —
+			# cycling a breaker every block is how you wear out a plant
+			if state == "online" and committed_cap > need * 1.15:
+				commands[pid]["breaker"] = "open"
 
-	# --- locality first: each metro's own plants cover their own demand ---
-	var local_target := {}  # pid -> MW already claimed by its own zone
-	if not home_zone.is_empty():
-		for zone_id: String in zone_ids:
-			var zone_need: float = Demand.zone_mw(zone_id, t_days) * LOSS_MARGIN
-			var mine: Array[Dictionary] = []
-			for entry: Dictionary in committed:
-				if str(home_zone.get(entry["id"], "")) == zone_id:
-					mine.append(entry)
-			for entry: Dictionary in mine:
-				if zone_need <= 0.0:
-					break
-				var state := str(device_states.get(entry["id"], {}).get("state", "online"))
-				if state != "online":
-					continue
-				var take: float = minf(zone_need, float(entry["p_max"]) * HEADROOM_FRAC)
-				local_target[entry["id"]] = take
-				zone_need -= take
-
-	# --- energy dispatch: merit order BETWEEN price tiers, PROPORTIONAL
-	# within a tier. Greedy fill-to-cap commanded 5 nuclear units up and the
-	# marginal one 611 MW down — the slew asymmetry (fast up, 19 min down)
-	# built a ~570 MW surplus that tiny nuclear FCR bands could not hold and
-	# the fleet tripped at 51.5 Hz (found by probe). Proportional tiers keep
-	# per-unit deltas small.
+	# --- energy dispatch --------------------------------------------------
+	# ONE budget, two passes: locality places what it can, the merit order
+	# places the rest, and a unit's schedule is their SUM.
+	#
+	# The previous version floored each unit at its own metro's need and ALSO
+	# gave it a merit share, taking max(floor, share) per unit. Per unit that
+	# looks conservative; summed over the fleet it is strictly larger than
+	# either plan, so the schedule over-generated by hundreds of MW. Nothing
+	# could pull it back — the campaign island runs on must-run nuclear,
+	# which does not regulate (ledger 9), so aFRR had zero down-headroom —
+	# and frequency parked at +0.06 Hz, then climbed past +0.26 Hz, holding
+	# the engine permanently in ALERT (10 ms ticks) on a grid where nothing
+	# was happening. The invariant that fixes it: sum(dispatch) == residual
+	# whenever the committed fleet has the room.
 	var losses: float = demand_now * 0.01
 	var latest_pf: Dictionary = Orchestrator.latest().get("pf", {}).get("latest", {})
 	if latest_pf.has("loss_mw") and latest_pf["loss_mw"] != null:
 		losses = float(latest_pf["loss_mw"])
 	var residual := maxf(demand_now + losses - renewable_mw, 0.0)
+
+	var room := {}  # pid -> MW this unit may be scheduled to
+	for entry: Dictionary in committed:
+		var pid: String = entry["id"]
+		var online_now := str(device_states.get(pid, {}).get("state", "online")) == "online"
+		var cap: float = entry["p_max"] * HEADROOM_FRAC
+		if not online_now or plant_mode.get(pid, "auto") == "reserve_only":
+			cap = 0.0
+		room[pid] = cap
+	var alloc := {}  # pid -> MW scheduled
 	var price := 0.0
+	var placed := 0.0
+
+	# PASS 1 — locality: each metro's SHARE OF THE RESIDUAL (not its raw
+	# demand) is served by its own plants first, cheapest local unit first.
+	# A location-blind merit order serves Hamburg from Munich and cooks the
+	# corridor between them until duty protection cuts the grid in three.
+	if not home_zone.is_empty() and demand_now > 0.0:
+		for zone_id: String in zone_ids:
+			var share_mw: float = residual \
+				* maxf(float(zone_need.get(zone_id, 0.0)), 0.0) / demand_now
+			for entry: Dictionary in committed:
+				if share_mw <= 0.0:
+					break
+				var pid: String = entry["id"]
+				if str(home_zone.get(pid, "")) != zone_id:
+					continue
+				var take: float = minf(share_mw,
+					float(room[pid]) - float(alloc.get(pid, 0.0)))
+				if take <= 0.0:
+					continue
+				alloc[pid] = float(alloc.get(pid, 0.0)) + take
+				share_mw -= take
+				placed += take
+				price = maxf(price, float(entry["mc"]))
+
+	# PASS 2 — what locality could not place follows the merit order between
+	# price tiers, PROPORTIONAL within a tier. Greedy fill-to-cap commanded 5
+	# nuclear units up and the marginal one 611 MW down — the slew asymmetry
+	# (fast up, 19 min down) built a ~570 MW surplus that tiny nuclear FCR
+	# bands could not hold and the fleet tripped at 51.5 Hz (found by probe).
+	var remaining := residual - placed
 	var i := 0
-	while i < committed.size():
-		var tier_mc: float = committed[i]["mc"]
+	while i < committed.size() and remaining > 0.0:
+		var tier_mc: float = float(committed[i]["mc"])
 		var j := i
-		var tier: Array[Dictionary] = []
-		var tier_cap := 0.0
-		while j < committed.size() and committed[j]["mc"] == tier_mc:
-			var entry: Dictionary = committed[j]
-			var pid: String = entry["id"]
-			var online_now := str(device_states.get(pid, {}).get("state", "online")) == "online"
-			var cap: float = entry["p_max"] * HEADROOM_FRAC
-			if not online_now or plant_mode.get(pid, "auto") == "reserve_only":
-				cap = 0.0
-			tier.append({"pid": pid, "cap": cap})
-			tier_cap += cap
+		var tier: Array[String] = []
+		var tier_room := 0.0
+		while j < committed.size() and float(committed[j]["mc"]) == tier_mc:
+			var pid: String = committed[j]["id"]
+			var free: float = maxf(float(room[pid]) - float(alloc.get(pid, 0.0)), 0.0)
+			if free > 0.0:
+				tier.append(pid)
+				tier_room += free
 			j += 1
-		var take_tier: float = clampf(residual, 0.0, tier_cap)
-		var share := take_tier / tier_cap if tier_cap > 0.0 else 0.0
-		for unit: Dictionary in tier:
-			var command: Dictionary = commands.get(unit["pid"], {})
-			# never below what the unit's own metro needs from it
-			var value: float = maxf(share * float(unit["cap"]),
-				float(local_target.get(unit["pid"], 0.0)))
-			command["dispatch_mw"] = snappedf(minf(value, float(unit["cap"])), 0.1)
-			commands[unit["pid"]] = command
-		residual -= take_tier
+		var take_tier: float = minf(remaining, tier_room)
 		if take_tier > 0.0:
+			var frac := take_tier / tier_room
+			for pid: String in tier:
+				var free: float = maxf(float(room[pid]) - float(alloc.get(pid, 0.0)), 0.0)
+				alloc[pid] = float(alloc.get(pid, 0.0)) + free * frac
+			remaining -= take_tier
 			price = maxf(price, tier_mc)
 		i = j
+
+	for entry: Dictionary in committed:
+		var pid: String = entry["id"]
+		var command: Dictionary = commands.get(pid, {})
+		command["dispatch_mw"] = snappedf(float(alloc.get(pid, 0.0)), 0.1)
+		commands[pid] = command
+	# what the committed fleet could NOT serve — the scarcity signal below
+	residual = remaining
 
 	# --- surplus renewables: curtail pro-rata -----------------------------
 	last_curtailed_mw = 0.0

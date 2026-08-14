@@ -181,7 +181,10 @@ rttransportflow/
 ├── data/
 │   ├── grids/europe_mini/        # P1: authored 10-bus, 8-country scenario bundle
 │   ├── grids/europe/             # P5+: full campaign map bundle
-│   ├── map/europe_v1.json        # tile map (GAME_DESIGN §1.7)
+│   ├── map/europe_v3.json        # tile map, 960x804 @ 5 km (GAME_DESIGN §1.7, ledger 38);
+│   │                             #   v1/v2 kept as the load_map() fallback chain
+│   ├── scenarios/<id>.json       # P9 scenario RECIPES (§5.4: seed + difficulty +
+│   │                             #   forces + world-or-build, never a snapshot)
 │   ├── catalogs/                 # plant_types.json line_types.json storage_types.json economy.json
 │   ├── profiles/  load_centers/  campaign/
 │   └── sources/<id>/DATASET.md   # vendored validation references with provenance

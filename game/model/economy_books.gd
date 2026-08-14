@@ -92,6 +92,7 @@ func _on_substation_placed(_tile: Vector2i) -> void:
 
 
 func _spend_capex(eur: float) -> void:
+	eur *= Sandbox.knob("capex")
 	capex_spent += eur
 	treasury_eur -= eur
 	books_updated.emit()
@@ -105,7 +106,10 @@ func _on_step(_t: int, result: Dictionary) -> void:
 		return
 	var t_days := float(result.get("t_sim_end", 0.0)) / 86400.0
 	var tariff := float(cfg.get("tariff_eur_per_mwh", 95.0))
-	var voll := float(cfg.get("voll_eur_per_mwh", 3000.0))
+	# unserved energy is priced by the difficulty knob (§5.3): the physics
+	# of a blackout never changes, only what it costs GridCo
+	var voll := float(cfg.get("voll_eur_per_mwh", 3000.0)) \
+		* Sandbox.knob("voll_scale")
 
 	for zone_id: String in result.get("zones", {}):
 		var supplied: Variant = result["zones"][zone_id].get("supplied", 0.0)

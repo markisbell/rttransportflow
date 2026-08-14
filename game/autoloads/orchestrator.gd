@@ -149,7 +149,7 @@ func step_once(dt_s: float) -> Dictionary:
 		"interrupt_on_event": true,
 		"zone_demand": Boundary.zone_demand(GameClock.t_sim),
 		"avail_mw": Boundary.avail_mw(GameClock.t_sim),
-		"device_commands": Boundary.device_commands(GameClock.t_sim),
+		"device_commands": Boundary.device_commands(GameClock.t_sim, dt_s),
 	}
 	if not pending_events.is_empty():
 		request["scheduled_events"] = pending_events.duplicate()

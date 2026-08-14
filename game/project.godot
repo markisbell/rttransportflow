@@ -22,6 +22,8 @@ Dispatch="*res://model/dispatch.gd"
 Economy="*res://model/economy_books.gd"
 BuildSession="*res://model/build_session.gd"
 Campaign="*res://model/campaign.gd"
+Sandbox="*res://model/sandbox.gd"
+Scenario="*res://model/scenario.gd"
 SaveLoad="*res://model/save_load.gd"
 
 [editor_plugins]

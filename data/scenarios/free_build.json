@@ -1,0 +1,10 @@
+{
+  "id": "free_build",
+  "title": "Free build (three metros)",
+  "description": "A recipe with no authored world at all: the three-metro cluster is rebuilt from the map itself, so this scenario survives any future map regeneration.",
+  "seed": 42,
+  "sandbox": true,
+  "difficulty": "relaxed",
+  "build": {"metros": ["hamburg", "berlin", "munich"]},
+  "forces": []
+}

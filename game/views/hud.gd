@@ -59,6 +59,12 @@ func _ready() -> void:
 		if view != null:
 			view.tool_id = tool_id)
 
+	# classroom console — shows itself only in sandbox mode (§5.4).
+	# preload by path, not by class_name: a freshly added script is not in
+	# the global class cache until the project is re-imported, and a headless
+	# smoke run then fails to compile the whole HUD.
+	add_child(preload("res://views/sandbox_panel.gd").new())
+
 	# P8 replay panel: auto-fetches counterfactual ghosts after significant
 	# events (the ring only holds ~120 s — ledger 23); key R toggles it
 	var replay := preload("res://views/replay_panel.gd").new()

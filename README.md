@@ -38,11 +38,14 @@ rtheatflow, rtwaterflow, infrastruct):
 
 ## Status
 
-**P0–P4 implemented**: backend scaffold, europe_mini PF time-series +
-Grafana stack, the frequency-dynamics engine (analytically validated),
-per-kind plant models, the frozen gamebridge v2 contract, and the first
-playable Godot shell (live frequency dial; press **T** to trip the largest
-unit). Per-phase log: [CLAUDE.md](CLAUDE.md) §6. Plan documents:
+**P0–P8 implemented, P9/P10 in progress**: backend scaffold, europe_mini PF
+time-series + Grafana stack, the frequency-dynamics engine (analytically
+validated), per-kind plant models, the frozen gamebridge v2 contract, the
+Godot game (960 × 804 tiles at 5 km over real Natural Earth geometry, 3D
+isometric view with streamed terrain, menu-driven building, live frequency
+dial), demand/weather/dispatch/economy, storage + hydrogen + HVDC, and the
+protection layer (UFLS, cascades, black start, counterfactual replay).
+Per-phase log: [CLAUDE.md](CLAUDE.md) §6. Plan documents:
 
 | Document | Contents |
 |---|---|
@@ -55,6 +58,20 @@ unit). Per-phase log: [CLAUDE.md](CLAUDE.md) §6. Plan documents:
 | [CLAUDE.md](CLAUDE.md) | Handoff/context document: binding rules, decision ledger, open questions |
 
 ## Quickstart
+
+### Play the game
+
+```bash
+scripts/package_game.sh linux      # frozen backend + exported game + data
+build/dist/rttransportflow-*-linux-x86_64/rttransportflow.x86_64
+```
+
+The bundle is self-contained — no Python on the player's machine. The game
+starts its own physics backend on port 8030 and logs to `.run/` beside the
+executable. From a source checkout, `install.sh` then opening `game/` in
+Godot 4.7 works too.
+
+### Run the backend alone (teaching mode)
 
 ```bash
 docker compose up          # backend :8003, Grafana :3003

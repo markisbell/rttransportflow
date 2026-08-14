@@ -51,7 +51,7 @@ func run() -> void:
 
 
 func _csv_path() -> String:
-	return ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir() \
+	return AppPaths.root() \
 		+ "/tools/balancing/economy_windows.csv"
 
 

@@ -22,7 +22,7 @@ func run() -> void:
 	if not await p7_boot(TAG):
 		return
 	# inherited 2025 world + campaign mode
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
 		repo + "/" + Campaign.START_STATE_PATH))
 	if not (parsed is Dictionary) or not World.restore(parsed):

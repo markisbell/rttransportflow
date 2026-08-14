@@ -1,0 +1,11 @@
+{
+  "id": "inherited_2025",
+  "title": "Take the Reins (2025)",
+  "description": "GridCo Europa inherits the mainland backbone: coal-heavy Germany and Poland, nuclear France, gas in the Low Countries. No wind, no batteries, no hydrogen — those arrive with their unlock years.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "world": "data/campaign/start_2025.json",
+  "_why_world_not_build": "The inherited backbone is authored (scripts/../author_start) and pinned as a golden so milestone 1's incident lands on a known fleet. Recipes that describe a SITUATION rather than a legacy use `build.metros` instead.",
+  "forces": []
+}

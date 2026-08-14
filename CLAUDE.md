@@ -24,9 +24,13 @@ divergence-is-data, Docker/Grafana stack.
 
 ## 2. State
 
-**Planning complete (2026-08-10). No code yet.** The plan was produced by a
-multi-agent research+design pass over the sibling repos, then synthesized and
-cross-reviewed. Start with ROADMAP P0.
+**P0–P8 complete, P9 closing, P10 started (2026-08-14).** The backend, the
+contract, the game, the 5 km Europe map, the economy and the protection layer
+are in and their gates are green; P9's determinism gate (`save_load_replay`)
+passes and the campaign gate is the open item; P10 has export presets, a
+packaging script that plays the bundle it builds, and the release checklist
+in §8. Per-phase evidence is in §6 — read the last entry before touching
+anything.
 
 Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
 docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2.md →
@@ -273,13 +277,76 @@ docs/GAME_DESIGN.md.
       keys cost tens of MB; read via `terrain_at()` / `in_bounds()`.
     - **every radius is a DISTANCE, not a tile count** (`tiles_for_km`):
       metro footprints 60/45 km, PHS snap 40 km, load-centre search 150 km,
-      foothill halo 50 km. Tile-count constants silently shrink by the
-      resolution factor — this bit twice.
+      foothill halo 50 km, forest noise span 250 km, smoke build rings
+      200 km. Tile-count constants silently shrink by the resolution factor.
+      This has now bitten **five** times, and the fifth was the worst kind:
+      `HUB_BIND_TILES = 2` was not a rendering radius but a *game rule* —
+      PARAMETERS §1.16's 100 km offshore collector reach — so at 5 km no
+      far-shore farm could reach a platform and the whole DC path silently
+      stopped existing. It is now `HUB_BIND_KM`. **A tile count in a rule is
+      a bug**: write kilometres, convert at the edge.
     - a metro footprint may span water and keeps only its land tiles (a
       solid-land square left Rome with nowhere to stand).
     - the renderer MUST stream: the whole map cannot be resident (chunked
       terrain/decoration/models around the camera + a coarse overview mesh),
       and a navigation panel (minimap + jump list) replaces panning.
+39. **Schedules RAMP across the block boundary** (2026-08-14): the dispatcher
+    still decides once per 15-min block, but `Boundary.device_commands()`
+    now blends the previous schedule into the new one over
+    `Dispatch.RAMP_S = 300 s` instead of stepping the whole fleet at once.
+    A step change is a synchronous multi-GW jolt that no real system ever
+    applies: frequency wandered ±300 mHz in CALM with the grid otherwise
+    healthy, and the resulting ALERT episodes both hid real events and cost
+    compute. With ramping the same day holds 50.004–50.027 Hz. This is the
+    *game* smoothing its own schedule, not the engine hiding a transient —
+    trips and outages are still instantaneous, which is the point.
+40. **A schedule is a budget, not a set of floors** (2026-08-14): the
+    dispatcher allocates the residual ONCE — locality places what it can,
+    the merit order places the rest, and a unit's schedule is the SUM of the
+    two passes. `sum(dispatch) == residual` is the invariant. Taking
+    `max(local_floor, merit_share)` per unit reads as conservative and is
+    the opposite: summed over the fleet it exceeds either plan, and the
+    campaign island (must-run nuclear, which does not regulate — ledger 9)
+    had NO aFRR down-headroom to absorb it, so frequency parked at +60 mHz
+    and climbed past +260 mHz, pinning the engine in ALERT on a grid where
+    nothing was happening. Diagnostic that found it: `afrr_used_mw ≈ 0`
+    while `fcr_used_mw` sat at a few hundred MW — primary control silently
+    holding a steady-state error that secondary control should have erased.
+    Post-fix the same world holds 50.000 Hz (f ∈ [49.986, 50.006]) in CALM.
+41. **The inherited world is CONTINENTAL** (P9, 2026-08-14): `author_start`
+    builds the 16 mainland metros (~95 GW peak, 142 plants, 64 buses / 120
+    branches — inside the ledger-13 budget), not the 3-city demo cluster.
+    This is physics, not scenery: a 12 GW island holds ~500 MW of FCR (bands
+    are per-kind fractions of P_n and nuclear does not participate by
+    default, ledger 9), so GAME_DESIGN §5.2.1's scripted 1.2 GW trip drove
+    it through 49.0 Hz into UFLS — measured nadir **48.97 Hz**. The tutorial
+    was teaching "your grid dies when a unit trips". On the mainland the
+    same incident is the 1.3 % event it is meant to be. Islanded centres
+    (london, stockholm, oslo, athens, lisbon, Iberia) join later via the
+    links the player unlocks.
+42. **Circuits are sized per branch, not per map** (P9, 2026-08-14):
+    `GridTopology` sizes each branch from the power it must actually move.
+    A branch whose removal splits the network is a bridge, and power balance
+    pins its flow — everything behind it that is generated and not consumed
+    has to cross — so it gets `ceil(min(max(gen, load) per side) / 562 MVA)`
+    circuits, clamped to [4, 12]; meshed branches share their flow with the
+    parallel path and keep 4. A flat 4 circuits (~2.5 GVA) cannot evacuate a
+    5 GW plant cluster: the continental build tripped five spurs at
+    157–211 % **within 10 ms of registering** and fell into eight islands
+    before the player touched anything. Sizing from bus-local capacity
+    instead is the obvious first attempt and does nothing — every spur runs
+    plant→junction→…→metro and a junction has no capacity of its own, so the
+    `min()` is zero exactly where the overload is.
+43. **Silence is not zero** (P9, 2026-08-14): the engine holds the last
+    setpoint it was given, so a plant the dispatcher does not commit keeps
+    generating at whatever it was last told — for the inherited world, the
+    bundle's startup profile. 40 of 142 plants uncommitted left ~5 GW of
+    unasked-for generation in the island, parked frequency at +0.24 Hz and
+    pinned the engine in ALERT (10 ms ticks) so hard that 194 wire steps
+    advanced the sim clock by 0.05 days. Every uncommitted unit is now
+    explicitly commanded to 0 MW; the breaker only opens on a real surplus
+    (cycling it every block wears the plant). The 3-city world committed
+    everything, which is why this hid until the fleet grew.
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -808,6 +875,92 @@ P10 revisit.
 
 **Next:** P9 — campaign, scenarios, save/load, balancing.
 
+### UI overhaul + Europe map v3 (user direction, 2026-08-14)
+
+**Built:** the game's look and scale, on the user's direction that the
+sibling's per-component 3D models and menu-driven building are the bar.
+RENDERING: `views/world_view_3d.gd` (Forward+, SSAO, filmic tonemap, locked
+isometric orthographic camera, depth fog), `views/rendering/` —
+`europe_terrain.gd` (chunked terrain meshes), `plant_models.gd` (a distinct
+procedural low-poly model per plant kind — cooling towers, turbine halls,
+rotors, pylons), `deco_scatter.gd` (deterministic forest/rock MultiMesh
+cover from a noise field, hashed jitter so a re-streamed chunk reproduces
+exactly). BUILDING: `views/build_menu.gd` — five category tabs with live
+SubViewport 3D thumbnails; **every build hotkey is gone** per the user's
+instruction. NAVIGATION: `views/nav_panel.gd` (minimap + jump list) replaces
+panning across a continent. MAP: `tools/map_authoring/natural_earth.py` +
+regenerated `data/map/europe_v3.json` — 960 × 804 tiles at 5 km from
+Natural Earth (public domain; ledger 38), real coastlines, 222 named
+mountain ranges, 55 river courses.
+
+**Tests:** 7 map validations re-pinned for the new grid (SHA-256 digest
+comparison — pytest diffing two 4 MB strings hangs); GdUnit 33/33; the P4/P5
+smoke set re-run green on the new map.
+
+**Acceptance evidence:** screenshots at three zooms in `docs/look/`; the
+continent streams at interactive frame rates with a 320 × 268 minimap built
+in 41 ms.
+
+**Discoveries:** (1) fog under an orthographic camera applies uniformly and
+veils the whole scene white — `FOG_MODE_DEPTH` instead. (2) A missing
+`vertex_color_is_srgb` bleached the terrain. (3) `PanelContainer` anchor
+presets do not apply to a CanvasLayer child; set anchors explicitly.
+(4) The 10× finer grid broke every radius written as a tile count — see
+ledger 38, which now records five separate instances.
+
+**Deviations (deliberate):** the offshore/HVDC visuals reuse the plant-model
+system rather than bespoke meshes; `europe_v1`/`v2` stay in the repo as the
+fallback chain `BuildSession.load_map()` walks.
+
+**Next:** P9 — campaign, scenarios, save/load, balancing.
+
+### P9 — Campaign, scenarios, sandbox, save/load (2026-08-14)
+
+**Built:** the inherited world re-authored as the **continental** backbone
+(`author_start` over 16 mainland metros — 142 plants, ~95 GW peak, 64 buses /
+120 branches, ledger 41) because milestone 1's scripted 1.2 GW trip is only
+the 1.3 % event the design intends on a real synchronous area; per-branch
+circuit sizing in `GridTopology` (bridge analysis — ledger 42); the
+dispatcher's allocator rewritten so locality and merit share ONE budget
+(ledger 40) and every uncommitted or mothballed unit is explicitly zeroed
+(ledger 43); `model/sandbox.gd` + `views/sandbox_panel.gd` (GAME_DESIGN §5.4
+classroom console: difficulty presets, trip-the-largest-unit, weather force
+windows, treasury) with the difficulty knobs wired into capex, demand growth
+and VoLL — never into physics; `model/scenario.gd` + `data/scenarios/`
+(recipes, not snapshots: seed + difficulty + forces + world-or-build).
+
+**Tests:** backend suite green; GdUnit 33/33 (topology golden unchanged —
+small worlds still take 4 circuits); smokes `campaign_take_the_reins`,
+`save_load_replay`, `scenarios`, `dispatch_day`, plus the P4/P5 set.
+
+**Acceptance evidence:** `SMOKE_CAMPAIGN {"ok":true, "stars":3, "ufls":0}` —
+milestone 1 completed by scripted play at the pinned ★★★, replay viewed,
+campaign state round-trips. `SMOKE_SAVE_LOAD {"ok":true}` with frequency and
+plant power **bit-identical** across save → 4 blocks → load → replay.
+`SMOKE_SCENARIOS {"ok":true}` — three recipes load and the build recipe
+reproduces its world exactly. The continental world runs as ONE island at
+w = 1.00, 49.98 Hz in CALM, with aFRR trimming (−600 MW) and zero line
+trips; `SMOKE_DISPATCH_DAY` green with night price 7.7 €/MWh and evening
+63.1 €/MWh.
+
+**Discoveries:** four bugs, each invisible at 3-city scale and each fatal at
+142 plants — ledger 40 (a schedule is a budget, not a set of floors), 41
+(the island must be big enough for its own reference incident), 42 (circuits
+sized per branch), 43 (silence is not zero). The diagnostic that found the
+first: `afrr_used_mw ≈ 0` while `fcr_used_mw` held hundreds of MW — primary
+control quietly carrying a steady-state error that secondary control should
+have erased.
+
+**Deviations (deliberate):** §4.4's stochastic event table (MTBF unit trips,
+storm-correlated line trips, forecast busts) is NOT in v1 — campaign
+incidents are the scripted ones plus what the player's own grid does; the
+sandbox therefore ships without an `event_rate` knob rather than with a knob
+that scales nothing. The morning ramp still dips to 49.60 Hz (pump/ely shed
+fire, no UFLS): the dispatcher schedules against demand at the block START,
+so generation lags a steep ramp by one block — open, tracked.
+
+**Next:** P10 — hardening, packaging, release.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -830,3 +983,27 @@ ledger entry:
 7. **Synthetic-inertia & PHS variants** — wind synthetic inertia ships as a
    2035 unlock (chosen); ternary/var-speed PHS and PHS syncon mode are
    backlog flags.
+
+## 8. Release checklist (ROADMAP P10)
+
+Run in order; every step is a gate, not a suggestion.
+
+1. `.venv/bin/pytest` — backend suites green (contract fixtures included).
+2. `game/` GdUnit suites green (topology goldens, map validations).
+3. Smoke sweep, each on its own port (`RTTF_PORT_OFFSET=<n>` isolates a
+   parallel run — two runs on one port make the loser silently adopt the
+   winner's backend and report someone else's grid):
+   P4/P5 `boot_and_day`, `trip_reaction`, `trip_key`, `sidecar_crash`,
+   `island_cut`, `build_and_supply`; P6 `dispatch_day`, `economy`,
+   `calm_week`; P7 `hydrogen_chain`, `battery_response`, `hvdc_link`,
+   `north_sea_hub`; P8 `ride_through`, `cascade_low_inertia`,
+   `replay_panel`; P9 `save_load_replay`, `campaign_take_the_reins`.
+4. `scripts/freeze_backend.sh` — frozen backend boots and answers `/health`.
+5. `scripts/package_game.sh linux` — assembles the bundle AND plays it
+   (`boot_and_day` inside the bundle). A bundle that assembles but cannot
+   boot its own backend is worthless, so the play step is the real gate.
+6. Soak: 24 in-game hours at max speed — budget held, memory flat, zero
+   leaked processes (`pgrep -f rttransportflow.main` empty afterwards).
+7. Docs: README status + quickstart current; PHYSICS honesty section still
+   true of the code; this file's §6 log carries the phase entry.
+8. Tag and publish only on explicit authorization (§3).

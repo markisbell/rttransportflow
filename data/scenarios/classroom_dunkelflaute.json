@@ -1,0 +1,13 @@
+{
+  "id": "classroom_dunkelflaute",
+  "title": "Classroom: Dunkelflaute",
+  "description": "Sandbox demo — the mainland fleet under a five-day windless, overcast winter episode. Every unlock is open and the classroom console is live, so a demonstrator can trip units and watch reserves respond.",
+  "seed": 7,
+  "sandbox": true,
+  "difficulty": "normal",
+  "world": "data/campaign/start_2025.json",
+  "forces": [
+    {"kind": "wind_lambda_scale", "region": "", "t0_days": 0.0, "t1_days": 5.0, "value": 0.3},
+    {"kind": "clearness_scale", "region": "", "t0_days": 0.0, "t1_days": 5.0, "value": 0.5}
+  ]
+}

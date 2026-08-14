@@ -13,7 +13,7 @@ var loaded := false
 
 
 func bundle_dir() -> String:
-	return ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir() \
+	return AppPaths.root() \
 		+ "/data/grids/europe_mini"
 
 
@@ -95,6 +95,8 @@ var _line_buses: Dictionary = {}
 var _plant_bus: Dictionary = {}
 var _decided_block := -1
 var _gridco: Dictionary = {"device_commands": {}, "avail_mw": {}}
+## the previous block's commands, held so the new schedule can be ramped in
+var _ramp_from: Dictionary = {}
 
 
 func enable_gridco() -> void:
@@ -107,24 +109,34 @@ func enable_gridco() -> void:
 			"to": str(line["to_bus"])}
 	for plant: Dictionary in docs["plants"].get("plants", []):
 		_plant_bus[str(plant["id"])] = str(plant["bus"])
-	# nearest-metro assignment for locality-first dispatch
+	# Nearest-metro assignment for locality-first dispatch. DEVICES get one
+	# too, not just plants: an HVDC terminal draws or injects real MW in a
+	# real metro, and the dispatcher cannot net that against the zone unless
+	# it knows which zone the terminal stands in.
 	var home := {}
 	for plant: Dictionary in docs["plants"].get("plants", []):
-		var pid := str(plant["id"])
-		var tile: Vector2i = World.plants.get(pid, {}).get("tile", Vector2i.ZERO)
-		var best := ""
-		var best_d := 1 << 30
-		for lc_id: String in World.load_centers:
-			for lc_tile: Vector2i in World.load_centers[lc_id]["tiles"]:
-				var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
-				if d < best_d:
-					best_d = d
-					best = lc_id
-		home[pid] = best
+		home[str(plant["id"])] = _nearest_zone(str(plant["id"]))
+	for device: Dictionary in wire_devices:
+		home[str(device.get("id", ""))] = _nearest_zone(str(device.get("id", "")))
 	Dispatch.home_zone = home
 	Dispatch.wire_devices = wire_devices
 	Dispatch.hub_farms = hub_farms
 	Economy.set_fleet(docs["plants"].get("plants", []), wire_devices)
+
+
+## The metro a placed thing belongs to (Manhattan distance to the nearest
+## load-centre tile) — the same rule GridTopology uses for plants.
+func _nearest_zone(pid: String) -> String:
+	var tile: Vector2i = World.plants.get(pid, {}).get("tile", Vector2i.ZERO)
+	var best := ""
+	var best_d := 1 << 30
+	for lc_id: String in World.load_centers:
+		for lc_tile: Vector2i in World.load_centers[lc_id]["tiles"]:
+			var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
+			if d < best_d:
+				best_d = d
+				best = lc_id
+	return best
 
 
 func _zone_ids() -> Array:
@@ -178,10 +190,44 @@ func avail_mw(t_sim: float) -> Dictionary:
 	return out
 
 
-func device_commands(t_sim: float) -> Dictionary:
+## Commands the SCHEDULE across the block instead of stepping it at the
+## boundary. A dispatcher decision is a 15-minute schedule, and real systems
+## ramp units onto the next setpoint over the boundary rather than jumping
+## at :00 — stepping it made the fleet chase a discontinuity every block and
+## the frequency wandered +-0.3 Hz, which is also why the save/load gate
+## could not find a quiesced moment.
+## `dt_s` is the length of the step these commands are FOR. The ramp is
+## sampled at the step's midpoint rather than its start: sampled at the
+## start, `fmod(t, BLOCK_S)` is 0 on every block boundary, so a step as long
+## as a block commands the PREVIOUS block's schedule against the new block's
+## demand. At 10 Hz stepping the difference is invisible; at dt = 900 s it
+## is a whole schedule out of date, which is what put the morning ramp
+## 49.60 Hz deep (pump and electrolyzer shed both fired) and left a test
+## island at 50.3 Hz with aFRR saturated on the night decline.
+func device_commands(t_sim: float, dt_s: float = 0.0) -> Dictionary:
 	if mode == "gridco":
+		var previous: Dictionary = _gridco["device_commands"].duplicate(true) \
+			if _decided_block >= 0 else {}
+		var block_before := _decided_block
 		_ensure_decided(t_sim)
-		return _gridco["device_commands"]
+		if block_before != _decided_block:
+			_ramp_from = previous
+		var progress: float = clampf(
+			fmod(t_sim + dt_s * 0.5, Dispatch.BLOCK_S) / Dispatch.RAMP_S, 0.0, 1.0)
+		if progress >= 1.0 or _ramp_from.is_empty():
+			return _gridco["device_commands"]
+		var blended := {}
+		for pid: String in _gridco["device_commands"]:
+			var target: Dictionary = _gridco["device_commands"][pid]
+			var command: Dictionary = target.duplicate(true)
+			if target.has("dispatch_mw") and _ramp_from.has(pid) \
+					and (_ramp_from[pid] as Dictionary).has("dispatch_mw"):
+				var from_mw := float((_ramp_from[pid] as Dictionary)["dispatch_mw"])
+				var to_mw := float(target["dispatch_mw"])
+				command["dispatch_mw"] = snappedf(
+					from_mw + (to_mw - from_mw) * progress, 0.1)
+			blended[pid] = command
+		return blended
 	var idx := _step_index(t_sim)
 	var out := {}
 	for plant: Dictionary in docs["plants"].get("plants", []):

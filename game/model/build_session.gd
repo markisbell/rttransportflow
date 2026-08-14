@@ -25,7 +25,7 @@ var _map_doc: Dictionary = {}
 
 
 static func load_repo_json(rel_path: String) -> Dictionary:
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	var parsed: Variant = JSON.parse_string(
 		FileAccess.get_file_as_string(repo + "/" + rel_path))
 	return parsed if parsed is Dictionary else {}
@@ -42,7 +42,7 @@ func _ready() -> void:
 
 ## Map file: the real Europe map when present, the test fixture otherwise.
 static func map_path() -> String:
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	# v3 is the 5 km Natural Earth grid (ledger 38); the coarser grids stay
 	# as fallbacks so an older checkout still boots
 	for name: String in ["europe_v3.json", "europe_v2.json", "europe_v1.json"]:

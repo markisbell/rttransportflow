@@ -26,12 +26,7 @@ var _poll_timer: Timer
 
 
 func _ready() -> void:
-	if OS.has_feature("editor"):
-		var game_dir := ProjectSettings.globalize_path("res://")
-		repo_root = game_dir.rstrip("/").get_base_dir()
-	else:
-		# exported build (no "standalone" tag — check ABSENCE of "editor")
-		repo_root = OS.get_executable_path().get_base_dir()
+	repo_root = AppPaths.root()
 	_poll_timer = Timer.new()
 	_poll_timer.wait_time = POLL_INTERVAL_S
 	_poll_timer.timeout.connect(_poll)
@@ -63,6 +58,14 @@ func configure(port: int = 0) -> void:
 					cfg.merge(entry, true)
 	if port > 0:
 		cfg["port"] = port
+	# Two smoke runs on one machine otherwise fight over the same port, and
+	# the loser silently ADOPTS the winner's already-healthy backend — its
+	# verdict then describes someone else's grid. RTTF_PORT_OFFSET shifts the
+	# whole spawn+talk path together (everything downstream reads port_of()),
+	# so a parallel run is isolated rather than merely lucky.
+	var offset := int(OS.get_environment("RTTF_PORT_OFFSET"))
+	if offset != 0:
+		cfg["port"] = int(cfg["port"]) + offset
 	cfg["env"]["RTTRANSPORTFLOW_PORT"] = str(cfg["port"])
 
 	var http := HTTPRequest.new()

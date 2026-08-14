@@ -29,6 +29,8 @@ const SMOKES := {
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"start_check": "res://smokes/start_check.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",
+	"soak": "res://smokes/soak.gd",
+	"scenarios": "res://smokes/scenarios.gd",
 }
 
 
@@ -124,7 +126,7 @@ func _boot_game(campaign: bool = false) -> void:
 func _load_start_world() -> void:
 	if not World.plants.is_empty() or not World.corridors.is_empty():
 		return
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	var path := repo + "/data/campaign/start_2025.json"
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) \
 		if FileAccess.file_exists(path) else null
@@ -140,7 +142,7 @@ func _load_start_world() -> void:
 ## `--campaign` boots the inherited-2025 world and arms the milestone
 ## tracker (sandbox — the default — leaves everything open, §5.4).
 func _boot_campaign() -> void:
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
 		repo + "/" + Campaign.START_STATE_PATH))
 	if parsed is Dictionary and World.restore(parsed):

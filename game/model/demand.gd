@@ -98,10 +98,14 @@ func total_mw(t_days: float, zone_ids: Array) -> float:
 
 # ---------------------------------------------------------------- factors
 
-## Growth: +1.5 %/yr for the first 5 years, +2.5 %/yr after (electrification).
+## Growth: +1.5 %/yr for the first 5 years, +2.5 %/yr after (electrification),
+## scaled by the difficulty knob — how fast the world electrifies is a
+## scenario choice, unlike the physics it drives.
 func _growth(t_days: float) -> float:
 	var year := int(floor(t_days / 12.0))
-	return pow(1.015, mini(year, 5)) * pow(1.025, maxi(year - 5, 0))
+	var scale := Sandbox.knob("demand_growth")
+	return pow(1.0 + 0.015 * scale, mini(year, 5)) \
+		* pow(1.0 + 0.025 * scale, maxi(year - 5, 0))
 
 
 func _month(t_days: float) -> int:

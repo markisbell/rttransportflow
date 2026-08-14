@@ -58,8 +58,11 @@ const PLANT_SIZES := {
 }
 const BATTERY_HOURS := 2.0  # PARAMETERS §1.11 default duration
 const CAVERN_CAPACITY_KG := 4_000_000.0  # §1.14 working gas
-## far-shore farms bind to a platform within this ring (§1.16 collector rule)
-const HUB_BIND_TILES := 2
+## Far-shore farms bind to a platform within 100 km (PARAMETERS §1.16
+## collector rule). Expressed in KILOMETRES: as a tile count it silently
+## became 10 km on the 5 km grid and no farm could reach a platform
+## (ledger 38 — the same trap as the build radii).
+const HUB_BIND_KM := 100.0
 
 
 func load_map(doc: Dictionary) -> bool:
@@ -168,15 +171,20 @@ func can_place_plant(kind: String, tile: Vector2i) -> bool:
 
 
 ## Nearest offshore platform pid within the collector ring, "" if none.
+func hub_bind_tiles() -> int:
+	return maxi(1, int(round(HUB_BIND_KM / maxf(tile_km, 1.0))))
+
+
 func platform_near(tile: Vector2i) -> String:
 	var best := ""
-	var best_d := HUB_BIND_TILES + 1
+	var reach := hub_bind_tiles()
+	var best_d := reach + 1
 	for pid: String in plants:
 		if str(plants[pid]["kind"]) != "offshore_platform":
 			continue
 		var d: Vector2i = (plants[pid]["tile"] as Vector2i) - tile
 		var cheb := maxi(absi(d.x), absi(d.y))
-		if cheb <= HUB_BIND_TILES and cheb < best_d:
+		if cheb <= reach and cheb < best_d:
 			best_d = cheb
 			best = pid
 	return best

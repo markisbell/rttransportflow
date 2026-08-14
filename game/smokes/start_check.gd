@@ -10,7 +10,7 @@ func run() -> void:
 	Weather.setup(42)
 	Demand.setup(42)
 	Demand.weather = Weather
-	var repo := ProjectSettings.globalize_path("res://").rstrip("/").get_base_dir()
+	var repo := AppPaths.root()
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
 		repo + "/data/campaign/start_2025.json"))
 	if not (parsed is Dictionary) or not World.restore(parsed):
