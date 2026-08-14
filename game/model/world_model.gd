@@ -13,8 +13,11 @@ signal substation_placed(tile: Vector2i)
 
 const ENVELOPE_VERSION := 1
 
-## terrain: Vector2i -> String (one of S s c p h m), loaded from the map doc
-var terrain: Dictionary = {}
+## Terrain is stored as the map document's ROWS (one String per row), not a
+## per-tile Dictionary: at 5 km tiles the map holds ~772 000 tiles and a
+## Vector2i-keyed Dictionary of that size costs tens of MB and seconds to
+## build. Read it through terrain_at()/in_bounds() — never index directly.
+var terrain_rows: PackedStringArray = PackedStringArray()
 var width: int = 0
 var height: int = 0
 var tile_km: float = 50.0
@@ -60,7 +63,7 @@ const HUB_BIND_TILES := 2
 
 
 func load_map(doc: Dictionary) -> bool:
-	terrain.clear()
+	terrain_rows = PackedStringArray()
 	resources.clear()
 	solar_bands.clear()
 	load_centers.clear()
@@ -75,8 +78,7 @@ func load_map(doc: Dictionary) -> bool:
 		var row: String = rows[y]
 		if row.length() != width:
 			return false
-		for x in range(width):
-			terrain[Vector2i(x, y)] = row[x]
+		terrain_rows.push_back(row)
 	for res: Dictionary in doc.get("resources", []):
 		var kind := str(res.get("kind", ""))
 		if res.has("band_lat"):
@@ -102,8 +104,14 @@ func load_map(doc: Dictionary) -> bool:
 	return true
 
 
+func in_bounds(tile: Vector2i) -> bool:
+	return tile.x >= 0 and tile.y >= 0 and tile.x < width and tile.y < height
+
+
 func terrain_at(tile: Vector2i) -> String:
-	return str(terrain.get(tile, "S"))
+	if not in_bounds(tile):
+		return "S"  # off-map reads as open sea
+	return terrain_rows[tile.y][tile.x]
 
 
 func is_land(tile: Vector2i) -> bool:

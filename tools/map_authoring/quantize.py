@@ -1,4 +1,10 @@
-"""Generate data/map/europe_v2.json — the 320x268 stylized Europe tile map.
+"""Generate data/map/europe_v3.json — the 960x804 Europe tile map.
+
+Geometry comes from NATURAL EARTH (public domain, see natural_earth.py):
+real coastlines, real river courses, real named mountain ranges. The
+hand-authored polygons below are kept only as the fallback when the NE
+cache is unavailable — at 5 km per tile, hand-drawing Europe is neither
+accurate enough nor worth the effort.
 
 Deterministic (no RNG, no time): hand-authored lat/lon polygons are
 rasterized onto the 50 km tile grid (GAME_DESIGN SS1.7 format). Regenerate:
@@ -7,7 +13,7 @@ rasterized onto the 50 km tile grid (GAME_DESIGN SS1.7 format). Regenerate:
 
 Projection (documented, equirectangular at a fixed metric scale):
     1 deg lat = 111.32 km ; 1 deg lon = 111.32 * cos(52 deg) = 68.536 km
-    tile = 15 km  ->  DLAT = 0.135 deg/tile , DLON = 0.219 deg/tile
+    tile = 5 km  ->  DLAT = 0.0449 deg/tile , DLON = 0.0730 deg/tile
     row 0 center sits at LAT0 = 71 N (North Cape clipped), col 0 at LON0=-20.
     Content spans Lisbon-Helsinki / Ireland-Athens with sea margins.
 
@@ -38,7 +44,7 @@ METRO_BIG_KM = 60.0  # footprint of a >= 8 GW metro region
 METRO_KM = 45.0
 PREVIEW = Path(__file__).resolve().parent / "preview.txt"
 
-WIDTH, HEIGHT, TILE_KM = 320, 268, 15
+WIDTH, HEIGHT, TILE_KM = 960, 804, 5
 LAT0, LON0 = 71.0, -20.0
 KM_PER_DEG_LAT = 111.32
 KM_PER_DEG_LON = 111.32 * math.cos(math.radians(52.0))  # 68.536
@@ -73,6 +79,55 @@ def _value_noise(width: int, height: int, cells: int, seed: int
             row.append(top * (1 - wy) + bot * wy)
         out.append(row)
     return out
+
+
+# --- Natural Earth sourcing (public domain; see natural_earth.py) --------
+_NE_LAND_USED = False
+_NE_RANGES: list[list[bool]] | None = None
+_NE_RIVERS: dict[str, set[tuple[int, int]]] | None = None
+BBOX = (LON0 - 1.0, LAT0 - HEIGHT * (TILE_KM / KM_PER_DEG_LAT) - 1.0,
+        LON0 + WIDTH * (TILE_KM / KM_PER_DEG_LON) + 1.0, LAT0 + 1.0)
+
+
+def _tile_of_float(lon: float, lat: float) -> tuple[float, float]:
+    """Sub-tile position — the rasteriser needs fractions, not floor()."""
+    return (lon - LON0) / DLON, (LAT0 - lat) / DLAT
+
+
+def _natural_earth_land() -> list[list[bool]] | None:
+    """Land mask, named ranges and rivers straight from Natural Earth.
+    Returns None (and leaves the hand-authored fallback in charge) when the
+    cache is missing and the download is unavailable."""
+    global _NE_LAND_USED, _NE_RANGES, _NE_RIVERS
+    try:
+        import natural_earth as ne
+    except ImportError:
+        return None
+    try:
+        land_rings = ne.rings_in("land", BBOX)
+        if not land_rings:
+            return None
+        mask = ne.rasterize(land_rings, _tile_of_float, WIDTH, HEIGHT)
+        # lakes are cut back out of the land mask: at 5 km the Ladoga,
+        # Vänern and the Alpine lakes are real features, not noise
+        for row_index, row in enumerate(
+                ne.rasterize(ne.rings_in("lakes", BBOX, min_size=0.02),
+                             _tile_of_float, WIDTH, HEIGHT)):
+            for x, wet in enumerate(row):
+                if wet:
+                    mask[row_index][x] = False
+        _NE_RANGES = ne.rasterize(ne.rings_in("regions", BBOX,
+                                              featurecla="Range/mtn"),
+                                  _tile_of_float, WIDTH, HEIGHT)
+        _NE_RIVERS = ne.river_tiles(BBOX, tile_of)
+        _NE_LAND_USED = True
+        print(f"  Natural Earth: {sum(sum(r) for r in mask)} land tiles, "
+              f"{sum(sum(r) for r in _NE_RANGES)} range tiles, "
+              f"{len(_NE_RIVERS)} rivers")
+        return mask
+    except Exception as exc:  # noqa: BLE001 — the fallback must always work
+        print(f"  Natural Earth unavailable ({exc}); using hand polygons")
+        return None
 
 
 def tile_of(lon: float, lat: float) -> tuple[int, int]:
@@ -351,12 +406,17 @@ def sample_path(path: list[tuple[float, float]], step_deg: float = 0.05):
 
 
 def build() -> dict:
-    land = [[False] * WIDTH for _ in range(HEIGHT)]
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            lon, lat = center_of(x, y)
-            if any(point_in_poly(lon, lat, poly) for poly in LANDMASSES):
-                land[y][x] = True
+    land = _natural_earth_land()
+    if land is None:
+        land = [[False] * WIDTH for _ in range(HEIGHT)]
+    if _NE_LAND_USED:
+        pass  # Natural Earth already filled the mask
+    else:
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                lon, lat = center_of(x, y)
+                if any(point_in_poly(lon, lat, poly) for poly in LANDMASSES):
+                    land[y][x] = True
 
     for path in CARVES:  # forced sea channels
         for lon, lat in sample_path(path):
@@ -384,6 +444,10 @@ def build() -> dict:
     for y in range(HEIGHT):
         for x in range(WIDTH):
             if not land[y][x]:
+                continue
+            if _NE_RANGES is not None:
+                if _NE_RANGES[y][x]:
+                    grid[y][x] = "m"
                 continue
             lon, lat = center_of(x, y)
             if any(point_in_poly(lon, lat, poly) for poly in MOUNTAINS):
@@ -480,21 +544,30 @@ def build() -> dict:
 
     for lon, lat, gwh in PHS_SITES:
         x, y = tile_of(lon, lat)
-        # snap to the nearest `m` tile within radius 2
+        # Snap to the nearest upland tile. The radius is a DISTANCE (~40 km)
+        # and mountains are preferred but hills accepted: Natural Earth's
+        # named ranges do not cover every real PHS massif (the Scottish
+        # Highlands are hill-classed here), and a pumped-storage site in
+        # hill country is perfectly plausible.
         best = None
-        for r in range(0, 3):
-            for dy in range(-r, r + 1):
-                for dx in range(-r, r + 1):
-                    xx, yy = x + dx, y + dy
-                    if 0 <= xx < WIDTH and 0 <= yy < HEIGHT and grid[yy][xx] == "m":
-                        best = [xx, yy]
+        reach = max(2, int(round(40.0 / TILE_KM)))
+        for wanted in ("m", "h"):
+            for r in range(0, reach + 1):
+                for dy in range(-r, r + 1):
+                    for dx in range(-r, r + 1):
+                        xx, yy = x + dx, y + dy
+                        if 0 <= xx < WIDTH and 0 <= yy < HEIGHT \
+                                and grid[yy][xx] == wanted:
+                            best = [xx, yy]
+                            break
+                    if best:
                         break
                 if best:
                     break
             if best:
                 break
         if best is None:
-            raise SystemExit(f"phs_site at ({lon},{lat}) found no mountain tile")
+            raise SystemExit(f"phs_site at ({lon},{lat}) found no upland tile")
         resources.append({"kind": "phs_site", "tiles": [best], "max_gwh": gwh})
 
     wind_tiles_130, wind_tiles_125, wind_tiles_115 = [], [], []
@@ -513,26 +586,43 @@ def build() -> dict:
     resources.append({"kind": "solar_resource", "band_lat": [35, 44], "factor": 1.3})
     resources.append({"kind": "solar_resource", "band_lat": [44, 50], "factor": 1.1})
 
-    for name, path in RIVERS.items():
-        tiles, seen = [], set()
-        for lon, lat in sample_path(path):
-            x, y = tile_of(lon, lat)
-            if (x, y) not in seen and is_land(x, y):
-                seen.add((x, y))
-                tiles.append([x, y])
-        resources.append({"kind": "river", "name": name, "tiles": tiles})
+    if _NE_RIVERS:
+        # real courses from Natural Earth: the Rhine actually bends at Basel
+        # and the Danube reaches the delta. Only tiles that ended up on land
+        # count — a course crossing an estuary must not paint the sea.
+        for name, course in sorted(_NE_RIVERS.items()):
+            tiles = [[x, y] for x, y in sorted(course) if is_land(x, y)]
+            if len(tiles) < 3:
+                continue
+            resources.append({"kind": "river", "name": name.lower(),
+                              "tiles": tiles})
+    else:
+        for name, path in RIVERS.items():
+            tiles, seen = [], set()
+            for lon, lat in sample_path(path):
+                x, y = tile_of(lon, lat)
+                if (x, y) not in seen and is_land(x, y):
+                    seen.add((x, y))
+                    tiles.append([x, y])
+            resources.append({"kind": "river", "name": name, "tiles": tiles})
 
     # --- load centers ---------------------------------------------------
     def footprint_ok(x0, y0, n, taken):
+        """A metro footprint must be mostly buildable land and unclaimed.
+
+        Not ENTIRELY land: at 5 km a real coastal metro (Rome, Lisbon,
+        Copenhagen, Athens) legitimately spans water, and demanding a solid
+        square left them homeless."""
+        buildable = 0
         for yy in range(y0, y0 + n):
             for xx in range(x0, x0 + n):
                 if not (0 <= xx < WIDTH and 0 <= yy < HEIGHT):
                     return False
-                if grid[yy][xx] not in ("p", "h", "c"):
-                    return False
                 if (xx, yy) in taken:
                     return False
-        return True
+                if grid[yy][xx] in ("p", "h", "c"):
+                    buildable += 1
+        return buildable >= int(0.7 * n * n)
 
     centers = []
     taken: set[tuple[int, int]] = set()
@@ -543,7 +633,8 @@ def build() -> dict:
         cx, cy = tile_of(lon, lat)
         x0, y0 = cx - n // 2, cy - n // 2
         placed = None
-        for r in range(0, 5):
+        # the search radius is a DISTANCE (~150 km), not a tile count
+        for r in range(0, max(4, int(round(150.0 / TILE_KM)))):
             candidates = sorted(
                 ((x0 + dx, y0 + dy) for dx in range(-r, r + 1)
                  for dy in range(-r, r + 1)),
@@ -560,7 +651,8 @@ def build() -> dict:
         px, py = placed
         if (px, py) != (x0, y0):
             shifts.append((cid, abs(px - x0) + abs(py - y0)))
-        tiles = [[px + dx, py + dy] for dy in range(n) for dx in range(n)]
+        tiles = [[px + dx, py + dy] for dy in range(n) for dx in range(n)
+                 if grid[py + dy][px + dx] in ("p", "h", "c")]
         taken.update((t[0], t[1]) for t in tiles)
         centers.append({
             "id": cid, "name": name, "tiles": tiles,
@@ -605,7 +697,7 @@ def render_preview(doc: dict) -> str:
 def main() -> None:
     doc, shifts = build()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "europe_v2.json").write_text(json.dumps(doc, indent=1) + "\n")
+    (OUT_DIR / "europe_v3.json").write_text(json.dumps(doc, indent=1) + "\n")
     PREVIEW.write_text(render_preview(doc))
     counts: dict[str, int] = {}
     for row in doc["terrain_rows"]:
@@ -614,7 +706,7 @@ def main() -> None:
     print("tile counts:", dict(sorted(counts.items())))
     if shifts:
         print("shifted load centers:", shifts)
-    print(f"wrote {OUT_DIR / 'europe_v2.json'} and {PREVIEW}")
+    print(f"wrote {OUT_DIR / 'europe_v3.json'} and {PREVIEW}")
 
 
 if __name__ == "__main__":

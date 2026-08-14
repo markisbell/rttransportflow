@@ -8,3 +8,4 @@ __pycache__/
 build/
 dist/
 data/recordings/
+tools/map_authoring/ne_cache/
