@@ -105,6 +105,14 @@ def _natural_earth_land() -> list[list[bool]] | None:
     cache is missing and the download is unavailable."""
     global _NE_LAND_USED, _NE_RANGES, _NE_RIVERS
     try:
+        # the tool's own directory is not on sys.path when quantize is
+        # imported from elsewhere (pytest does exactly that) — without this
+        # the generator silently fell back to the hand-drawn polygons and
+        # the byte-identical pin compared two DIFFERENT maps
+        import sys
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
         import natural_earth as ne
     except ImportError:
         return None

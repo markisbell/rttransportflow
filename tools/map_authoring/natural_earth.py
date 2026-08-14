@@ -22,6 +22,7 @@ quantize.py, which passes its own tile_of() in.
 from __future__ import annotations
 
 import json
+import unicodedata
 import urllib.request
 from pathlib import Path
 from typing import Callable, Iterable
@@ -235,7 +236,9 @@ def river_tiles(bbox: tuple[float, float, float, float],
         rank = props.get("scalerank")
         if rank is None or rank > max_scalerank:
             continue
-        name = props.get("name_en") or props.get("NAME") or props.get("name") or "river"
+        name = _canonical_name(props)
+        if not name:
+            continue
         for line in _lines(feature["geometry"]):
             previous: tuple[int, int] | None = None
             for lon, lat in line:
@@ -249,6 +252,23 @@ def river_tiles(bbox: tuple[float, float, float, float],
                 bucket.add(tile)
                 previous = tile
     return out
+
+
+## Natural Earth carries a river's name in several fields and several
+## languages, so one watercourse arrives as "Rhine", "Rhein" and a
+## mojibake'd "Rhne". Canonicalise to unaccented lowercase English and let
+## river_tiles() merge the segments, or the map grows three Rhines.
+_ALIASES = {"rhein": "rhine", "rhne": "rhone", "donau": "danube",
+            "rhein-": "rhine", "elba": "elbe", "wisla": "vistula"}
+
+
+def _canonical_name(props: dict) -> str:
+    raw = (props.get("name_en") or props.get("NAME_EN")
+           or props.get("name") or props.get("NAME") or "")
+    folded = unicodedata.normalize("NFKD", str(raw))
+    ascii_name = "".join(c for c in folded if not unicodedata.combining(c))
+    ascii_name = ascii_name.strip().lower()
+    return _ALIASES.get(ascii_name, ascii_name)
 
 
 def _walk(a: tuple[int, int], b: tuple[int, int]) -> Iterable[tuple[int, int]]:

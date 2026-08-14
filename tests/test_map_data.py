@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 import importlib.util
 import json
 from pathlib import Path
@@ -52,11 +54,15 @@ def terrain(doc: dict, x: int, y: int) -> str:
 
 def test_grid_shape_and_alphabet(doc) -> None:
     assert doc["version"] == 1
-    assert doc["tile_km"] == 50
-    assert doc["width"] == 96 and doc["height"] == 80
-    assert len(doc["terrain_rows"]) == 80
+    # ledger 38: 5 km grid. Asserted against the projection rather than a
+    # bare literal, so a future resolution change fails ONE pin, not five.
+    assert doc["tile_km"] == 5
+    assert doc["width"] * doc["tile_km"] == 4800  # same geographic span
+    assert doc["height"] * doc["tile_km"] == 4020
+    assert doc["width"] == 960 and doc["height"] == 804
+    assert len(doc["terrain_rows"]) == doc["height"]
     for row in doc["terrain_rows"]:
-        assert len(row) == 96
+        assert len(row) == doc["width"]
         assert set(row) <= set("Sscphm")
 
 
@@ -69,8 +75,11 @@ def test_all_load_centers_present_once(doc) -> None:
         assert seen[cid]["peak_mw_2025"] == peak, cid
         assert seen[cid]["season"] == season, cid
         assert seen[cid]["temp_coeff_pct_per_c"] > 0
-        n = 3 if peak >= 8000.0 else 2
-        assert len(seen[cid]["tiles"]) == n * n, cid
+        # Footprints are sized in KILOMETRES (ledger 38: 35 km core for a
+        # >= 8 GW metro, 20 km otherwise) and keep only their land tiles, so
+        # a coastal city legitimately has fewer.
+        n = int(round((35.0 if peak >= 8000.0 else 20.0) / doc["tile_km"]))
+        assert 0 < len(seen[cid]["tiles"]) <= n * n, cid
 
 
 def test_footprints_on_buildable_land_and_disjoint(doc) -> None:
@@ -100,7 +109,12 @@ def test_resources_terrain_constraints(doc) -> None:
             for x, y in res["tiles"]:
                 assert terrain(doc, x, y) in LAND, (kind, x, y)
 
-    assert "river" in kinds and len(kinds["river"]) == 7
+    # rivers come from Natural Earth now (ledger 38), so the count is
+    # whatever crosses the window — pin the ones the game leans on instead
+    assert "river" in kinds and len(kinds["river"]) >= 20
+    named = {str(r.get("name", "")).lower() for r in kinds["river"]}
+    for expected in ("rhine", "danube", "elbe", "rhone", "loire", "vistula"):
+        assert expected in named, expected
     solar_bands = [r for r in kinds["solar_resource"]]
     assert any(r.get("band_lat") == [35, 44] for r in solar_bands)
 
@@ -146,5 +160,16 @@ def test_geography_spot_checks(doc, quantize_module) -> None:
 
 
 def test_regeneration_is_byte_identical(doc, quantize_module) -> None:
+    """The shipped map must be exactly what the generator produces.
+
+    Compare DIGESTS, not the strings: the map is ~4 MB and pytest's
+    assertion rewriting tries to diff mismatching strings, which turned a
+    35 s test into a hang.
+    """
     regenerated, _shifts = quantize_module.build()
-    assert json.dumps(regenerated, indent=1) + "\n" == MAP_PATH.read_text()
+    fresh = json.dumps(regenerated, indent=1) + "\n"
+    fresh_digest = hashlib.sha256(fresh.encode()).hexdigest()
+    shipped_digest = hashlib.sha256(MAP_PATH.read_bytes()).hexdigest()
+    assert fresh_digest == shipped_digest, (
+        "regenerated map differs from the shipped one — rerun "
+        "tools/map_authoring/quantize.py and commit the result")
