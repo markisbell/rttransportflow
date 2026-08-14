@@ -98,9 +98,30 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		var mw: float = Demand.zone_mw(zone_id, t_days)
 		zone_need[zone_id] = mw
 		demand_now += mw
-	# fold in last block's flexibility loads (sample-and-hold, same pattern
-	# as the PF loss feedback) so the merit order generates for them and
-	# renewable curtailment leaves them room
+	var latest_devices: Dictionary = Orchestrator.latest().get("devices", {})
+	# Flexibility load, MEASURED rather than commanded (the commanded value
+	# is only the fallback before the first result). A battery told to charge
+	# at 250 MW draws nothing once it is full, and an electrolyzer that shed
+	# itself on low frequency draws nothing either — but the ledger carried
+	# the command, so the dispatcher generated for load that did not exist
+	# AND under-curtailed the wind that then had nowhere to go. On the
+	# calm_week island that was ~800 MW of phantom demand holding the grid at
+	# 50.72 Hz with FCR absorbing 1.5 GW. On the wire any negative injection
+	# is load, which covers both device kinds without a sign special case.
+	var measured_flex := 0.0
+	var saw_flex := false
+	for device: Dictionary in wire_devices:
+		if not (str(device.get("kind", "")) in
+				["battery", "grid_forming", "electrolyzer"]):
+			continue
+		var raw: Variant = (latest_devices.get(str(device.get("id", "")), {})
+			as Dictionary).get("p_mw")
+		if raw == null:
+			continue
+		saw_flex = true
+		measured_flex += maxf(-float(raw), 0.0)
+	if saw_flex:
+		_flex_load_mw = measured_flex
 	demand_now += _flex_load_mw
 	# HVDC terminals are engine-side power the zone ledger cannot see — the
 	# same blind spot `_flex_load_mw` covers for electrolyzers. The sending
@@ -112,11 +133,20 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	# transit it exists to unload. MEASURED terminal power is used, not the
 	# setpoint, so the DC path losses are counted by the engine exactly once
 	# and the link's net effect on the island is just those losses.
-	var latest_devices: Dictionary = Orchestrator.latest().get("devices", {})
-	for term_id: String in link_setpoints:
+	for device: Dictionary in wire_devices:
+		if str(device.get("kind", "")) != "hvdc":
+			continue
+		# BOTH terminals, from the registered devices — not from
+		# `link_setpoints`, which holds only the commanded end (the engine
+		# derives the other from the pair). Netting one end alone adds the
+		# sending draw and never credits the receiving injection, which is
+		# the additive behaviour this block exists to remove.
+		var term_id := str(device.get("id", ""))
 		var raw: Variant = (latest_devices.get(term_id, {}) as Dictionary).get("p_mw")
+		if raw == null:
+			continue  # no measurement yet — net nothing rather than guess
 		# p < 0 draws from its bus, p > 0 injects into it
-		var p: float = float(link_setpoints[term_id]) if raw == null else float(raw)
+		var p := float(raw)
 		var zone := str(home_zone.get(term_id, ""))
 		if zone_need.has(zone):
 			zone_need[zone] = float(zone_need[zone]) - p

@@ -116,7 +116,7 @@ func _renewables_heavy_build() -> void:
 	# excitation — 2.5× peak stepped ±1.5 GW per block and tripped the grid
 	# even on the NORMAL day (pre-aFRR small island, fork finding)
 	while placed_wind < peak * 1.6:
-		var site := DemoBuild.find_site(World, "wind_onshore", anchor, 10, avoid)
+		var site := DemoBuild.find_site(World, "wind_onshore", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
 		if site == Vector2i(-1, -1):
 			break
 		World.place_plant("wind_onshore", site)
@@ -131,7 +131,7 @@ func _renewables_heavy_build() -> void:
 	# stays inside FCR band + load damping (~150 MW here) — sized so the
 	# evening residual is ~80 MW: real scarcity pricing, sag, no collapse
 	while placed_gas < peak * 1.28:
-		var site := DemoBuild.find_site(World, "gas_ccgt", anchor, 10, avoid)
+		var site := DemoBuild.find_site(World, "gas_ccgt", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
 		if site == Vector2i(-1, -1):
 			break
 		var gas_pid := World.place_plant("gas_ccgt", site)
@@ -152,7 +152,7 @@ func _renewables_heavy_build() -> void:
 	# is exactly the storage role P7 ships (battery_response proves it).
 	var placed_bat := 0.0
 	while placed_bat < peak * 0.3:
-		var site := DemoBuild.find_site(World, "battery", anchor, 10, avoid)
+		var site := DemoBuild.find_site(World, "battery", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
 		if site == Vector2i(-1, -1):
 			break
 		World.place_plant("battery", site)

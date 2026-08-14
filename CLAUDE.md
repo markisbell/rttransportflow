@@ -348,6 +348,28 @@ docs/GAME_DESIGN.md.
     (cycling it every block wears the plant). The 3-city world committed
     everything, which is why this hid until the fleet grew.
 
+44. **The dispatcher's ledger is MEASURED, not commanded** (P9/P10,
+    2026-08-14): every engine-side power the zone ledger cannot see must be
+    folded back in from the last RESULT, never from the command that asked
+    for it. Two instances, found within an hour of each other:
+    - **Flexibility load**: a battery told to charge 250 MW draws nothing
+      once it is full, and an electrolyzer that shed itself on low frequency
+      draws nothing either — but `_flex_load_mw` carried the command, so the
+      dispatcher generated for load that did not exist AND under-curtailed
+      the wind that then had nowhere to go. The calm_week island sat at
+      **50.72 Hz** with FCR absorbing 1.5 GW; measured, it sits at 50.000 Hz
+      with FCR 0.
+    - **HVDC terminals** (found by the smoke-repair fork): neither end was
+      in the ledger at all, so an active bipole was ADDITIVE instead of a
+      substitution — the exporting metro's coal still covered the importing
+      metro's whole demand. An 800 MW link added ~1.1 GW of surplus
+      (+0.29 Hz) and relieved 72 MW of the AC transit it exists to unload.
+      Terminals now net against their home metro (devices get a home zone
+      too, not just plants), using measured power so the DC path losses are
+      counted by the engine exactly once.
+    On the wire any negative injection is load, which covers both device
+    kinds without a sign special case.
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
@@ -961,6 +983,44 @@ so generation lags a steep ramp by one block — open, tracked.
 
 **Next:** P10 — hardening, packaging, release.
 
+### P10 — Hardening, packaging, release (2026-08-14)
+
+**Built:** `game/export_presets.cfg` (Linux + Windows, gdUnit/tests excluded
+from the PCK) and `scripts/package_game.sh` — freezes the backend, exports
+the game, assembles the flat runtime layout (`data/` and
+`orchestration/sidecars.json` beside the executable, the frozen backend under
+`backend/`, sidecar config pointing at the binary rather than a venv) and
+then **plays the bundle it just built**; `model/app_paths.gd` (one helper for
+repo-relative reads); `smokes/soak.gd` (24 in-game hours: step budget,
+backend RSS, leaked processes); CI grown two jobs — `game-tests` (GdUnit +
+the fast smokes on a fetched Godot) and a test-gated `image` publish;
+release checklist in §8; README quickstart rewritten around the bundle.
+
+**Tests:** `SMOKE_SOAK {"ok":true}` — 96 blocks, 0 PF failures, RSS
+331.3 → 332.9 MB, step 3.50 s → 4.61 s (ratio 1.32, no drift), no leaked
+process. Packaging verified end to end: the 199 MB bundle boots its own
+frozen backend and runs `boot_and_day` to 80/80 converged, t_sim exactly
+7200 s, f ∈ [49.998, 50.036] — numerically identical to the same smoke from
+source.
+
+**Acceptance evidence:** `build/dist/rttransportflow-0.0.1-linux-x86_64.tar.gz`,
+self-contained, no Python required on the player's machine.
+
+**Discoveries:** (1) `globalize_path("res://").get_base_dir()` is correct in
+the editor and WRONG in an export (res:// is the PCK) — the packaged game
+booted to an empty world looking for `/data/grids/...`. Caught only because
+the packaging script plays the bundle instead of listing its files; that is
+the whole argument for the play step. (2) Measured speed on the continental
+world: ~1.9-2.1 s per 900 s block off-peak, ~4.9 s across the evening peak,
+so the game sustains ~180-450x real time rather than the 900x the top speed
+button requests — the orchestrator's skip-never-stall absorbs it. The number
+belongs in the log, not behind a loose threshold.
+
+**Deviations (deliberate):** the heavy smokes (campaign, soak, calm_week)
+stay local rather than in CI — minutes each, and CI is not where you want to
+discover them. Windows packaging is wired (preset + script branch) but only
+the Linux bundle is verified on this machine.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -1002,8 +1062,11 @@ Run in order; every step is a gate, not a suggestion.
 5. `scripts/package_game.sh linux` — assembles the bundle AND plays it
    (`boot_and_day` inside the bundle). A bundle that assembles but cannot
    boot its own backend is worthless, so the play step is the real gate.
-6. Soak: 24 in-game hours at max speed — budget held, memory flat, zero
-   leaked processes (`pgrep -f rttransportflow.main` empty afterwards).
+6. `--smoke=soak` — 24 in-game hours: step budget held, memory flat, zero
+   leaked processes. Reference: RSS 331 -> 333 MB, step 3.5 -> 4.6 s (no
+   drift). NEVER `pkill -f smoke=...` to clean up between runs: the pattern
+   matches your own shell and kills the session (cost several runs today).
+   Use `fuser -k <port>/tcp`, and give concurrent runs distinct offsets.
 7. Docs: README status + quickstart current; PHYSICS honesty section still
    true of the code; this file's §6 log carries the phase entry.
 8. Tag and publish only on explicit authorization (§3).

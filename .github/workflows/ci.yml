@@ -33,3 +33,71 @@ jobs:
           python -m venv .venv --system-site-packages
       - name: Freeze and smoke
         run: ./scripts/freeze_backend.sh
+
+  game-tests:
+    # GdUnit + the FAST smokes. The heavy ones (campaign_take_the_reins is
+    # 194 wire steps over a 142-plant continent, soak is 24 in-game hours)
+    # stay local: they are minutes each and CI is not where you discover
+    # them. `scenarios` needs no backend; the others spawn one, so the
+    # sidecar's `.venv/bin/python` has to exist here too.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: |
+          pip install -e ".[dev]"
+          python -m venv .venv --system-site-packages
+      - name: Fetch Godot
+        run: |
+          curl -sSL -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.7.1-stable_linux.x86_64
+          echo "GODOT_BIN=$PWD/Godot_v4.7.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Import project
+        # first headless open builds .godot/ (script class cache, imports);
+        # without it the first real run fails to resolve class_names
+        run: |
+          cd game
+          "$GODOT_BIN" --headless --import --path . || true
+      - name: GdUnit suites
+        run: |
+          cd game
+          bash addons/gdUnit4/runtest.sh -a tests
+      - name: Fast smokes
+        run: |
+          cd game
+          for s in scenarios boot_and_day trip_reaction island_cut; do
+            echo "::group::$s"
+            timeout 900 "$GODOT_BIN" --headless --path . -- --smoke=$s | tee "/tmp/$s.log"
+            grep -q '"ok":true' "/tmp/$s.log" || { echo "$s FAILED"; exit 1; }
+            echo "::endgroup::"
+          done
+
+  image:
+    # Test-gated container publish (ROADMAP P10). Only on main, only after
+    # the suites pass — an image that was never tested is worse than no
+    # image, because someone will run it.
+    needs: [test, game-tests]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
