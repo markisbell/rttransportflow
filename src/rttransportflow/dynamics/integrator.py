@@ -146,6 +146,7 @@ class Integrator:
         self.watch_specs: list[tuple[str, str, int]] = []
         self.queue = EventQueue()
         self._pending_topology_events: list[Event] = []
+        self._batch_was_alive: np.ndarray | None = None
         self.rings = {i: FineRing() for i in range(islands.n)}
         self._rocof_inst = np.zeros(islands.n)
         self.energy_in_mj = 0.0  # ∫(P_inj − P_load − P_loss) dt
@@ -166,6 +167,9 @@ class Integrator:
         RoCoF rebuilds within ~one ALERT sample). The energy-balance ledger
         restarts — the identity is only meaningful within one topology."""
         idx = np.array(parent_of_new, dtype=np.int64)
+        if self._batch_was_alive is not None:
+            # carry an in-flight event batch's alive-mask through the reshape
+            self._batch_was_alive = self._batch_was_alive[idx].copy()
         self.islands = islands
         self.rings = {i: FineRing() for i in range(islands.n)}
         self._rocof_inst = self._rocof_inst[idx].copy()
@@ -229,7 +233,11 @@ class Integrator:
         self.energy_load_mj += float(np.sum(p_load)) * dt_s
 
     def _apply_events(self, events: list[Event]) -> None:
-        was_alive = ~self.islands.blackout()
+        # A line event inside THIS batch can re-topologize mid-loop, so the
+        # alive-mask lives on the instance and `replace_islands` remaps it by
+        # parent island. (A raw comparison crashed on a 2->3 split; the 1->2
+        # case had been masked by numpy broadcasting.)
+        self._batch_was_alive = ~self.islands.blackout()
         for event in events:
             if event.kind == "trip":
                 try:
@@ -257,6 +265,10 @@ class Integrator:
         # a COLLAPSE disconnects everything: a newly-dead island loses its
         # load (w -> 0) so a later black start faces an unloaded system and
         # the game re-picks demand up in restore_load blocks (PHYSICS §2.7)
+        # An island BORN dead by a split counts as newly black too: the mask
+        # was remapped through the split, so it carries its parent's state.
+        was_alive = self._batch_was_alive
+        self._batch_was_alive = None
         newly_black = was_alive & self.islands.blackout()
         for island in np.nonzero(newly_black)[0]:
             self.islands.w[island] = 0.0

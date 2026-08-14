@@ -220,6 +220,36 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
         sim.integrator.queue.schedule(Event(max(at_us, sim.integrator.t_us + QUANTUM_US),
                                             kind, ev.get("element", ""), data))
 
+    # From here on, ANY engine exception is DATA (family never-crash rule):
+    # a raised step used to kill the WS handler while /health stayed green —
+    # the game then froze forever against a live-but-deaf backend.
+    try:
+        return _step_body(gb, body, t, dt_s, interrupt, notes, line_events, t0)
+    except Exception as exc:  # noqa: BLE001 — the loop must survive anything
+        import traceback
+        result = _r({
+            "t": t, "status": "failed", "solve_ms": 0.0,
+            "dt_done_s": 0.0, "t_sim_end": sim.integrator.t_us / US,
+            "mode": sim.integrator.mode,
+            "islands": {}, "trajectory": {"t_rel_s": [], "islands": {}, "watched": {}},
+            "pf": {"latest": {}, "window_extremes": {}},
+            "devices": {}, "zones": {}, "events": [],
+            "violations": [{"element": "engine", "kind": "exception",
+                            "severity": "critical",
+                            "value": f"{type(exc).__name__}: {exc}"}],
+            "summary": {"balance_err": 0.0,
+                        "traceback": traceback.format_exc()[-2000:]},
+        })
+        gb.last_t = t
+        gb.last_result = result
+        return result, None
+
+
+def _step_body(gb: GbState, body: dict, t: int, dt_s: float, interrupt: bool,
+               notes: list, line_events: list,
+               t0: float) -> tuple[dict | None, dict | None]:
+    sim = gb.sim
+
     # meters before, for per-step deltas
     e_before = sim.fleet.energy_mwh.copy()
     fuel_before = sim.fleet.fuel_mwh_th.copy()
@@ -400,8 +430,12 @@ async def step_ws(websocket: WebSocket) -> None:
             if gb is None:
                 await websocket.send_json({"error": "no_network"})
                 continue
-            async with gb.lock:
-                result, error = await asyncio.to_thread(_handle_step, gb, body)
+            try:
+                async with gb.lock:
+                    result, error = await asyncio.to_thread(_handle_step, gb, body)
+            except Exception as exc:  # noqa: BLE001 — a raise must not deafen the WS
+                result, error = None, {"error": "step_failed",
+                                       "detail": f"{type(exc).__name__}: {exc}"}
             await websocket.send_json(error if error is not None else result)
     except (WebSocketDisconnect, asyncio.CancelledError):
         pass

@@ -297,3 +297,51 @@ def test_snapshot_roundtrip_carries_device_state(client) -> None:
         ref["devices"]["cavern_north"]["h2_kg"]
     assert replay["devices"]["hvdc_suedlink_s"]["p_mw"] == \
         ref["devices"]["hvdc_suedlink_s"]["p_mw"]
+
+
+def test_successive_splits_reshape_the_island_set(client) -> None:
+    """A line event inside an event batch re-topologizes mid-batch. The
+    2 -> 3 reshape crashed the step path (the 1 -> 2 case survived only by
+    numpy broadcasting); a pocket born WITHOUT a source must read blackout
+    with its load disconnected (w = 0), not silently keep w = 1."""
+    _reset(client, reset_with_devices())
+    _step(client, 0, dt_s=30.0)
+
+    # 1 -> 2: copenhagen (wind + local CCGT) becomes its own island
+    r1 = _step(client, 1, dt_s=60.0, interrupt_on_event=False,
+               scheduled_events=[{"at_s_rel": 5.0, "kind": "line_trip",
+                                  "element": "berlin-copenhagen"}])
+    assert any(e["kind"] == "island_split" for e in r1["events"])
+    assert len(r1["islands"]) == 2
+
+    # 2 -> 3: warsaw (coal only) splits off as well — the batch that crashed
+    r2 = _step(client, 2, dt_s=60.0, interrupt_on_event=False,
+               scheduled_events=[{"at_s_rel": 5.0, "kind": "line_trip",
+                                  "element": "berlin-warsaw"}])
+    assert any(e["kind"] == "island_split" for e in r2["events"])
+    assert len(r2["islands"]) == 3
+    assert r2["status"] in ("converged", "degraded")  # never a 500
+
+    # every zone still resolves to SOME island's supplied fraction
+    for zone in ("paris", "copenhagen", "warsaw"):
+        assert r2["zones"][zone]["supplied"] is not None
+
+
+def test_island_born_without_a_source_blacks_out(client) -> None:
+    """A split pocket with no synchronous machine is dead on arrival: the
+    engine must disconnect its load (w = 0) and say so."""
+    _reset(client, reset_with_devices())
+    _step(client, 0, dt_s=30.0)
+    # kill copenhagen's only sync unit, THEN island it: wind alone (H = 0)
+    # cannot carry a pocket
+    _step(client, 1, dt_s=30.0, interrupt_on_event=False,
+          scheduled_events=[{"at_s_rel": 2.0, "kind": "trip",
+                             "element": "ccgt_copenhagen"}])
+    res = _step(client, 2, dt_s=60.0, interrupt_on_event=False,
+                scheduled_events=[{"at_s_rel": 5.0, "kind": "line_trip",
+                                   "element": "berlin-copenhagen"}])
+    dead = [i for i, island in res["islands"].items() if island["blackout"]]
+    assert dead, "the source-less pocket must read blackout"
+    for i in dead:
+        assert res["islands"][i]["w"] == 0.0  # load disconnected by the collapse
+    assert res["zones"]["copenhagen"]["supplied"] == 0.0
