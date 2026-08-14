@@ -16,7 +16,11 @@ extends RefCounted
 const SINUOSITY := 1.12
 const BUS_WARN := 120
 const BUS_REFUSE := 150
-const DEFAULT_PARALLEL := 2
+## Circuits per corridor. A 400 kV right-of-way carries four circuits in
+## practice (~2.5 GVA); two circuits (~1.26 GVA) cannot even evacuate a
+## single 1.6 GW nuclear unit, which is how the first 5 km build tripped
+## three lines at 165-222 % loading within 10 ms of registering.
+const DEFAULT_PARALLEL := 4
 const STEPS := 96
 
 const NEIGHBORS: Array[Vector2i] = [

@@ -87,6 +87,27 @@ static func tap_for(world: Node, tiles: Array, avoid: Dictionary = {}) -> Vector
 	return fallback
 
 
+## Up to four taps around a footprint, one per side where possible — the
+## routes into a metro must not all converge on one tile.
+static func taps_around(world: Node, tiles: Array,
+		avoid: Dictionary = {}) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for offset: Vector2i in GridTopology.NEIGHBORS:
+		for tile: Vector2i in tiles:
+			var n: Vector2i = tile + offset
+			if out.has(n) or avoid.has(n):
+				continue
+			if world.can_place_corridor(n) and world.plant_at(n) == "" \
+					and world.load_center_at(n) == "":
+				out.append(n)
+				break
+	if out.is_empty():
+		var single := tap_for(world, tiles, avoid)
+		if single != Vector2i(-1, -1):
+			out.append(single)
+	return out
+
+
 ## Pick a compact cluster: the seed city plus its 2 nearest neighbors
 ## (chaining alphabetically-distant capitals across seas is how a demo
 ## build times out — found the hard way on the real Europe map).
@@ -145,18 +166,47 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 				for dy in range(-ring, ring + 1):
 					avoid[tile + Vector2i(dx, dy)] = true
 
+	# TRUNK FIRST. Routing the inter-city line after the plants are down
+	# fails: a ring of plants around a metro walls its tap in, and the BFS
+	# has no way through (the 5 km grid made the ring thick enough to seal).
+	# On an empty map the trunk always routes, and every later spur simply
+	# stops at it.
+	var city_taps := {}  # lc_id -> Array[Vector2i]
+	for lc_id: String in ids:
+		city_taps[lc_id] = taps_around(world, world.load_centers[lc_id]["tiles"],
+			avoid)
+	var trunk_from := Vector2i(-1, -1)
+	for lc_id: String in ids:
+		var here: Array = city_taps[lc_id]
+		if here.is_empty():
+			continue
+		var entry: Vector2i = here[0]
+		world.place_corridor(entry)
+		if trunk_from != Vector2i(-1, -1):
+			var link := route(world, trunk_from, entry, false, avoid)
+			if link.is_empty():
+				push_warning("auto_build: trunk to %s unroutable" % lc_id)
+			for tile: Vector2i in link:
+				world.place_corridor(tile)
+		trunk_from = entry
+
 	var taps: Array[Vector2i] = []
 	for lc_id: String in ids:
 		var lc: Dictionary = world.load_centers[lc_id]
-		var lc_tap := tap_for(world, lc["tiles"], avoid)
-		if lc_tap == Vector2i(-1, -1):
+		# Feed a metro from SEVERAL sides. One tap means one spur carrying the
+		# city's whole supply — at 5 km tiles the ring search packs plants
+		# next to each other and that single branch hit 222 % loading.
+		var taps_here: Array = city_taps[lc_id]
+		if taps_here.is_empty():
 			continue
+		var lc_tap: Vector2i = taps_here[0]
 		var anchor: Vector2i = lc["tiles"][0]
 		# 1.35: the LIVE demand model's weather-driven peak runs above the
 		# map's static peak_mw — a 1.2 build blacked out at 10:00 (found by
 		# the dispatch_day DBG trace: 10.4 GW fleet, 11.5 GW forecast peak).
 		var need: float = lc["peak_mw"] * 1.35
 		var placed := 0.0
+		var placed_count := 0
 		# unroutable sites — retrying them loops forever; seeded with the
 		# avoid rings: a site inside a foreign ring can never route out, and
 		# each doomed BFS floods the whole map (385 of them stalled buildcheck)
@@ -199,6 +249,8 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 			var path: Array[Vector2i] = []
 			if plant_tap != Vector2i(-1, -1):
 				path = route(world, plant_tap, lc_tap, true, avoid)
+			# rotate the target tap so spurs arrive on different sides
+			lc_tap = taps_here[placed_count % taps_here.size()]
 			if path.is_empty():
 				# an unconnectable plant is 100 % waste: remove it and let the
 				# ladder try elsewhere (silent orphans starved dispatch_day)
@@ -208,14 +260,9 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 					% [kind, site, lc_id])
 				continue
 			placed += world.PLANT_SIZES[kind]
+			placed_count += 1
 			for tile: Vector2i in path:
 				world.place_corridor(tile)
 		taps.append(lc_tap)
 
-	for i in range(taps.size() - 1):  # chain the cluster
-		var link := route(world, taps[i], taps[i + 1], false, avoid)
-		if link.is_empty():
-			push_warning("auto_build: cluster chain %d->%d unroutable" % [i, i + 1])
-		for tile: Vector2i in link:
-			world.place_corridor(tile)
-	return not taps.is_empty()
+	return not taps.is_empty()  # the trunk was laid before any plant landed
