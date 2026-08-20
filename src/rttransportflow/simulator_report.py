@@ -110,7 +110,7 @@ class ReportingMixin:
         n_islands = island.n
         s_online_arr = self.fleet.s_online_per_island(n_islands)
         agc_up, _agc_dn = self.fleet.agc_headroom(n_islands)
-        fcr_arr = getattr(self.fleet, "fcr_used", None)
+        fcr_arr = self.fleet.fcr_used  # a declared field since Stage 6
         return {str(i): {
             "f_hz": float(res.f_end[i]) if i < len(res.f_end) else float(island.f[i]),
             "rocof_hz_s": float(self.integrator.rings[i].rocof_window(self.integrator.t_us)),
@@ -122,8 +122,7 @@ class ReportingMixin:
             "h_sys_s": (float(island.e_k[i] / s_online_arr[i])
                         if s_online_arr[i] > 0 else 0.0),
             "blackout": bool(island.blackout()[i]),
-            "fcr_used_mw": (float(fcr_arr[i])
-                            if fcr_arr is not None and i < len(fcr_arr) else 0.0),
+            "fcr_used_mw": (float(fcr_arr[i]) if i < len(fcr_arr) else 0.0),
             "afrr_used_mw": (float(self.integrator.agc_mw[i])
                              if i < len(self.integrator.agc_mw) else 0.0),
             "afrr_headroom_up_mw": float(agc_up[i]) if i < len(agc_up) else 0.0,

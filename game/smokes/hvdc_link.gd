@@ -151,8 +151,17 @@ func run() -> void:
 	check("terminals_dead", numf(after.get("devices", {}).get(conv_h, {}), "p_mw", 1.0) == 0.0
 		and numf(after.get("devices", {}).get(conv_b, {}), "p_mw", 1.0) == 0.0)
 	check("flows_redistribute_back", after_loading - relieved_loading > 1.0)
+	# ledger 28, measured AMBIENT-RELATIVE (P7 discovery 5: small islands
+	# idle off-nominal, and the corrected-projection demand parks this
+	# fixture's island ABOVE 50 Hz — the old absolute [49.5, 50.5] window
+	# tested the operating point, not the trip): an 800 MW infeed loss
+	# would swing this island by well over a Hz (battery_response run A
+	# craters 1.25 Hz on ~370 MW); the embedded pair's COI cancellation
+	# must keep the trip window's swing around its pre-trip point tight.
+	var f_pre := numf(island_r, "f_hz", 50.0)
 	check("trip_is_not_an_infeed_loss",
-		f_min_trip > 49.5 and numf(island_t, "f_max", 50.0) < 50.5)
+		absf(f_min_trip - f_pre) < 0.4
+		and absf(numf(island_t, "f_max", 50.0) - f_pre) < 0.4)
 	check("no_cascade", stray_trips == 0
 		and numf(island_a, "f_min", 0.0) > 49.0
 		and not bool(island_a.get("blackout", false)))

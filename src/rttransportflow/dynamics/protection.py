@@ -233,19 +233,24 @@ class DefensePlan:
 
         return trips, events
 
+    # (attribute, island axis) — every per-island latch/timer the plan owns,
+    # gathered by remap(). ADD NEW STATE HERE, never as a hand line in
+    # remap: a forgotten site is the ledger-37 bug shape.
+    PER_ISLAND = (
+        ("stage_armed", 1), ("stage_timer_us", 1),
+        ("ely_latched", 0), ("pump_latched", 0),
+        ("rocof_armed", 1), ("pole_armed", 0),
+        ("restore_target_w", 0), ("f_ok_since_us", 0),
+    )
+
     def remap(self, parent_of_new: list[int]) -> None:
         """Re-shape all per-island latches after an island split/merge: each
         NEW island inherits its parent's defense state (COI approximation —
         same rule as the frequency itself)."""
         idx = np.array(parent_of_new, dtype=np.int64)
-        self.stage_armed = self.stage_armed[:, idx].copy()
-        self.stage_timer_us = self.stage_timer_us[:, idx].copy()
-        self.ely_latched = self.ely_latched[idx].copy()
-        self.pump_latched = self.pump_latched[idx].copy()
-        self.rocof_armed = self.rocof_armed[:, idx].copy()
-        self.pole_armed = self.pole_armed[idx].copy()
-        self.restore_target_w = self.restore_target_w[idx].copy()
-        self.f_ok_since_us = self.f_ok_since_us[idx].copy()
+        for name, axis in self.PER_ISLAND:
+            arr = getattr(self, name)
+            setattr(self, name, np.take(arr, idx, axis=axis))
 
     def state_dict(self) -> dict:
         return {

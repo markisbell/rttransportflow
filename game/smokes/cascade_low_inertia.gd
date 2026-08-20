@@ -54,7 +54,14 @@ func run() -> void:
 
 	check("both_trips_seen_high", high["trips"] >= 2)
 	check("both_trips_seen_low", low["trips"] >= 2)
-	check("low_rocof_multiple", low["rocof_max"] >= high["rocof_max"] * 1.5)
+	# >=1.3x, not 1.5: the WINDOWED (500 ms mean) RoCoF dilutes the exact
+	# 2x E_k contrast as the fast fleet's arrest bites inside the window —
+	# the old 1.5 threshold measured 1.52 by luck of the fixture's demand,
+	# and the corrected projection lands it at ~1.38. The INSTANT-RoCoF
+	# physics ratio is pinned backend-side (test_units_comparative, rel
+	# 3 %); this check keeps the teaching claim: B's RoCoF is a clear
+	# multiple of A's on the same script.
+	check("low_rocof_multiple", low["rocof_max"] >= high["rocof_max"] * 1.3)
 	check("low_nadir_deeper", low["f_min"] < high["f_min"])
 	# UFLS saves the low-inertia island at the cost of shed load — while the
 	# high-inertia fleet rides the same script without shedding anything

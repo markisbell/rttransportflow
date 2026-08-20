@@ -52,6 +52,9 @@ class HVDCLinks:
     term_q: np.ndarray = field(default_factory=lambda: np.zeros(0))  # PF only [MVAr]
 
     _row_of: dict = field(default_factory=dict, repr=False)
+    # per-dt exact-exponential coefficient memo (ledger 21's cached-coeff
+    # rule had an undocumented exception here: the same exp() on every tick)
+    _coeff: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self._row_of = {tid: i for i, tid in enumerate(self.term_ids)}
@@ -92,7 +95,14 @@ class HVDCLinks:
         inj = np.zeros(n_islands)
         if self.n == 0:
             return inj
-        a = 1.0 - np.exp(-(dt_us / US) / self.t_lag_s)
+        a = self._coeff.get(dt_us)
+        if a is None:
+            # memoized, not changed: the identical expression, computed once
+            # per distinct dt — bit-equal by construction
+            a = 1.0 - np.exp(-(dt_us / US) / self.t_lag_s)
+            if len(self._coeff) > 64:
+                self._coeff.clear()
+            self._coeff[dt_us] = a
         self.p += a * (self.p_set - self.p)
         self.p = np.where(self.online, np.clip(self.p, -self.p_max, self.p_max), 0.0)
         delivered = self.p * (1.0 - self.loss_frac)

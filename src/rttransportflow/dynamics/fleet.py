@@ -95,6 +95,19 @@ def _soft_db(df: np.ndarray, db: np.ndarray) -> np.ndarray:
     return np.sign(df) * np.maximum(np.abs(df) - db, 0.0)
 
 
+def storage_caps(soc: np.ndarray, lo: np.ndarray, hi: np.ndarray,
+                 eta_ch: np.ndarray, eta_dis: np.ndarray,
+                 dt_s: float) -> tuple[np.ndarray, np.ndarray]:
+    """(charge_cap, discharge_cap) in MW over this tick — THE storage energy
+    clamp, shared by the battery and PHS blocks (three hand-rolled copies
+    had drifted in guard style; the eta guards are float-identical for
+    every catalog efficiency ≥ 1e-9, i.e. all of them)."""
+    scale = 3600.0 / max(dt_s, 1e-9)
+    ch_cap = np.maximum(hi - soc, 0.0) / np.maximum(eta_ch, 1e-9) * scale
+    dis_cap = np.maximum(soc - lo, 0.0) * eta_dis * scale
+    return ch_cap, dis_cap
+
+
 @dataclass
 class Fleet:
     # --- synchronous machines ---
@@ -220,7 +233,9 @@ class Fleet:
     ely_store_row: np.ndarray = None
     h2: object = None  # H2Stores (attach_h2)
     hvdc: object = None  # HVDCLinks (attach_hvdc)
-    notices: list = None  # (kind, device_id) engine notices, polled per tick
+    # (kind, device_id) engine notices, polled per tick (a REAL field now —
+    # it was lazily created by attach_h2/attach_hvdc)
+    notices: list = field(default_factory=list)
     # aFRR / AGC (PHYSICS §2.8, ledger 19): contracted secondary band and
     # the participation weight (default ∝ band, `agc_participation` overrides)
     afrr_band: np.ndarray = None
@@ -235,6 +250,10 @@ class Fleet:
     inv_row: dict = None
     bat_row: dict = None
     ely_row: dict = None
+    # per-island |FCR/FFR| deployed, rebuilt every tick (it was an
+    # UNDECLARED attribute created mid-tick — state with no home; the API
+    # needed a getattr guard to read it)
+    fcr_used: np.ndarray = None
 
     _coeff_cache: dict[int, dict[str, np.ndarray]] = field(default_factory=dict, repr=False)
 
@@ -418,7 +437,6 @@ class Fleet:
         self.h2_store_row = np.full(self.n_sync, -1, dtype=np.int64)
         self.h2_starved = np.zeros(self.n_sync, dtype=bool)
         self.ely_store_row = np.full(len(self.ely_ids), -1, dtype=np.int64)
-        self.notices = []
         for pid, store_id in sync_store_ids.items():
             row = self.sync_row[pid]
             self.fuel_is_h2[row] = True
@@ -430,8 +448,6 @@ class Fleet:
         """Wire the HVDC block (HVDCLinks); its per-island injection joins
         p_inv each tick. H = 0 — never enters e_k."""
         self.hvdc = links
-        if self.notices is None:
-            self.notices = []
 
     # ------------------------------------------------------------------
 
@@ -494,11 +510,10 @@ class Fleet:
                                       self.ramp_mw_s * dt_s)
             self.hy_pump_p = np.where(online, self.hy_pump_p, 0.0)
             has_res = self.hy_e_mwh > 0.0
-            ch_cap = np.where(
-                has_res,
-                (self.hy_e_mwh - self.hy_soc_mwh) / np.maximum(self.hy_eta_ch, 1e-9)
-                * (3600.0 / max(dt_s, 1e-9)),
-                np.inf)
+            hy_ch_cap, _hy_dis = storage_caps(
+                self.hy_soc_mwh, np.zeros_like(self.hy_soc_mwh),
+                self.hy_e_mwh, self.hy_eta_ch, self.hy_eta_dis, dt_s)
+            ch_cap = np.where(has_res, hy_ch_cap, np.inf)
             self.hy_pump_p = np.minimum(self.hy_pump_p, np.maximum(ch_cap, 0.0))
 
         # unified chain (steam / ccgt / ocgt)
@@ -525,7 +540,9 @@ class Fleet:
         # PHS reservoir: pumped inflow, turbine outflow, hard energy bounds
         res_rows = self.is_hydro & (self.hy_e_mwh > 0.0)
         if res_rows.any():
-            dis_cap = self.hy_soc_mwh * self.hy_eta_dis * (3600.0 / max(dt_s, 1e-9))
+            _hy_ch, dis_cap = storage_caps(
+                self.hy_soc_mwh, np.zeros_like(self.hy_soc_mwh),
+                self.hy_e_mwh, self.hy_eta_ch, self.hy_eta_dis, dt_s)
             y = np.where(res_rows, np.minimum(y, np.maximum(dis_cap, 0.0)), y)
             dt_h = dt_s / 3600.0
             self.hy_soc_mwh += np.where(
@@ -615,10 +632,9 @@ class Fleet:
             p_cmd = np.clip(p_cmd, -self.bat_p_max, self.bat_p_max)
             self.bat_p += (1.0 - cf["bt"]) * (p_cmd - self.bat_p)
             # energy-bound clamps over this tick
-            dis_cap = np.maximum(self.bat_soc - self.bat_soc_min, 0.0) \
-                * self.bat_eta_dis * (3600.0 / max(dt_s, 1e-9))
-            ch_cap = np.maximum(self.bat_soc_max - self.bat_soc, 0.0) \
-                / self.bat_eta_ch * (3600.0 / max(dt_s, 1e-9))
+            ch_cap, dis_cap = storage_caps(self.bat_soc, self.bat_soc_min,
+                                           self.bat_soc_max, self.bat_eta_ch,
+                                           self.bat_eta_dis, dt_s)
             clamped = (self.bat_p > dis_cap) | (self.bat_p < -ch_cap)
             self.bat_p = np.clip(self.bat_p, -ch_cap, dis_cap)
             self.bat_p = np.where(self.bat_online, self.bat_p, 0.0)
@@ -927,6 +943,7 @@ def make_fleet(
         ely_online=np.ones(len(electrolyzers), dtype=bool),
         ely_energy_mwh=np.zeros(len(electrolyzers)),
     )
+    fleet.fcr_used = np.zeros(1)
     fleet.sync_row = {pid: i for i, pid in enumerate(fleet.ids)}
     fleet.inv_row = {pid: i for i, pid in enumerate(fleet.inv_ids)}
     fleet.bat_row = {pid: i for i, pid in enumerate(fleet.bat_ids)}

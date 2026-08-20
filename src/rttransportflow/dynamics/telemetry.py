@@ -37,20 +37,51 @@ class FineRing:
             np.concatenate([self.f[cut:], self.f[:cut]]),
         )
 
+    def _search(self, x: int, side: str) -> int:
+        """searchsorted over the chronologically ordered ring WITHOUT
+        materializing it. The wrapped ring used to pay two full-array
+        concatenations per rocof_window call — twice per boundary on the
+        ALERT hot path (the permanent-ALERT islands the P8 log keeps
+        'slow-ish by design' paid it most). The two segments are each
+        sorted and older-max < newer-min (timestamps are monotonic), so a
+        two-segment search returns the identical index."""
+        if self.n <= self.capacity:
+            return int(np.searchsorted(self.t_us[: self.n], x, side=side))
+        cut = self.n % self.capacity
+        older = self.t_us[cut:]
+        pos = int(np.searchsorted(older, x, side=side))
+        if pos < len(older):
+            return pos
+        return len(older) + int(np.searchsorted(self.t_us[:cut], x, side=side))
+
+    def _at(self, i: int) -> tuple[int, float]:
+        """(t, f) at ordered index i — same element _ordered()[i] would give."""
+        if self.n <= self.capacity:
+            return int(self.t_us[i]), float(self.f[i])
+        j = (self.n % self.capacity + i) % self.capacity
+        return int(self.t_us[j]), float(self.f[j])
+
     def rocof_window(self, t_us: int, window_us: int = 500_000) -> float:
-        """Windowed mean RoCoF [Hz/s]: (f(t) - f(t-w)) / actual span."""
-        t, f = self._ordered()
-        if len(t) < 2:
+        """Windowed mean RoCoF [Hz/s]: (f(t) - f(t-w)) / actual span.
+        Value-identical to the concatenating version (same indices, same
+        two samples, same arithmetic on IEEE doubles); only the ordered-copy
+        allocation is gone. NOTE: the twin computation at the advance
+        loop's two call sites is NOT deduplicable — _sample() appends
+        between them on every sample boundary, so a cached value would
+        silently move the wire rocof_max (audited; do not 'fix')."""
+        if min(self.n, self.capacity) < 2:
             return 0.0
-        i_now = int(np.searchsorted(t, t_us, side="right")) - 1
+        i_now = self._search(t_us, "right") - 1
         if i_now <= 0:
             return 0.0
-        i_then = int(np.searchsorted(t, t_us - window_us, side="left"))
+        i_then = self._search(t_us - window_us, "left")
         i_then = min(i_then, i_now - 1)
-        span_us = t[i_now] - t[i_then]
+        t_now, f_now = self._at(i_now)
+        t_then, f_then = self._at(i_then)
+        span_us = t_now - t_then
         if span_us <= 0:
             return 0.0
-        return float((f[i_now] - f[i_then]) / (span_us / US))
+        return float((f_now - f_then) / (span_us / US))
 
 
 class TrajectoryBuffer:

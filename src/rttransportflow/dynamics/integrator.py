@@ -133,6 +133,14 @@ class AdvanceResult:
 
 
 class Integrator:
+    # 1-D per-island state gathered by parent on every island reshape.
+    # Ledger 37 is the bug shape this prevents: a forgotten hand-remap
+    # compiles, runs fine on single-island worlds, and corrupts on the
+    # first mid-batch split. DECLARE new arrays here — replace_islands
+    # gathers everything listed; only genuinely special state (fresh
+    # FineRings, the energy-ledger restart, f_start) is remapped by hand.
+    PER_ISLAND = ("_rocof_inst", "agc_mw", "agc_int")
+
     def __init__(
         self,
         fleet: Fleet,
@@ -202,11 +210,11 @@ class Integrator:
             self._batch_was_alive = self._batch_was_alive[idx].copy()
         self.islands = islands
         self.rings = {i: FineRing() for i in range(islands.n)}
-        self._rocof_inst = self._rocof_inst[idx].copy()
-        # control areas re-form with the islands: inherit the parent's
-        # secondary state rather than kicking every unit at the split
-        self.agc_mw = self.agc_mw[idx].copy()
-        self.agc_int = self.agc_int[idx].copy()
+        # declared per-island state: control areas re-form with the islands
+        # (inherit the parent's secondary state rather than kicking every
+        # unit at the split)
+        for name in self.PER_ISLAND:
+            setattr(self, name, getattr(self, name)[idx].copy())
         self.f_start = islands.f.copy()
         self.energy_in_mj = 0.0
         self.energy_load_mj = 0.0
