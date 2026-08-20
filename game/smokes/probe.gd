@@ -1,7 +1,19 @@
 extends SmokeBase
+## Diagnostic probe: auto-build the demo world and print per-step telemetry
+## (wall time, frequency, reserves, gen-vs-demand ledger, events, devices).
+## --steps=N --dt=S select the cadence: the defaults probe 6 dispatch blocks
+## at 900 s; --steps=60 --dt=6 is the old fine-grained probe6 variant.
 const TAG := "SMOKE_PROBE"
 
+
 func run() -> void:
+	var steps := 6
+	var dt := 900.0
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--steps="):
+			steps = int(arg.trim_prefix("--steps="))
+		elif arg.begins_with("--dt="):
+			dt = float(arg.trim_prefix("--dt="))
 	if not await gridco_boot(TAG):
 		return
 	var t0 := Time.get_ticks_msec()
@@ -12,9 +24,9 @@ func run() -> void:
 	var status: Array = await BuildSession.build_status
 	print("PROBE register_ms=", Time.get_ticks_msec() - t0, " ok=", status[0], " msg=", status[1])
 	Orchestrator.stop()
-	for i in range(6):
+	for i in range(steps):
 		t0 = Time.get_ticks_msec()
-		var result: Dictionary = await Orchestrator.step_once(900.0)
+		var result: Dictionary = await Orchestrator.step_once(dt)
 		var gen_sum := 0.0
 		for pid: String in result.get("devices", {}):
 			gen_sum += numf(result["devices"][pid], "p_mw", 0.0)

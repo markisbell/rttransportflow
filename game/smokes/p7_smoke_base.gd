@@ -38,14 +38,14 @@ func p7_step(dt_s: float, tag: String = "") -> Dictionary:
 
 ## Step ONE 15-min dispatch block as three 300 s slices.
 ##
-## The dispatcher ramps a new schedule in over Dispatch.RAMP_S (300 s) and the
-## blend is sampled at the step's START time — so a single dt = 900 s step
-## always samples progress 0 and commands the PREVIOUS block's schedule for
-## the whole block. On a declining night curve that leaves the island a few
-## hundred MW long: it parks around 50.3 Hz, aFRR saturates, and a trip test
-## on top of it measures nothing (battery_response reported a "nadir" of
-## 50.27 Hz). Slicing lets the ramp actually run, which is also what the game
-## does — it steps at 0.1-6 s, never a block at a time.
+## The old start-sampling bug (a dt = 900 s step commanded the PREVIOUS
+## block's schedule) is FIXED — the ramp blend now samples at the step
+## midpoint (P9). Slicing is still required for a different reason:
+## zone_demand is sample-and-hold per wire step, so a single 900 s step
+## lands a whole demand ramp as one instantaneous multi-GW jump the fleet
+## can only slew after (the 49.60 Hz morning-ramp artifact in the P9 log).
+## Slicing is also simply what the game does — it steps at 0.1-6 s, never
+## a block at a time.
 func p7_block(tag: String = "") -> Dictionary:
 	var result: Dictionary = {}
 	for _i in range(3):

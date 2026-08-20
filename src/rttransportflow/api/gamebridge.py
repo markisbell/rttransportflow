@@ -205,7 +205,10 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
     for zone_id, zcmd in (body.get("zone_commands") or {}).items():
         restore = zcmd.get("restore_load")
         if restore is not None:
-            # zones map onto island 0 until the split/merge layer lands
+            # restore_load targets island 0; multi-island targeting is NOT
+            # wired — resolve via _zone_bus/_bus_island (as _step_body's zone
+            # report does) when a black-start flow needs it. Masked today
+            # because the black-start smokes restore single-island worlds.
             sim.integrator.defense.request_restore(0, float(restore))
     notes += sim.set_watch(body.get("watch", []))
     line_events = sim.apply_line_commands(body.get("line_commands"))

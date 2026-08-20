@@ -32,12 +32,15 @@ Authority: map/tiles, load centers, game loop, economy rules, campaign, UI
 - Godot `TileMap` with the WorldModel pattern (infrastruct ADR-002): pure Vector2i-keyed
   dictionaries as source of truth, versioned JSON envelope, views only render.
   1 tile = 1.0 world unit.
-- The map is **hand-authored data**, not GIS: `data/map/europe_v1.json`
-  (§1.7), produced by a small authoring script that quantizes a public-domain
-  Europe raster, then hand-corrected. Do **not** import OSM geometry into the
-  game map for v1 (an OSM-derived *scenario seed* for the starting grid is a
-  P10 stretch goal; ODbL data is fine to derive from — keep gridedit's AGPL
-  *code* out).
+- The map is **generated from public-domain Natural Earth vector data**:
+  `data/map/europe_v3.json` (§1.7), 960×804 tiles at 5 km, produced by
+  `tools/map_authoring/natural_earth.py` (ledger 38). The licensing rule
+  moved with the source: NE is explicitly public domain, whereas OSM is ODbL
+  and a shipped tile grid IS a derived database — so do **not** import OSM
+  geometry into the game map (an OSM-derived *scenario seed* for the
+  starting grid remains a stretch goal; keep gridedit's AGPL *code* out
+  either way). The superseded hand-authored 96×80/50 km grids are archived
+  under `tools/map_authoring/archive/`.
 
 ### 1.2 Terrain kinds & resource overlays
 
@@ -153,11 +156,11 @@ Mountain tiles ×1.6 on AC cost. Loading thresholds inherit the family enum
 | Transformer bay 400/220, 700 MVA | 25 M€ | ≤ 3 per bus; loading reported like lines |
 | Connection bay (plant / load-center feeder) | 5 M€ | auto-billed when a corridor touches a footprint |
 
-### 1.7 Map authoring format (`data/map/europe_v1.json`)
+### 1.7 Map authoring format (`data/map/europe_v3.json`)
 
 ```json
 {
-  "version": 1, "tile_km": 50, "width": 96, "height": 80,
+  "version": 1, "tile_km": 5, "width": 960, "height": 804,
   "terrain_rows": ["SSSSssccpp...", "..."],
   "resources": [
     {"kind": "coal_basin", "tiles": [[41,33],[42,33]]},
@@ -585,8 +588,8 @@ mandatory in `model/`.
 
 ## 8. Data authoring deliverables
 
-1. `data/map/europe_v1.json` — §1.7, via `tools/map_authoring/quantize.py` +
-   hand fixes.
+1. `data/map/europe_v3.json` — §1.7, via `tools/map_authoring/natural_earth.py`
+   (v1/v2 predecessors archived in `tools/map_authoring/archive/`).
 2. `data/load_centers/centers_v1.json` — §2.1 + footprints + temp
    coefficients.
 3. `data/profiles/demand_classes.json` — §2.2 shapes + monthly factors.

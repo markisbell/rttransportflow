@@ -14,9 +14,7 @@ const SMOKES := {
 	"economy": "res://smokes/economy.gd",
 	"calm_week": "res://smokes/calm_week.gd",
 	"probe": "res://smokes/probe.gd",
-	"probe6": "res://smokes/probe6.gd",
 	"buildcheck": "res://smokes/buildcheck.gd",
-	"calm_probe": "res://smokes/calm_probe.gd",
 	"hydrogen_chain": "res://smokes/hydrogen_chain.gd",
 	"battery_response": "res://smokes/battery_response.gd",
 	"hvdc_link": "res://smokes/hvdc_link.gd",
@@ -27,7 +25,6 @@ const SMOKES := {
 	"author_start": "res://smokes/author_start.gd",
 	"campaign_take_the_reins": "res://smokes/campaign_take_the_reins.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
-	"start_check": "res://smokes/start_check.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",
 	"soak": "res://smokes/soak.gd",
 	"scenarios": "res://smokes/scenarios.gd",
@@ -130,40 +127,33 @@ func _boot_game(campaign: bool = false) -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
-	if campaign:
-		_boot_campaign()
-	_boot_async()
+	_boot_async(campaign)
 
 
-func _load_start_world() -> void:
-	if not World.plants.is_empty() or not World.corridors.is_empty():
-		return
-	var repo := AppPaths.root()
-	var path := repo + "/data/campaign/start_2025.json"
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) \
-		if FileAccess.file_exists(path) else null
-	if parsed is Dictionary and World.restore(parsed):
-		BuildSession.rebuild_now()
-		return
-	# no authored start state: fall back to the scripted demo build so the
-	# map is never empty on first run
-	DemoBuild.auto_build(World)
+## Boot the opening world from the ONE authored start state
+## (Campaign.START_STATE_PATH — previously duplicated as a second literal
+## path here); `--campaign` additionally arms the milestone tracker
+## (sandbox — the default — leaves everything open, §5.4). Registration is
+## EXPLICIT for both modes: the campaign world used to be registered by a
+## debounce side effect racing sidecar startup.
+func _restore_start_world(arm_campaign: bool) -> void:
+	if World.plants.is_empty() and World.corridors.is_empty():
+		var path := AppPaths.root() + "/" + Campaign.START_STATE_PATH
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) \
+			if FileAccess.file_exists(path) else null
+		if not (parsed is Dictionary and World.restore(parsed)):
+			if arm_campaign:
+				push_error("campaign start state missing/invalid — sandbox boot")
+				arm_campaign = false
+			# no authored start state: fall back to the scripted demo build
+			# so the map is never empty on first run
+			DemoBuild.auto_build(World)
 	BuildSession.rebuild_now()
-
-
-## `--campaign` boots the inherited-2025 world and arms the milestone
-## tracker (sandbox — the default — leaves everything open, §5.4).
-func _boot_campaign() -> void:
-	var repo := AppPaths.root()
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
-		repo + "/" + Campaign.START_STATE_PATH))
-	if parsed is Dictionary and World.restore(parsed):
+	if arm_campaign:
 		Campaign.start_campaign()
-	else:
-		push_error("campaign start state missing/invalid — sandbox boot")
 
 
-func _boot_async() -> void:
+func _boot_async(campaign: bool = false) -> void:
 	SidecarManager.configure(SidecarManager.GAME_PORT)
 	SidecarManager.start_all()
 	while not SidecarManager.all_healthy():
@@ -174,43 +164,7 @@ func _boot_async() -> void:
 	# interleaving while the clock ran. (You inherit a grid, you do not
 	# start on empty land — GAME_DESIGN §5.1.)
 	BuildSession.enabled = false  # the scripted build must not arm the debounce
-	_load_start_world()
-	var status: Array = await BuildSession.build_status
-	if OS.get_environment("BOOT_TRACE") != "":
-		print("TRACE build ok=", status[0], " msg=", status[1],
-			" plants=", World.plants.size(), " corridors=", World.corridors.size())
+	_restore_start_world(campaign)
+	await BuildSession.build_status
 	BuildSession.enabled = true
-	if OS.get_environment("BOOT_TRACE") != "":
-		var seen := [0]
-		Orchestrator.step_completed.connect(
-			func(t: int, result: Dictionary) -> void:
-				seen[0] += 1
-				if seen[0] > 40:
-					return
-				var isl: Dictionary = result.get("islands", {}).get("0", {})
-				if seen[0] == 1:
-					var lines: Dictionary = result.get("pf", {}).get("latest", {}).get("lines", {})
-					var ranked: Array = lines.keys()
-					ranked.sort_custom(func(a: String, b: String) -> bool:
-						return float(lines[a].get("loading_percent", 0.0)) \
-							> float(lines[b].get("loading_percent", 0.0)))
-					for lid: String in ranked.slice(0, 4):
-						var spec := {}
-						for l: Dictionary in Boundary.docs["lines"]["lines"]:
-							if str(l["id"]) == lid:
-								spec = l
-						print("TRACE line ", lid, " ", spec.get("from_bus"), "->",
-							spec.get("to_bus"), " km=", spec.get("length_km"),
-							" par=", spec.get("parallel"),
-							" load=", lines[lid].get("loading_percent"),
-							" p=", lines[lid].get("p_from_mw"))
-					for pid: String in result.get("devices", {}):
-						var d: Dictionary = result["devices"][pid]
-						if float(d.get("p_mw", 0.0) if d.get("p_mw") != null else 0.0) > 700.0:
-							print("TRACE big ", pid, " p=", d.get("p_mw"))
-				print("TRACE t=", t, " status=", result.get("status"),
-					" f=", isl.get("f_hz"), " n_isl=", (result.get("islands", {}) as Dictionary).size(),
-					" load=", result.get("pf", {}).get("latest", {}).get("max_loading_pct"),
-					" ev=", (result.get("events", []) as Array).map(
-						func(e: Dictionary) -> String: return str(e.get("kind")) + ":" + str(e.get("element")))))
 	GameClock.speed = 60.0

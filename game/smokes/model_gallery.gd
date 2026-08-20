@@ -5,7 +5,7 @@ extends SmokeBase
 ## reads at a glance, so the gallery is how it gets reviewed.
 
 const TAG := "SMOKE_MODEL_GALLERY"
-const DEFAULT_SHOT := "/tmp/claude-1000/-home-markus-Documents-SoftwareProjects-rttransportflow/3321ff91-1515-42d3-ab96-2756e9d162b4/scratchpad/gallery.png"
+const DEFAULT_SHOT := "user://gallery.png"  # override with --shot=<path>
 
 ## Grid order: thermal row, renewable row, storage/H2 row, grid/HVDC row —
 ## neighbours in a row are the ones a player compares.

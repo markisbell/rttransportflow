@@ -7,14 +7,15 @@ extends RefCounted
 ## gallery, the palette thumbnails and the world renderer all share one
 ## library.
 ##
-## SCALE: one tile = 1.0 world unit = 50 km. These are SYMBOLS, not scale
+## SCALE: one tile = 1.0 world unit; the tile's real length is defined by
+## the map (currently 5 km — ledger 38). These are SYMBOLS, not scale
 ## models — a 1600 MW station reads at a glance because its silhouette says
-## "nuclear", not because the cooling tower is 0.003 units tall. Every
+## "nuclear", not because the cooling tower is to scale. Every
 ## make() model fits a 0.9 x 0.9 footprint centred on the origin, base at
 ## y = 0, height <= 1.6 so a plant never hides its neighbours.
 
-## Corridor accent colours — the game's existing line language (build_view
-## KIND_COLORS): 400 kV red, 220 kV green, HVDC violet. Steel stays grey;
+## Corridor accent colours — the game's line language (world_view_3d /
+## build_menu): 400 kV red, 220 kV green, HVDC violet. Steel stays grey;
 ## the colour rides the conductors and a crossarm cap so a corridor's
 ## voltage reads from the air at any zoom.
 const LINE_400_COLOR := Color(0.90, 0.25, 0.20)
@@ -31,6 +32,8 @@ const WHITE := Color(0.95, 0.96, 0.97)
 const WATER_BLUE := Color(0.18, 0.40, 0.62)
 const TRANSFORMER := Color(0.62, 0.63, 0.65)
 const HAZARD := Color(0.95, 0.80, 0.15)
+## Hydrogen-chain accent (electrolyzer + cavern share it — one teal, not two)
+const H2_TEAL := Color(0.20, 0.68, 0.66)
 
 const KENNEY := "res://assets/kenney/"
 
@@ -635,10 +638,9 @@ static func _make_battery() -> Node3D:
 static func _make_electrolyzer() -> Node3D:
 	var node := Node3D.new()
 	node.add_child(pad(0.9, Color(0.62, 0.63, 0.62)))
-	var h2_teal := Color(0.20, 0.68, 0.66)
 	node.add_child(box(Vector3(0.42, 0.20, 0.26), Color(0.86, 0.87, 0.89),
 		Vector3(-0.14, 0.14, 0.14)))
-	node.add_child(box(Vector3(0.44, 0.03, 0.28), h2_teal, Vector3(-0.14, 0.255, 0.14)))
+	node.add_child(box(Vector3(0.44, 0.03, 0.28), H2_TEAL, Vector3(-0.14, 0.255, 0.14)))
 	for i in 4:  # stack modules visible through the hall's open bay
 		node.add_child(box(Vector3(0.06, 0.13, 0.07), Color(0.50, 0.54, 0.60),
 			Vector3(-0.29 + i * 0.10, 0.105, 0.02)))
@@ -649,7 +651,7 @@ static func _make_electrolyzer() -> Node3D:
 		node.add_child(taper(0.0, 0.028, 0.04, Color(0.66, 0.68, 0.72),
 			Vector3(0.16 + i * 0.08, 0.36, -0.02), 10))
 	# H2 header pipe + valve skid
-	var header := cyl(0.014, 0.42, h2_teal, Vector3(0.16, 0.06, -0.22))
+	var header := cyl(0.014, 0.42, H2_TEAL, Vector3(0.16, 0.06, -0.22))
 	header.rotation.z = PI / 2
 	node.add_child(header)
 	node.add_child(box(Vector3(0.10, 0.08, 0.09), Color(0.70, 0.72, 0.76),
@@ -664,7 +666,6 @@ static func _make_electrolyzer() -> Node3D:
 static func _make_h2_cavern() -> Node3D:
 	var node := Node3D.new()
 	node.add_child(pad(0.66, Color(0.66, 0.64, 0.58)))
-	var h2_teal := Color(0.20, 0.68, 0.66)
 	# wellhead: casing spool stack topped by the valve tree
 	node.add_child(cyl(0.05, 0.05, Color(0.55, 0.57, 0.62), Vector3(0, 0.06, 0)))
 	node.add_child(cyl(0.030, 0.16, Color(0.68, 0.70, 0.74), Vector3(0, 0.16, 0)))
@@ -673,15 +674,15 @@ static func _make_h2_cavern() -> Node3D:
 			Vector3(0, 0.19 + v * 0.06, 0.036), 10)
 		wheel.rotation.x = PI / 2
 		node.add_child(wheel)
-	node.add_child(box(Vector3(0.05, 0.04, 0.05), h2_teal, Vector3(0, 0.26, 0)))
+	node.add_child(box(Vector3(0.05, 0.04, 0.05), H2_TEAL, Vector3(0, 0.26, 0)))
 	node.add_child(taper(0.014, 0.018, 0.06, Color(0.55, 0.57, 0.62),
 		Vector3(0, 0.31, 0), 8))
 	# valve skids either side + the header leaving the pad
 	for side: float in [-0.20, 0.20]:
 		node.add_child(box(Vector3(0.11, 0.07, 0.10), Color(0.74, 0.76, 0.80),
 			Vector3(side, 0.075, -0.10)))
-		node.add_child(cyl(0.010, 0.09, h2_teal, Vector3(side, 0.15, -0.10)))
-	var header := cyl(0.013, 0.40, h2_teal, Vector3(0, 0.09, 0.20))
+		node.add_child(cyl(0.010, 0.09, H2_TEAL, Vector3(side, 0.15, -0.10)))
+	var header := cyl(0.013, 0.40, H2_TEAL, Vector3(0, 0.09, 0.20))
 	header.rotation.z = PI / 2
 	node.add_child(header)
 	node.add_child(box(Vector3(0.06, 0.05, 0.04), HAZARD, Vector3(-0.22, 0.07, 0.20)))

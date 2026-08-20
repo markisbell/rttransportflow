@@ -41,14 +41,15 @@ func _ready() -> void:
 
 
 ## Map file: the real Europe map when present, the test fixture otherwise.
+## v3 ONLY (5 km Natural Earth grid, ledger 38) — the old v1/v2 fallbacks
+## were a trap, not a safety net: campaign saves and every km-radius
+## constant assume the 5 km grid, so falling back to a 10× coarser map
+## would restore a world with silently wrong geometry instead of failing
+## loudly. The archived grids live in tools/map_authoring/archive/.
 static func map_path() -> String:
-	var repo := AppPaths.root()
-	# v3 is the 5 km Natural Earth grid (ledger 38); the coarser grids stay
-	# as fallbacks so an older checkout still boots
-	for name: String in ["europe_v3.json", "europe_v2.json", "europe_v1.json"]:
-		var europe := repo + "/data/map/" + name
-		if FileAccess.file_exists(europe):
-			return europe
+	var europe := AppPaths.root() + "/data/map/europe_v3.json"
+	if FileAccess.file_exists(europe):
+		return europe
 	return ProjectSettings.globalize_path("res://testdata/mini_map.json")
 
 

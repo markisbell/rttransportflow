@@ -94,7 +94,7 @@ func month_name(day: float = -1.0) -> String:
 
 # ---------------------------------------------------------------- unlocks
 
-## Build-palette gate. tool ids match build_view TOOLS + "h2_retrofit".
+## Build-palette gate. tool ids match build_menu TOOLS + "h2_retrofit".
 func unlocked(kind: String) -> bool:
 	if not active:
 		return true  # §5.4 sandbox: everything open

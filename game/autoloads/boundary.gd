@@ -76,11 +76,10 @@ func reset_doc() -> Dictionary:
 			"grid": docs["grid"], "lines": docs["lines"], "plants": docs["plants"],
 			"load_centers": docs["load_centers"], "scenario": docs["scenario"],
 		},
-		"zones": docs["grid"].get("zones", []).map(
-			func(zone: Dictionary) -> Dictionary:
-				return {"id": zone["id"], "node": zone["bus"]}),
 		"devices": wire_devices,
 	}
+	# (no top-level "zones": the channel is accepted-and-ignored in 2.0 —
+	# zone binding is authoritative in native.grid.zones; see v2.md)
 	if not pending_snapshot.is_empty():
 		doc["snapshot"] = pending_snapshot
 		pending_snapshot = {}  # one-shot: only the load's reset restores
