@@ -1,7 +1,11 @@
 extends Node
-## Boundary — P4 stub boundary provider (ROADMAP P4): replays the
-## europe_mini daily profiles as boundary conditions. GridCo's real
-## demand/weather/dispatch models replace this in P6.
+## Boundary — the wire-boundary provider. Two modes behind `mode`:
+## "profiles" replays the bundle's authored daily profiles (P4 smokes,
+## standalone parity); "gridco" runs the live models (Weather/Demand/
+## Dispatch, P6+) — one dispatcher decision per 15-min block, the schedule
+## RAMPED across the boundary (ledger 39). Also owns the reset-document
+## assembly (native bundle + devices channel) and the one-shot save/load
+## snapshot handoff. (Its header claimed "P4 stub" for five phases.)
 
 var docs := {}  # grid / lines / plants / load_centers / scenario (verbatim)
 var loaded := false
@@ -55,10 +59,20 @@ func _step_index(t_sim: float) -> int:
 	return int(t_sim / Dispatch.BLOCK_S) % steps_per_day()
 
 
-## Contract reset document: native bundle VERBATIM + zones (+ no device
-## overrides at P4 — the backend derives the fleet from native).
-## Set by SaveLoad before the load's re-register; consumed by ONE reset.
+## Contract reset document: native bundle VERBATIM (+ the devices channel).
+## Armed by SaveLoad before the load's re-register; consumed by ONE reset.
 var pending_snapshot: Dictionary = {}
+
+
+## SaveLoad seam: arm the exact-state restore for the NEXT reset (one-shot).
+func arm_snapshot(snap: Dictionary) -> void:
+	pending_snapshot = snap
+
+
+## SaveLoad seam: force a fresh dispatch decision at the next boundary read
+## (the restore rewinds the clock; a stale block id would skip the decision).
+func invalidate_schedule() -> void:
+	_decided_block = -1
 
 
 func reset_doc() -> Dictionary:
@@ -118,19 +132,12 @@ func enable_gridco() -> void:
 	Economy.set_fleet(docs["plants"].get("plants", []), wire_devices)
 
 
-## The metro a placed thing belongs to (Manhattan distance to the nearest
-## load-centre tile) — the same rule GridTopology uses for plants.
+## The metro a placed thing belongs to — GridTopology.nearest_zone is the
+## ONE rule (a private copy here could home a plant to a metro the topology
+## no longer served; the all-centres candidate domain is now explicit).
 func _nearest_zone(pid: String) -> String:
 	var tile: Vector2i = World.plants.get(pid, {}).get("tile", Vector2i.ZERO)
-	var best := ""
-	var best_d := 1 << 30
-	for lc_id: String in World.load_centers:
-		for lc_tile: Vector2i in World.load_centers[lc_id]["tiles"]:
-			var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
-			if d < best_d:
-				best_d = d
-				best = lc_id
-	return best
+	return GridTopology.nearest_zone(World, tile, World.load_centers.keys())
 
 
 func _zone_ids() -> Array:

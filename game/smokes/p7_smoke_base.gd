@@ -84,34 +84,22 @@ func p7_report(registered: Dictionary) -> void:
 		print("P7BUILD warn: ", warning)
 
 
-## Hand-lay an `hvdc` corridor from `from_tile` to `to_tile` (inclusive):
-## BFS over tiles a DC corridor may occupy, path replayed via the parent map.
+## Hand-lay an `hvdc` corridor from `from_tile` to `to_tile` (inclusive)
+## via DemoBuild.route with the DC passability predicate — one BFS, one
+## neighbor order (a private second copy was drift waiting to happen).
 ## HVDC may cross ANY terrain (incl. deep sea); occupied sites AND existing
 ## corridors block (one corridor kind per tile — an overwrite would cut the
 ## AC path it crosses).
 func lay_hvdc(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 	if not _hvdc_free(from_tile) or not _hvdc_free(to_tile):
 		return false
-	var queue: Array[Vector2i] = [from_tile]
-	var came := {from_tile: from_tile}
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
-		if current == to_tile:
-			var path: Array[Vector2i] = []
-			while current != came[current]:
-				path.append(current)
-				current = came[current]
-			path.append(from_tile)
-			for tile: Vector2i in path:
-				if not World.place_corridor(tile, "hvdc"):
-					return false
-			return true
-		for offset: Vector2i in GridTopology.NEIGHBORS:
-			var n: Vector2i = current + offset
-			if not came.has(n) and _hvdc_free(n):
-				came[n] = current
-				queue.append(n)
-	return false
+	var path := DemoBuild.route(World, from_tile, to_tile, false, {}, _hvdc_free)
+	if path.is_empty():
+		return false
+	for tile: Vector2i in path:
+		if not World.place_corridor(tile, "hvdc"):
+			return false
+	return true
 
 
 func _hvdc_free(tile: Vector2i) -> bool:

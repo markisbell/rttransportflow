@@ -25,8 +25,12 @@ static func fixture_build(world: Node) -> void:
 ## on the FIRST tile that already carries a corridor — plant spurs merge
 ## into shared trunks instead of laying parallel spaghetti (a junction
 ## explosion blew the bus budget on the real Europe map).
+## `passable` (optional) replaces the default can_place_corridor expansion
+## test — the ONE deterministic BFS now also serves the DC corridor layer
+## (P7SmokeBase.lay_hvdc used to keep a private second copy).
 static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
-		stop_at_existing: bool = false, avoid: Dictionary = {}) -> Array[Vector2i]:
+		stop_at_existing: bool = false, avoid: Dictionary = {},
+		passable: Callable = Callable()) -> Array[Vector2i]:
 	var queue: Array[Vector2i] = [from_tile]
 	var came := {from_tile: from_tile}
 	while not queue.is_empty():
@@ -42,7 +46,10 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 			return path
 		for offset: Vector2i in GridTopology.NEIGHBORS:
 			var n := current + offset
-			if came.has(n) or avoid.has(n) or not world.can_place_corridor(n):
+			if came.has(n) or avoid.has(n):
+				continue
+			if not (passable.call(n) if passable.is_valid()
+					else world.can_place_corridor(n)):
 				continue
 			came[n] = current
 			queue.append(n)

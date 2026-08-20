@@ -336,9 +336,9 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	if lines["lines"].is_empty():
 		return {"ok": false, "error": "no branches between buses", "warnings": warnings}
 
-	var demand := _demand_profiles(world, kept_zones, demand_sampler)
-	var dispatch := _dispatch_profiles(world, kept_plants, demand["total"],
-		_home_zones(world, kept_plants, kept_zones), demand, kept_zones)
+	var demand := StartupProfiles._demand_profiles(world, kept_zones, demand_sampler)
+	var dispatch := StartupProfiles._dispatch_profiles(world, kept_plants, demand["total"],
+		StartupProfiles._home_zones(world, kept_plants, kept_zones), demand, kept_zones)
 
 	var plants_doc := {"plants": []}
 	for pid: String in kept_plants:
@@ -370,48 +370,16 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 		"description": "player-built grid (P5)"}
 
 	# --- 7. wire devices (P7): storage, H2 chain, HVDC links + hubs -----
-	var devices: Array[Dictionary] = []
-	var caverns: Array[String] = []
-	for pid: String in world.plants:
-		if str(world.plants[pid]["kind"]) == "h2_cavern":
-			caverns.append(pid)
-	caverns.sort()
-	for pid: String in caverns:
-		devices.append({"id": pid, "kind": "h2_store", "params": {
-			"capacity_kg": float(world.plants[pid]["capacity_kg"]),
-			# a fresh cavern starts at the recovery threshold: nothing to
-			# burn until the electrolyzers fill it (PHYSICS §2.8 floor rule)
-			"level_kg": 0.07 * float(world.plants[pid]["capacity_kg"]),
-		}})
-	var device_ids: Array[String] = []
-	device_ids.assign(device_bus.keys())
-	device_ids.sort()
-	for pid: String in device_ids:
-		var p: Dictionary = world.plants[pid]
-		var node := "b%d" % bus_rename[device_bus[pid]]
-		match str(p["kind"]):
-			"battery":
-				devices.append({"id": pid, "kind": "battery", "node": node,
-					"params": {"p_max_mw": float(p["p_max_mw"]),
-						"e_mwh": float(p.get("e_mwh", float(p["p_max_mw"]) * 2.0))}})
-			"electrolyzer":
-				if caverns.is_empty():
-					warnings.append("electrolyzer %s: no cavern anywhere — dropped" % pid)
-					continue
-				devices.append({"id": pid, "kind": "electrolyzer", "node": node,
-					"params": {"p_max_mw": float(p["p_max_mw"]),
-						"h2_store_id": _nearest_cavern(world, caverns, p["tile"])}})
-			# hvdc_converter: emitted by the link/hub pass below
-	var hvdc_result := _hvdc_devices(world, hvdc_corridors, farm_hub,
+	var wire: Dictionary = WireDeviceEmit.emit(world, hvdc_corridors, farm_hub,
 		device_bus, bus_rename, warnings)
-	devices.append_array(hvdc_result["devices"])
+	var devices: Array = wire["devices"]
 
 	return {
 		"ok": true,
 		"native": {"grid": grid, "lines": lines, "plants": plants_doc,
 			"load_centers": load_centers_doc, "scenario": scenario},
 		"devices": devices,
-		"hub_farms": hvdc_result["hub_farms"],
+		"hub_farms": wire["hub_farms"],
 		"zones": grid["zones"],
 		"interpretation": {
 			"n_buses": bus_names.size(),
@@ -423,120 +391,6 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 		},
 		"warnings": warnings,
 	}
-
-
-static func _nearest_cavern(world: Node, caverns: Array[String],
-		tile: Vector2i) -> String:
-	# H2 transport (pipeline/trucking) is abstracted: an electrolyzer feeds
-	# its NEAREST cavern (deterministic tie-break by pid sort order).
-	var best := caverns[0]
-	var best_d := 1 << 30
-	for pid: String in caverns:
-		var d: Vector2i = (world.plants[pid]["tile"] as Vector2i) - tile
-		var manhattan := absi(d.x) + absi(d.y)
-		if manhattan < best_d:
-			best_d = manhattan
-			best = pid
-	return best
-
-
-## HVDC pass: flood-fill `hvdc` corridor components; a component with exactly
-## two stations becomes a point-to-point link (2 onshore converters) or an
-## offshore hub (platform + onshore converter) per §1.16. Everything else
-## warns and is dropped — never a half-registered link.
-static func _hvdc_devices(world: Node, hvdc_corridors: Dictionary,
-		farm_hub: Dictionary, device_bus: Dictionary, bus_rename: Dictionary,
-		warnings: Array[String]) -> Dictionary:
-	var devices: Array[Dictionary] = []
-	var hub_farms := {}
-	var used_stations := {}
-	var seen := {}
-	for start: Vector2i in _sorted_tiles(hvdc_corridors):
-		if seen.has(start):
-			continue
-		# flood-fill one component
-		var tiles: Array[Vector2i] = []
-		var stack: Array[Vector2i] = [start]
-		while not stack.is_empty():
-			var current: Vector2i = stack.pop_back()
-			if seen.has(current):
-				continue
-			seen[current] = true
-			tiles.append(current)
-			for offset: Vector2i in NEIGHBORS:
-				var n := current + offset
-				if hvdc_corridors.has(n) and not seen.has(n):
-					stack.append(n)
-		# stations adjacent to the component
-		var stations: Array[String] = []
-		for tile: Vector2i in tiles:
-			for offset: Vector2i in NEIGHBORS:
-				var pid := str(world.plant_at(tile + offset))
-				if pid == "" or stations.has(pid) or used_stations.has(pid):
-					continue
-				if str(world.plants[pid]["kind"]) in ["hvdc_converter", "offshore_platform"]:
-					stations.append(pid)
-		stations.sort()
-		if stations.size() != 2:
-			warnings.append("hvdc corridor (%d tiles) touches %d stations — needs exactly 2"
-				% [tiles.size(), stations.size()])
-			continue
-		var length_km := snappedf(tiles.size() * world.tile_km * SINUOSITY, 0.01)
-		var kinds: Array[String] = [str(world.plants[stations[0]]["kind"]),
-			str(world.plants[stations[1]]["kind"])]
-		if kinds[0] == "hvdc_converter" and kinds[1] == "hvdc_converter":
-			if not (device_bus.has(stations[0]) and device_bus.has(stations[1])):
-				warnings.append("hvdc link %s-%s: a terminal has no AC bus — dropped"
-					% [stations[0], stations[1]])
-				continue
-			var p_max := minf(float(world.plants[stations[0]]["p_max_mw"]),
-				float(world.plants[stations[1]]["p_max_mw"]))
-			var link_id := "link_%s_%s" % [stations[0], stations[1]]
-			for pid: String in stations:
-				devices.append({"id": pid, "kind": "hvdc",
-					"node": "b%d" % bus_rename[device_bus[pid]],
-					"params": {"link_id": link_id, "p_max_mw": p_max,
-						"length_km": length_km}})
-				used_stations[pid] = true
-		elif "offshore_platform" in kinds and "hvdc_converter" in kinds:
-			var platform: String = stations[0] if kinds[0] == "offshore_platform" else stations[1]
-			var onshore: String = stations[1] if kinds[0] == "offshore_platform" else stations[0]
-			if not device_bus.has(onshore):
-				warnings.append("hub %s: onshore converter %s has no AC bus — dropped"
-					% [platform, onshore])
-				continue
-			var farms: Array[String] = []
-			var farm_mw := 0.0
-			for farm_pid: String in farm_hub:
-				if str(farm_hub[farm_pid]) == platform:
-					farms.append(farm_pid)
-					farm_mw += float(world.plants[farm_pid]["p_max_mw"])
-			farms.sort()
-			var platform_mw := float(world.plants[platform]["p_max_mw"])
-			if farm_mw > platform_mw:
-				warnings.append("hub %s over-subscribed: %.0f MW farms on a %.0f MW platform"
-					% [platform, farm_mw, platform_mw])
-			devices.append({"id": platform, "kind": "offshore_hub",
-				"node": "b%d" % bus_rename[device_bus[onshore]],
-				"params": {"p_max_mw": minf(platform_mw,
-						float(world.plants[onshore]["p_max_mw"])),
-					"platform_mw": platform_mw, "cable_km": length_km}})
-			hub_farms[platform] = farms
-			used_stations[platform] = true
-			used_stations[onshore] = true
-		else:
-			warnings.append("hvdc corridor joins two platforms (%s, %s) — dropped"
-				% [stations[0], stations[1]])
-	for pid: String in world.plants:
-		var kind := str(world.plants[pid]["kind"])
-		if kind in ["hvdc_converter", "offshore_platform"] \
-				and not used_stations.has(pid):
-			warnings.append("%s %s is not part of any HVDC link or hub" % [kind, pid])
-	for farm_pid: String in farm_hub:
-		if not hub_farms.has(str(farm_hub[farm_pid])):
-			warnings.append("farm %s bound to %s which is not a working hub — idle"
-				% [farm_pid, farm_hub[farm_pid]])
-	return {"devices": devices, "hub_farms": hub_farms}
 
 
 ## MVA each branch may be asked to carry, one entry per branch in order.
@@ -616,142 +470,20 @@ static func _bus_islands(n_buses: int, branches: Array[Dictionary]) -> Array[int
 	return result
 
 
-## Winter-workday demand shape (same curve family as europe_mini authoring).
-static func _load_shape(step: int) -> float:
-	var h := step / 4.0
-	return 0.62 + 0.22 * exp(-pow(h - 9.5, 2) / 8.0) \
-		+ 0.16 * exp(-pow(h - 13.0, 2) / 14.0) \
-		+ 0.38 * exp(-pow(h - 18.5, 2) / 5.0)
 
-
-static func _demand_profiles(world: Node, zone_ids: Array[String],
-		demand_sampler: Callable = Callable()) -> Dictionary:
-	# With a sampler (gridco mode) the native profiles COME FROM the live
-	# demand model, so the backend resets onto the operating point the wire
-	# will actually send — a stub-vs-live mismatch at t=0 collapsed a
-	# winter grid before the first dispatch could ramp (found by probe).
-	var out := {"total": []}
-	var totals: Array[float] = []
-	totals.resize(STEPS)
-	totals.fill(0.0)
-	for lc_id: String in zone_ids:
-		var peak: float = world.load_centers[lc_id]["peak_mw"]
-		var profile: Array[float] = []
-		for step in range(STEPS):
-			var value: float
-			if demand_sampler.is_valid():
-				value = snappedf(demand_sampler.call(lc_id, step), 0.1)
-			else:
-				value = snappedf(peak * _load_shape(step), 0.1)
-			profile.append(value)
-			totals[step] += value
-		out[lc_id] = profile
-	out["total"] = totals
-	return out
-
-
-## Stub balanced dispatch (real dispatch arrives in P6): must-take renewables
-## + flat nuclear + dispatchables sharing the residual pro-rata (capped 92 %).
-## Nearest metro for each plant, by tile distance. The START-UP operating
-## point must be LOCAL: a global pro-rata split sends a city's supply across
-## the whole network, and the first power flow after a reset hit 221 % on a
-## trunk and instant-tripped it before the dispatcher had said a word.
-static func _home_zones(world: Node, plant_ids: Array[String],
-		zone_ids: Array[String]) -> Dictionary:
-	var home := {}
-	for pid: String in plant_ids:
-		var tile: Vector2i = world.plants[pid]["tile"]
-		var best := ""
-		var best_d := 1 << 30
-		for lc_id: String in zone_ids:
-			for lc_tile: Vector2i in world.load_centers[lc_id]["tiles"]:
-				var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
-				if d < best_d:
-					best_d = d
-					best = lc_id
-		home[pid] = best
-	return home
-
-
-static func _dispatch_profiles(world: Node, plant_ids: Array[String],
-		total_load: Array[float], home_zones: Dictionary = {},
-		demand: Dictionary = {}, zone_ids: Array[String] = []) -> Dictionary:
-	var out := {}
-	for pid: String in plant_ids:
-		var profile: Array[float] = []
-		profile.resize(STEPS)
-		profile.fill(0.0)
-		out[pid] = profile
-
-	if not zone_ids.is_empty() and not home_zones.is_empty():
-		for zone_id: String in zone_ids:
-			var local: Array[String] = []
-			for pid: String in plant_ids:
-				if str(home_zones.get(pid, "")) == zone_id:
-					local.append(pid)
-			if local.is_empty():
-				continue
-			var zone_load: Array = demand[zone_id]
-			var zone_total: Array[float] = []
-			zone_total.resize(STEPS)
-			for step in range(STEPS):
-				zone_total[step] = float(zone_load[step])
-			_fill_profiles(world, local, zone_total, out)
-		# any plant with no metro of its own still shares the system load
-		var orphans: Array[String] = []
-		for pid: String in plant_ids:
-			if not home_zones.has(pid):
-				orphans.append(pid)
-		if not orphans.is_empty():
-			_fill_profiles(world, orphans, total_load, out)
-		return out
-	_fill_profiles(world, plant_ids, total_load, out)
-	return out
-
-
-## Balance one group of plants against one load series (must-take renewables
-## + flat nuclear + dispatchables sharing the residual, capped at 92 %).
-static func _fill_profiles(world: Node, plant_ids: Array[String],
-		total_load: Array[float], out: Dictionary) -> void:
-	for step in range(STEPS):
-		var target: float = total_load[step] * Dispatch.loss_margin
-		var fixed := 0.0
-		var dispatchable_cap := 0.0
-		var fixed_pids: Array[String] = []
-		for pid: String in plant_ids:
-			var p: Dictionary = world.plants[pid]
-			var kind := str(p["kind"])
-			var p_max: float = p["p_max_mw"]
-			var value := 0.0
-			match kind:
-				"nuclear":
-					value = 0.88 * p_max
-				"solar_pv":
-					var h := step / 4.0
-					value = p_max * maxf(0.0, sin(PI * (h - 8.0) / 10.0)) if h >= 8.0 and h <= 18.0 else 0.0
-				"wind_onshore", "wind_offshore":
-					value = 0.55 * p_max
-				_:
-					dispatchable_cap += p_max
-					continue
-			out[pid][step] = snappedf(value, 0.1)
-			fixed += out[pid][step]
-			fixed_pids.append(pid)
-		if fixed > target and fixed > 0.0:
-			# Over-generation collapses the grid UPWARD (51.5 Hz trip cascade,
-			# then blackout — found the hard way): scale must-run down so the
-			# stub dispatch always balances.
-			var scale := target / fixed
-			for pid: String in fixed_pids:
-				out[pid][step] = snappedf(out[pid][step] * scale, 0.1)
-			fixed = target
-		var residual := maxf(target - fixed, 0.0)
-		if dispatchable_cap > 0.0:
-			# ledger 30: the stub operating point uses the SAME deliverable
-			# cap the live dispatcher schedules against (stub-vs-live mismatch
-			# at t=0 collapsed a grid once — P6 discovery 3)
-			var share := minf(residual / dispatchable_cap, Dispatch.headroom_frac)
-			for pid: String in plant_ids:
-				var p: Dictionary = world.plants[pid]
-				if str(p["kind"]) in World.DISPATCHABLE_KINDS:
-					out[pid][step] = snappedf(share * float(p["p_max_mw"]), 0.1)
+## The ONE nearest-metro rule (Manhattan distance, candidate-list iteration
+## order, strict <). StartupProfiles._home_zones and Boundary used private
+## hand copies whose candidate DOMAINS had silently drifted — after a zone
+## drop, Boundary could home a plant to a metro the topology no longer
+## served (the ledger-44 split-brain class). The domain is now a visible
+## argument instead of a hidden divergence.
+static func nearest_zone(world: Node, tile: Vector2i, zone_ids: Array) -> String:
+	var best := ""
+	var best_d := 1 << 30
+	for lc_id in zone_ids:
+		for lc_tile: Vector2i in world.load_centers[lc_id]["tiles"]:
+			var d: int = absi(lc_tile.x - tile.x) + absi(lc_tile.y - tile.y)
+			if d < best_d:
+				best_d = d
+				best = str(lc_id)
+	return best

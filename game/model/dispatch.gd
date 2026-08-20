@@ -91,6 +91,27 @@ func setup(economy: Dictionary, catalog: Dictionary) -> void:
 	_mc_cache.clear()
 
 
+## Save/load (P9): the to_dict/from_dict idiom every sibling model follows
+## (SaveLoad used to write these fields directly).
+func to_dict() -> Dictionary:
+	return {"plant_mode": plant_mode.duplicate(true),
+		"link_setpoints": link_setpoints.duplicate(true)}
+
+
+func from_dict(state: Dictionary) -> void:
+	plant_mode = (state.get("plant_mode", {}) as Dictionary).duplicate(true)
+	link_setpoints = (state.get("link_setpoints", {}) as Dictionary).duplicate(true)
+
+
+## Campaign/scenario seam: reprice one economy constant and invalidate the
+## marginal-cost memo in the same breath (Campaign used to reach into the
+## private _mc_cache — the comment at the call site even documented the
+## failure mode it was compensating for).
+func repriced(key: String, value: float) -> void:
+	economy_cfg[key] = value
+	_mc_cache.clear()
+
+
 func marginal_cost(kind: String, fuel_override: String = "") -> float:
 	var cache_key := kind + "|" + fuel_override
 	if _mc_cache.has(cache_key):
@@ -121,95 +142,13 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		var mw: float = Demand.zone_mw(zone_id, t_days)
 		zone_need[zone_id] = mw
 		demand_now += mw
-	var latest_devices: Dictionary = Orchestrator.latest().get("devices", {})
-	# Flexibility load, MEASURED rather than commanded (the commanded value
-	# is only the fallback before the first result). A battery told to charge
-	# at 250 MW draws nothing once it is full, and an electrolyzer that shed
-	# itself on low frequency draws nothing either — but the ledger carried
-	# the command, so the dispatcher generated for load that did not exist
-	# AND under-curtailed the wind that then had nowhere to go. On the
-	# calm_week island that was ~800 MW of phantom demand holding the grid at
-	# 50.72 Hz with FCR absorbing 1.5 GW. On the wire any negative injection
-	# is load, which covers both device kinds without a sign special case.
-	var measured_flex := 0.0
-	var saw_flex := false
-	for device: Dictionary in wire_devices:
-		if not (str(device.get("kind", "")) in
-				["battery", "grid_forming", "electrolyzer"]):
-			continue
-		var raw: Variant = (latest_devices.get(str(device.get("id", "")), {})
-			as Dictionary).get("p_mw")
-		if raw == null:
-			continue
-		saw_flex = true
-		measured_flex += maxf(-float(raw), 0.0)
-	if saw_flex:
-		_flex_load_mw = measured_flex
-	demand_now += _flex_load_mw
-	# HVDC terminals are engine-side power the zone ledger cannot see — the
-	# same blind spot `_flex_load_mw` covers for electrolyzers. The sending
-	# end is extra LOAD in its metro, the receiving end is generation in
-	# its. Without netting both, an active bipole is ADDITIVE instead of a
-	# substitution: the dispatcher keeps scheduling the exporting metro's
-	# coal to cover the importing metro's full demand, so an 800 MW link
-	# added ~1.1 GW of surplus (+0.29 Hz) and relieved only ~72 MW of the AC
-	# transit it exists to unload. MEASURED terminal power is used, not the
-	# setpoint, so the DC path losses are counted by the engine exactly once
-	# and the link's net effect on the island is just those losses.
-	for device: Dictionary in wire_devices:
-		if str(device.get("kind", "")) != "hvdc":
-			continue
-		# BOTH terminals, from the registered devices — not from
-		# `link_setpoints`, which holds only the commanded end (the engine
-		# derives the other from the pair). Netting one end alone adds the
-		# sending draw and never credits the receiving injection, which is
-		# the additive behaviour this block exists to remove.
-		var term_id := str(device.get("id", ""))
-		var raw: Variant = (latest_devices.get(term_id, {}) as Dictionary).get("p_mw")
-		if raw == null:
-			continue  # no measurement yet — net nothing rather than guess
-		# p < 0 draws from its bus, p > 0 injects into it
-		var p := float(raw)
-		var zone := str(home_zone.get(term_id, ""))
-		if zone_need.has(zone):
-			zone_need[zone] = float(zone_need[zone]) - p
-		demand_now -= p
+	demand_now = _fold_measured_loads(zone_need, demand_now)
 
 	# --- renewables: availability from weather, must-take -----------------
-	var avail := {}
+	var avail := _renewable_availability(plants)
 	var renewable_mw := 0.0
-	var projection: Dictionary = BuildSession.map_projection()
-	for plant: Dictionary in plants:
-		var kind := str(plant["kind"])
-		if kind in World.CONVERTER_KINDS:
-			var tile: Vector2i = World.plants.get(str(plant["id"]), {}).get("tile", Vector2i.ZERO)
-			# fixture maps carry no projection block — fall back to one region
-			var region := "France" if projection.is_empty() \
-				else Weather.region_of_tile(tile, projection)
-			var cf := 0.0
-			match kind:
-				"wind_onshore":
-					cf = Weather.wind_cf(region, false)
-				"wind_offshore":
-					cf = Weather.wind_cf(region, true)
-				"solar_pv":
-					cf = Weather.pv_cf(region)
-			avail[str(plant["id"])] = snappedf(cf * float(plant["p_max_mw"]), 0.1)
-			renewable_mw += avail[str(plant["id"])]
-
-	# offshore hubs: ONE aggregated avail value per hub (bound farms are
-	# game-side only — §1.16); the backend owns the path losses
-	for hub_id: String in hub_farms:
-		var hub_avail := 0.0
-		for farm_pid: String in hub_farms[hub_id]:
-			var farm: Dictionary = World.plants.get(farm_pid, {})
-			if farm.is_empty():
-				continue
-			var region := "France" if projection.is_empty() \
-				else Weather.region_of_tile(farm["tile"], projection)
-			hub_avail += Weather.wind_cf(region, true) * float(farm["p_max_mw"])
-		avail[hub_id] = snappedf(hub_avail, 0.1)
-		renewable_mw += avail[hub_id]
+	for pid: String in avail:
+		renewable_mw += avail[pid]
 
 	# --- thermal merit order ---------------------------------------------
 	var thermal: Array[Dictionary] = []
@@ -391,43 +330,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		price = float(economy_cfg["scarcity_price_cap_eur_per_mwh"])
 	wholesale_price = price
 
-	# --- flexibility toolbox (P7): price-signal arbitrage -----------------
-	# batteries discharge into the gas tier and above, charge on cheap
-	# blocks; electrolyzers soak cheap/surplus power into their cavern.
-	# HVDC is `manual` in v1: player/scenario setpoints pass through.
-	var flex_next := 0.0
-	for dev: Dictionary in wire_devices:
-		var did := str(dev.get("id", ""))
-		var dev_params: Dictionary = dev.get("params", {})
-		match str(dev.get("kind", "")):
-			"battery", "grid_forming":
-				var bat_max := float(dev_params.get("p_max_mw", 0.0))
-				var was_charging: bool = bool(_bat_charging.get(did, false))
-				var bat_cmd := 0.0
-				# discharge only into genuine scarcity: a lower threshold let
-				# a sustained expensive tier drain the fleet to its SoC floor
-				# and the arrested MW vanished as one cliff (hydrogen_chain)
-				if scarcity or price >= bat_discharge_price:
-					bat_cmd = bat_discharge_frac * bat_max
-				elif price <= (bat_charge_price_on if was_charging else bat_charge_price_off):
-					bat_cmd = -bat_charge_frac * bat_max  # sticky through the self-bump
-				_bat_charging[did] = bat_cmd < 0.0
-				if bat_cmd < 0.0:
-					flex_next += -bat_cmd  # charging is load next block
-				commands[did] = {"dispatch_mw": snappedf(bat_cmd, 0.1)}
-			"electrolyzer":
-				var was_on: bool = bool(_ely_on.get(did, false))
-				var run: bool = (not scarcity) \
-					and price < (ely_price_on if was_on else ely_price_off)
-				_ely_on[did] = run
-				var ely_mw: float = float(dev_params.get("p_max_mw", 0.0)) if run else 0.0
-				flex_next += ely_mw
-				commands[did] = {"dispatch_mw": ely_mw}
-	_flex_load_mw = flex_next
-	for term_id: String in link_setpoints:
-		var link_cmd: Dictionary = commands.get(term_id, {})
-		link_cmd["dispatch_mw"] = float(link_setpoints[term_id])
-		commands[term_id] = link_cmd
+	_apply_flexibility(commands, price)
 
 	if OS.get_environment("DISPATCH_DEBUG") != "":
 		var n_online := 0
@@ -498,3 +401,155 @@ func _redispatch(commands: Dictionary, pf_lines: Dictionary,
 		commands[priciest_export["id"]] = down
 		redispatch_cost_eur += shift_mw * BLOCK_S / 3600.0 \
 			* absf(float(cheapest_import["mc"]) - float(priciest_export["mc"]))
+
+
+## Ledger 44: every engine-side power the zone ledger cannot see is folded
+## back in from the last RESULT, never from the command that asked for it.
+## Mutates `zone_need` (HVDC terminal netting) and returns the updated
+## system demand. Moved verbatim from decide().
+func _fold_measured_loads(zone_need: Dictionary, demand_now: float) -> float:
+	var latest_devices: Dictionary = Orchestrator.latest().get("devices", {})
+	# Flexibility load, MEASURED rather than commanded (the commanded value
+	# is only the fallback before the first result). A battery told to charge
+	# at 250 MW draws nothing once it is full, and an electrolyzer that shed
+	# itself on low frequency draws nothing either — but the ledger carried
+	# the command, so the dispatcher generated for load that did not exist
+	# AND under-curtailed the wind that then had nowhere to go. On the
+	# calm_week island that was ~800 MW of phantom demand holding the grid at
+	# 50.72 Hz with FCR absorbing 1.5 GW. On the wire any negative injection
+	# is load, which covers both device kinds without a sign special case.
+	var measured_flex := 0.0
+	var saw_flex := false
+	for device: Dictionary in wire_devices:
+		if not (str(device.get("kind", "")) in
+				["battery", "grid_forming", "electrolyzer"]):
+			continue
+		var raw: Variant = (latest_devices.get(str(device.get("id", "")), {})
+			as Dictionary).get("p_mw")
+		if raw == null:
+			continue
+		saw_flex = true
+		measured_flex += maxf(-float(raw), 0.0)
+	if saw_flex:
+		_flex_load_mw = measured_flex
+	demand_now += _flex_load_mw
+	# HVDC terminals are engine-side power the zone ledger cannot see — the
+	# same blind spot `_flex_load_mw` covers for electrolyzers. The sending
+	# end is extra LOAD in its metro, the receiving end is generation in
+	# its. Without netting both, an active bipole is ADDITIVE instead of a
+	# substitution: the dispatcher keeps scheduling the exporting metro's
+	# coal to cover the importing metro's full demand, so an 800 MW link
+	# added ~1.1 GW of surplus (+0.29 Hz) and relieved only ~72 MW of the AC
+	# transit it exists to unload. MEASURED terminal power is used, not the
+	# setpoint, so the DC path losses are counted by the engine exactly once
+	# and the link's net effect on the island is just those losses.
+	for device: Dictionary in wire_devices:
+		if str(device.get("kind", "")) != "hvdc":
+			continue
+		# BOTH terminals, from the registered devices — not from
+		# `link_setpoints`, which holds only the commanded end (the engine
+		# derives the other from the pair). Netting one end alone adds the
+		# sending draw and never credits the receiving injection, which is
+		# the additive behaviour this block exists to remove.
+		var term_id := str(device.get("id", ""))
+		var raw: Variant = (latest_devices.get(term_id, {}) as Dictionary).get("p_mw")
+		if raw == null:
+			continue  # no measurement yet — net nothing rather than guess
+		# p < 0 draws from its bus, p > 0 injects into it
+		var p := float(raw)
+		var zone := str(home_zone.get(term_id, ""))
+		if zone_need.has(zone):
+			zone_need[zone] = float(zone_need[zone]) - p
+		demand_now -= p
+
+	return demand_now
+
+
+## Renewable availability from the live weather (must-take; offshore hubs
+## aggregate their bound farms into ONE value — §1.16). Moved verbatim.
+func _renewable_availability(plants: Array) -> Dictionary:
+	var avail := {}
+	var projection: Dictionary = BuildSession.map_projection()
+	for plant: Dictionary in plants:
+		var kind := str(plant["kind"])
+		if kind in World.CONVERTER_KINDS:
+			var tile: Vector2i = World.plants.get(str(plant["id"]), {}).get("tile", Vector2i.ZERO)
+			# fixture maps carry no projection block — fall back to one region
+			var region := _region_for_tile(tile, projection)
+			var cf := 0.0
+			match kind:
+				"wind_onshore":
+					cf = Weather.wind_cf(region, false)
+				"wind_offshore":
+					cf = Weather.wind_cf(region, true)
+				"solar_pv":
+					cf = Weather.pv_cf(region)
+			avail[str(plant["id"])] = snappedf(cf * float(plant["p_max_mw"]), 0.1)
+
+	# offshore hubs: ONE aggregated avail value per hub (bound farms are
+	# game-side only — §1.16); the backend owns the path losses
+	for hub_id: String in hub_farms:
+		var hub_avail := 0.0
+		for farm_pid: String in hub_farms[hub_id]:
+			var farm: Dictionary = World.plants.get(farm_pid, {})
+			if farm.is_empty():
+				continue
+			var region := _region_for_tile(farm["tile"], projection)
+			hub_avail += Weather.wind_cf(region, true) * float(farm["p_max_mw"])
+		avail[hub_id] = snappedf(hub_avail, 0.1)
+
+	return avail
+
+
+## The P7 flexibility toolbox: price-signal arbitrage with hysteresis
+## (batteries scarcity-discharge / cheap-charge, electrolyzers soak cheap
+## blocks), plus the v1 `manual` HVDC setpoint pass-through. Moved verbatim.
+func _apply_flexibility(commands: Dictionary, price: float) -> void:
+	# batteries discharge into the gas tier and above, charge on cheap
+	# blocks; electrolyzers soak cheap/surplus power into their cavern.
+	# HVDC is `manual` in v1: player/scenario setpoints pass through.
+	var flex_next := 0.0
+	for dev: Dictionary in wire_devices:
+		var did := str(dev.get("id", ""))
+		var dev_params: Dictionary = dev.get("params", {})
+		match str(dev.get("kind", "")):
+			"battery", "grid_forming":
+				var bat_max := float(dev_params.get("p_max_mw", 0.0))
+				var was_charging: bool = bool(_bat_charging.get(did, false))
+				var bat_cmd := 0.0
+				# discharge only into genuine scarcity: a lower threshold let
+				# a sustained expensive tier drain the fleet to its SoC floor
+				# and the arrested MW vanished as one cliff (hydrogen_chain)
+				if scarcity or price >= bat_discharge_price:
+					bat_cmd = bat_discharge_frac * bat_max
+				elif price <= (bat_charge_price_on if was_charging else bat_charge_price_off):
+					bat_cmd = -bat_charge_frac * bat_max  # sticky through the self-bump
+				_bat_charging[did] = bat_cmd < 0.0
+				if bat_cmd < 0.0:
+					flex_next += -bat_cmd  # charging is load next block
+				commands[did] = {"dispatch_mw": snappedf(bat_cmd, 0.1)}
+			"electrolyzer":
+				var was_on: bool = bool(_ely_on.get(did, false))
+				var run: bool = (not scarcity) \
+					and price < (ely_price_on if was_on else ely_price_off)
+				_ely_on[did] = run
+				var ely_mw: float = float(dev_params.get("p_max_mw", 0.0)) if run else 0.0
+				flex_next += ely_mw
+				commands[did] = {"dispatch_mw": ely_mw}
+	_flex_load_mw = flex_next
+	for term_id: String in link_setpoints:
+		var link_cmd: Dictionary = commands.get(term_id, {})
+		link_cmd["dispatch_mw"] = float(link_setpoints[term_id])
+		commands[term_id] = link_cmd
+
+
+
+## Weather region for a tile; fixture maps carry no projection block and
+## fall back to ONE region. The two inline copies said "France" — a casing
+## that matches no REGIONS id (they are lowercase); unreachable on real
+## maps, and on a fixture the corrected id now returns france's weather
+## instead of nothing.
+func _region_for_tile(tile: Vector2i, projection: Dictionary) -> String:
+	if projection.is_empty():
+		return "france"
+	return Weather.region_of_tile(tile, projection)

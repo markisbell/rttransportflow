@@ -63,21 +63,9 @@ func set_treasury_meur(value_meur: float) -> void:
 ## debug key and the campaign's scripted incidents: a scheduled engine
 ## event, never a game-side fake.
 func trip_largest_unit(delay_s: float = 1.0) -> String:
-	var devices: Dictionary = Orchestrator.latest().get("devices", {})
-	var best_id := ""
-	var best_p := 0.0
-	for id: String in devices:
-		var device: Dictionary = devices[id]
-		# synchronous devices carry headroom_mw; converters don't
-		if str(device.get("state", "")) != "online" or not device.has("headroom_mw"):
-			continue
-		# the wire nulls non-finite floats (`_r()`) and GDScript float(null)
-		# is a hard script error
-		var raw: Variant = device.get("p_mw", 0.0)
-		var p: float = 0.0 if raw == null else float(raw)
-		if p > best_p:
-			best_p = p
-			best_id = id
+	var ranked: Array = FleetQuery.online_sync_ranked(
+		Orchestrator.latest().get("devices", {}))
+	var best_id: String = str(ranked.front()) if not ranked.is_empty() else ""
 	if best_id != "":
 		Orchestrator.inject([{"at_s_rel": delay_s, "kind": "trip",
 			"element": best_id}])

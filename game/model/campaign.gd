@@ -20,6 +20,29 @@ signal era_changed(era: Dictionary)
 
 const CAMPAIGN_PATH := "data/campaign/campaign_v1.json"
 const START_STATE_PATH := "data/campaign/start_2025.json"
+
+## The inherited backbone is CONTINENTAL (§5.1; ledger 41) — the metro list
+## that defines the product's start world lives HERE with its owner, not in
+## a smoke (regenerating the shipped world used to require knowing that a
+## test file was the authoring tool). Order is geographic: the trunk is
+## laid along this chain, so a scrambled list would zig-zag the backbone.
+## Mainland only: the islanded centres (london, stockholm, oslo, athens,
+## lisbon, Iberia) join via the links the player unlocks.
+const CONTINENTAL_CORE: Array[String] = [
+	"randstad", "ruhr", "hamburg", "berlin", "prague", "silesia", "warsaw",
+	"vienna", "munich", "stuttgart", "frankfurt", "brussels", "paris",
+	"lyon", "zurich", "milan",
+]
+
+
+## Build the inherited-2025 world (deterministic; author_start verifies it
+## against the shipped golden and start_2025.json restores it at boot).
+## No pre-placed wind or batteries: they shift mesh flows and pushed a
+## nuclear export spur past the 120 % duty threshold within the first
+## block (found by four event-log hunts) — renewables arrive through their
+## unlock years instead.
+static func build_inherited_world(world: Node) -> bool:
+	return DemoBuild.auto_build(world, CONTINENTAL_CORE)
 const BLOCK_DAYS := 1.0 / 96.0
 
 var active := false
@@ -122,12 +145,14 @@ func _apply_era(day: float) -> void:
 	var era: Dictionary = eras[era_index]
 	var co2 := float(era.get("co2_eur_per_t", 30.0))
 	var tariff := float(era.get("tariff_eur_per_mwh", 95.0))
-	Dispatch.economy_cfg["co2_eur_per_t"] = co2
+	# repriced() invalidates the marginal-cost memo in the same breath
+	# (this used to reach into Dispatch._mc_cache directly); the economy
+	# dict is loaded once and shared (GridcoBoot), so repricing Dispatch's
+	# copy IS repricing Economy's — the second write stays for boots that
+	# load the catalogs separately.
+	Dispatch.repriced("co2_eur_per_t", co2)
 	Economy.cfg["co2_eur_per_t"] = co2
 	Economy.cfg["tariff_eur_per_mwh"] = tariff
-	# the MC memo caches kind|fuel prices — stale entries would price the
-	# whole era at the old CO2 (marginal_cost() checks the cache first)
-	Dispatch._mc_cache.clear()
 	era_changed.emit(era)
 
 
@@ -226,23 +251,10 @@ func _staircase_force(field: String, region: String, from_day: float,
 
 
 func _unit_nearest_mw(target_mw: float) -> String:
-	var devices: Dictionary = Orchestrator.latest().get("devices", {})
-	var best := ""
-	var best_key := INF
-	var best_p := -1.0
-	for pid: String in devices:
-		var device: Dictionary = devices[pid]
-		if str(device.get("state", "")) != "online" or not device.has("headroom_mw"):
-			continue  # sync units only (converters carry no headroom field)
-		var p: float = Wire.numf(device, "p_mw", 0.0)
-		if p <= 0.0:
-			continue
-		var key := absf(p - target_mw)
-		if key < best_key or (key == best_key and p > best_p):
-			best_key = key
-			best_p = p
-			best = pid
-	return best
+	# FleetQuery keeps the comparator verbatim — scripted-event victim
+	# selection feeds the milestone-1 nadir and the star rubric
+	return FleetQuery.unit_nearest_mw(
+		Orchestrator.latest().get("devices", {}), target_mw)
 
 
 func _largest_hub() -> String:

@@ -107,16 +107,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if key.keycode != KEY_T:
 		return
-	var best_id := ""
-	var best_p := 0.0
-	for id: String in _latest_devices:
-		var device: Dictionary = _latest_devices[id]
-		# synchronous devices carry headroom_mw; converters don't
-		if device.get("state", "") == "online" and device.has("headroom_mw") \
-				and float(device.get("p_mw", 0.0)) > best_p:
-			best_p = float(device["p_mw"])
-			best_id = id
-	if best_id != "":
+	var ranked: Array = FleetQuery.online_sync_ranked(_latest_devices)
+	if not ranked.is_empty():
+		var best_id: String = str(ranked.front())
+		var best_p := Wire.numf(_latest_devices.get(best_id, {}), "p_mw", 0.0)
 		Orchestrator.inject([{"at_s_rel": 1.0, "kind": "trip", "element": best_id}])
 		_push("[debug] tripping %s (%.0f MW) in 1 s" % [best_id, best_p])
 

@@ -8,29 +8,6 @@ extends SmokeBase
 
 const TAG := "SMOKE_AUTHOR_START"
 
-## The inherited backbone is CONTINENTAL (§5.1: "GridCo Europa inherits the
-## continent's backbone"), not a three-city cluster. This is not cosmetic —
-## it is what makes milestone 1 physically honest. A 12 GW trio island holds
-## ~500 MW of FCR (bands are per-kind fractions of P_n and nuclear does not
-## participate by default, ledger 9), so §5.2.1's scripted 1.2 GW trip drove
-## it straight through 49.0 Hz into UFLS: the tutorial taught "your grid
-## collapses when a unit trips", which is the opposite of the lesson. On the
-## ~95 GW mainland the same incident is the 1.3 % event it is meant to be,
-## and the FCR/RoCoF numbers the replay panel shows are the ones a real
-## interconnected system produces.
-##
-## Mainland only: the islanded centres (london, stockholm, oslo, athens,
-## lisbon, plus Iberia behind the Pyrenees) need submarine/HVDC links, which
-## the player unlocks later — they join the synchronous area then.
-## Order is geographic: the trunk is laid along this chain, so a scrambled
-## list would zig-zag the backbone across the continent.
-const CONTINENTAL_CORE: Array[String] = [
-	"randstad", "ruhr", "hamburg", "berlin", "prague", "silesia", "warsaw",
-	"vienna", "munich", "stuttgart", "frankfurt", "brussels", "paris",
-	"lyon", "zurich", "milan",
-]
-
-
 func run() -> void:
 	if not BuildSession.load_map():
 		_fail(TAG, "map load failed")
@@ -61,12 +38,9 @@ func run() -> void:
 
 
 func _build() -> bool:
-	# No pre-placed wind or batteries: they shift mesh flows and pushed a
-	# nuclear export spur past the 120 % duty threshold within the first
-	# block (found by four event-log hunts). The "modest inherited renewable
-	# fleet" of §5.1 is narrative until the corridor-upgrade tool exists;
-	# wind and batteries arrive through their unlock years instead.
-	return DemoBuild.auto_build(World, CONTINENTAL_CORE)
+	# the world author lives with its owner (Campaign, beside
+	# START_STATE_PATH); this smoke is verify-plus-baseline only
+	return Campaign.build_inherited_world(World)
 
 
 func _count_kind(kind: String) -> int:

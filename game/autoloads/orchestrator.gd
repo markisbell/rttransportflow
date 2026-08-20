@@ -80,12 +80,25 @@ func _ready() -> void:
 ## resync pattern); GameClock.t_sim continues, boundary conditions follow it.
 func register(topology_doc: Dictionary) -> bool:
 	topology = topology_doc
+	var ok := await _reset_backend("register")
+	# a snapshot in the doc is ONE-SHOT (SaveLoad's exact restore): strip it
+	# from the STORED topology so a later crash/deaf recovery resets cold
+	# instead of silently rewinding the sim to the old save point
+	topology = topology_doc.duplicate()
+	topology.erase("snapshot")
+	return ok
+
+
+## THE reset sequence — register() and every recovery path share it
+## (previously two hand copies with independently drifted predicates; a
+## third was on its way). refused_snapshot is a LEGAL cold start (contract
+## reset semantics / SPEC §4.2): the reset applied, only the exact-state
+## restore didn't.
+func _reset_backend(reason: String) -> bool:
 	resetting = true
 	var response: Dictionary = await _bridge().net_reset(ID, topology)
 	resetting = false
 	last_reset_status = str(response.get("status", ""))
-	# refused_snapshot is a LEGAL cold start (contract reset semantics /
-	# SPEC §4.2): the reset applied, only the exact-state restore didn't
 	var ok: bool = response.get("_status", 0) == 200 \
 		and (last_reset_status == "ok" or last_reset_status == "refused_snapshot")
 	if ok and last_reset_status == "refused_snapshot":
@@ -97,10 +110,25 @@ func register(topology_doc: Dictionary) -> bool:
 		# zeroed every cap, declared scarcity and dumped the batteries into
 		# a healthy island (found by battery_response run B)
 		last_result = {}
+		needs_reset = false
+		if reason != "register":
+			var gap_start := down_since_sim
+			down_since_sim = -1.0
+			supply_event.emit("backend_recovered", "info",
+				{"gap_start_sim": gap_start, "resumed_sim": GameClock.t_sim,
+					"reason": reason})
 	else:
-		push_warning("net_reset failed: %s" % JSON.stringify(response))
+		push_warning("net_reset failed (%s): %s" % [reason, JSON.stringify(response)])
 		supply_event.emit("reset_failed", "critical", response)
 	return ok
+
+
+## SaveLoad seam: adopt a restored last_result so the dispatcher's first
+## post-load decision sees the exact pre-save device/PF context.
+## (register() clears last_result by design — that guard is for CRASH
+## recovery, not for a deliberate restore.)
+func adopt_result(result: Dictionary) -> void:
+	last_result = result
 
 
 func start() -> void:
@@ -130,6 +158,12 @@ func _on_tick() -> void:
 		if down_since_sim < 0.0 and needs_reset:
 			down_since_sim = GameClock.t_sim
 			supply_event.emit("backend_down", "critical", {"t_sim": GameClock.t_sim})
+		# a DEAF backend never transitions the sidecar state, so the
+		# HEALTHY-edge recovery in _on_sidecar_state can structurally never
+		# fire for it — recover from the tick loop instead (the deaf path
+		# used to spin here forever, skipped_down climbing)
+		if needs_reset and not resetting and _healthy():
+			_recover()
 		return
 	if in_flight:
 		stats["skipped_busy"] += 1
@@ -253,20 +287,18 @@ func _on_sidecar_state(_id: String, state: SidecarManager.State) -> void:
 		_recover()
 
 
+var _recovering := false
+
+
 func _recover() -> void:
-	if not await _bridge().handshake(ID):
-		supply_event.emit("handshake_failed", "critical", {})
-		return
-	var response: Dictionary = await _bridge().net_reset(ID, topology)
-	if response.get("_status", 0) == 200 and str(response.get("status", "")) == "ok":
-		needs_reset = false
-		last_t = -1  # fresh wire sequence after the reset (see register())
-		var gap_start := down_since_sim
-		down_since_sim = -1.0
-		supply_event.emit("backend_recovered", "info",
-			{"gap_start_sim": gap_start, "resumed_sim": GameClock.t_sim})
+	if _recovering:
+		return  # the 10 Hz tick loop may re-enter while the handshake awaits
+	_recovering = true
+	if await _bridge().handshake(ID):
+		await _reset_backend("recover")
 	else:
-		supply_event.emit("reset_failed", "critical", response)
+		supply_event.emit("handshake_failed", "critical", {})
+	_recovering = false
 
 
 func reset_for_test() -> void:
@@ -281,3 +313,4 @@ func reset_for_test() -> void:
 		"skipped_down": 0, "rejected": 0}
 	bridge_override = null
 	health_override = null
+	_recovering = false

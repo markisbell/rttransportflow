@@ -125,17 +125,7 @@ func chase_event(pre_dt_s: float, chase_steps: int, tag: String = "",
 ## The ONE victim-selection rule (it existed in three drifted copies; the
 ## unguarded variant would have picked a wind farm in a changed fixture).
 func online_sync_ranked(devices: Dictionary) -> Array:
-	var sync: Array = []
-	for pid: String in devices:
-		var device: Dictionary = devices[pid]
-		if str(device.get("state", "")) == "online" and device.has("headroom_mw"):
-			sync.append([numf(device, "p_mw", 0.0), pid])
-	sync.sort_custom(func(a: Array, b: Array) -> bool:
-		return a[0] > b[0] or (a[0] == b[0] and str(a[1]) < str(b[1])))
-	var out: Array = []
-	for entry: Array in sync:
-		out.append(entry[1])
-	return out
+	return FleetQuery.online_sync_ranked(devices)
 
 
 ## Foreign-footprint avoid set (the P5 lesson: corridors that brush another

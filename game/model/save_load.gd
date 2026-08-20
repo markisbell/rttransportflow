@@ -56,8 +56,7 @@ func save_game(path: String = DEFAULT_PATH, force: bool = false) -> Dictionary:
 		"weather": Weather.to_dict(),
 		"demand": Demand.to_dict(),
 		"economy": Economy.to_dict(),
-		"dispatch": {"plant_mode": Dispatch.plant_mode.duplicate(true),
-			"link_setpoints": Dispatch.link_setpoints.duplicate(true)},
+		"dispatch": Dispatch.to_dict(),
 		"campaign": Campaign.to_dict(),
 		"last_result": Orchestrator.last_result.duplicate(true),
 		"prev_speed": prev_speed,
@@ -93,28 +92,22 @@ func load_game(path: String = DEFAULT_PATH) -> Dictionary:
 	Weather.from_dict(envelope.get("weather", {}))
 	Demand.from_dict(envelope.get("demand", {}))
 	Economy.from_dict(envelope.get("economy", {}))
-	var dispatch: Dictionary = envelope.get("dispatch", {})
-	Dispatch.plant_mode = (dispatch.get("plant_mode", {}) as Dictionary).duplicate(true)
-	Dispatch.link_setpoints = \
-		(dispatch.get("link_setpoints", {}) as Dictionary).duplicate(true)
+	Dispatch.from_dict(envelope.get("dispatch", {}))
 	Campaign.from_dict(envelope.get("campaign", {}))
 	GameClock.restore(envelope.get("clock", {}))
 	GameClock.pause()  # restore() brings the saved speed; resume explicitly
 
 	# exact dynamic resume: the reset carries the snapshot; refused_snapshot
 	# is the legal cold-start fallback (SPEC §4.2)
-	Boundary.pending_snapshot = envelope.get("snapshot", {})
+	Boundary.arm_snapshot(envelope.get("snapshot", {}))
 	BuildSession.rebuild_now()
 	var status: Array = await BuildSession.build_status
 	if not bool(status[0]):
 		load_completed.emit(false, "register_failed: %s" % str(status[1]))
 		return {"ok": false, "reason": "register_failed"}
-	Boundary._decided_block = -1  # force a fresh dispatch decision at resume
-	# the dispatcher's first post-load decision must see the exact pre-save
-	# device/PF context (register() clears last_result by design — that
-	# guard is for CRASH recovery, not for a deliberate restore)
-	Orchestrator.last_result = \
-		(envelope.get("last_result", {}) as Dictionary).duplicate(true)
+	Boundary.invalidate_schedule()
+	Orchestrator.adopt_result(
+		(envelope.get("last_result", {}) as Dictionary).duplicate(true))
 	var refused := Orchestrator.last_reset_status == "refused_snapshot"
 	GameClock.speed = float(envelope.get("prev_speed", 1.0))
 	load_completed.emit(true, "refused_snapshot" if refused else "")
