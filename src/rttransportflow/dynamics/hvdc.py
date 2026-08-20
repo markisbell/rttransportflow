@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from . import US
+from ..snapshot import parse_floats, repr_floats
 
 CONVERTER_LOSS_FRAC = 0.01  # per station, two stations per path
 CABLE_LOSS_FRAC_PER_100KM = 0.003
@@ -113,17 +114,15 @@ class HVDCLinks:
         return np.where(self.term_sign > 0, inj_a, inj_b)
 
     def state_dict(self) -> dict:
-        def rf(a):
-            return [repr(float(v)) for v in a]
-
+        rf = repr_floats
         return {"p_set": rf(self.p_set), "p": rf(self.p),
                 "online": self.online.tolist(), "term_q": rf(self.term_q)}
 
     def restore_state(self, state: dict) -> None:
-        self.p_set[:] = np.array([float(v) for v in state["p_set"]])
-        self.p[:] = np.array([float(v) for v in state["p"]])
+        self.p_set[:] = parse_floats(state["p_set"])
+        self.p[:] = parse_floats(state["p"])
         self.online[:] = np.array(state["online"], dtype=bool)
-        self.term_q[:] = np.array([float(v) for v in state["term_q"]])
+        self.term_q[:] = parse_floats(state["term_q"])
 
 
 def make_links(pairs: list[dict]) -> HVDCLinks:

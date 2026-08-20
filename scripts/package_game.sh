@@ -65,27 +65,24 @@ cp -r data "$BUNDLE/data"
 
 BACKEND_EXE="backend/rttransportflow-backend/rttransportflow-backend"
 [ "$PLATFORM" = "windows" ] && BACKEND_EXE="$BACKEND_EXE.exe"
-python3 - "$BUNDLE/orchestration/sidecars.json" "$BACKEND_EXE" <<'PY'
+# TRANSFORM the checked-in sidecar config rather than re-typing it: the env
+# block has exactly one author (orchestration/sidecars.json) — a new env var
+# added there used to need a manual mirror into a heredoc here, or the
+# shipped bundle silently ran a different backend configuration than dev
+# (the config-file variant of the ledger-36 stale-backend failure).
+python3 - "orchestration/sidecars.json" "$BUNDLE/orchestration/sidecars.json" "$BACKEND_EXE" <<'PY'
 import json, sys
-out, exe = sys.argv[1], sys.argv[2]
-json.dump({
-    "_comment": "Packaged bundle: the sidecar is the FROZEN backend next to "
-                "the game, so no Python/venv is required on the player's "
-                "machine. Port 8030 per the family port map.",
-    "sidecars": [{
-        "id": "transmission",
-        "exe": exe,
-        "cwd": ".",
-        "port": 8030,
-        "env": {
-            "RTTRANSPORTFLOW_EXTERNAL_CLOCK": "true",
-            "RTTRANSPORTFLOW_HOST": "127.0.0.1",
-            "RTTRANSPORTFLOW_SIMULATOR": "null",
-            "RTTRANSPORTFLOW_AUTOSTART": "false",
-            "RTTRANSPORTFLOW_LOG_LEVEL": "warning",
-        },
-    }],
-}, open(out, "w"), indent=2)
+src, out, exe = sys.argv[1], sys.argv[2], sys.argv[3]
+doc = json.load(open(src))
+doc["_comment"] = ("Packaged bundle (generated from orchestration/"
+                   "sidecars.json): the sidecar is the FROZEN backend next "
+                   "to the game, so no Python/venv is required on the "
+                   "player's machine.")
+for entry in doc["sidecars"]:
+    entry.pop("python", None)
+    entry.pop("module", None)
+    entry["exe"] = exe
+json.dump(doc, open(out, "w"), indent=2)
 PY
 
 cat > "$BUNDLE/README-RUN.txt" <<EOF

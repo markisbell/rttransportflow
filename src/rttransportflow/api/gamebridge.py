@@ -20,13 +20,24 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from .. import APP_NAME, __version__
 from ..dynamics import QUANTUM_US, US, s_to_us
 from ..dynamics.events import Event
-from ..simulator import DynSimulator, WireDeviceError, _as_int, _r
+from ..dynamics.integrator import ModeConfig
+from ..simulator import (
+    SIM_SNAPSHOT_VERSION,
+    DynSimulator,
+    WireDeviceError,
+    _as_int,
+    _r,
+)
 from ..snapshot import model_hash
 
 CONTRACT = "2.0"
 NETWORK_KIND = "transmission"
+# dt_s bounds are CONTRACT numbers (schema: minimum 0.05, maximum 900) —
+# not operator knobs; the schema, this pair and the error message agree.
 MIN_DT_S = 0.05
-SNAPSHOT_VERSION = 2
+MAX_DT_S = 900.0
+# a replay window longer than ring retention is a guaranteed window_expired
+REPLAY_WINDOW_MAX_S = DynSimulator.RING_RETAIN_US / US
 
 router = APIRouter(prefix="/gb")
 
@@ -113,6 +124,7 @@ async def net_reset(request: Request) -> dict:
             catalog_path=container.settings.catalog_path,
             wire_devices=wire_devices,
             protection_seed=_as_int(body.get("protection_seed", 0.0)),
+            mode_cfg=ModeConfig.from_settings(container.settings),
         )
         sim.warmup()
         return sim
@@ -129,7 +141,7 @@ async def net_reset(request: Request) -> dict:
     snapshot_blob = body.get("snapshot")
     if snapshot_blob is not None:
         if (snapshot_blob.get("model_hash") == hash_
-                and snapshot_blob.get("version") == SNAPSHOT_VERSION):
+                and snapshot_blob.get("version") == SIM_SNAPSHOT_VERSION):
             sim.restore_blob(snapshot_blob["blob"])
         else:
             status = "refused_snapshot"  # applied WITHOUT it — game cold-starts
@@ -143,6 +155,7 @@ async def net_reset(request: Request) -> dict:
         "d_load_pct_per_hz": container.settings.d_load_pct_per_hz,
         "warm_start": container.settings.warm_start,
         "catalog_path": container.settings.catalog_path,
+        "mode_cfg": ModeConfig.from_settings(container.settings),
     }
     sim.enable_snapshot_ring()
     request.app.state.gb = gb
@@ -194,8 +207,8 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
         return None, _step_error([gb.last_t, gb.last_t + 1])
 
     dt_s = float(body.get("dt_s", 0.1))
-    if not (MIN_DT_S <= dt_s <= 900.0):
-        return None, {"error": f"dt_s {dt_s} outside [0.05, 900]"}
+    if not (MIN_DT_S <= dt_s <= MAX_DT_S):
+        return None, {"error": f"dt_s {dt_s} outside [{MIN_DT_S}, {MAX_DT_S:g}]"}
     interrupt = bool(body.get("interrupt_on_event", True))
 
     sim = gb.sim
@@ -462,7 +475,7 @@ def snapshot(request: Request) -> dict:
         "t": gb.last_t,
         "t_sim": gb.sim.integrator.t_us / US,
         "model_hash": gb.model_hash,
-        "version": SNAPSHOT_VERSION,
+        "version": SIM_SNAPSHOT_VERSION,
         "blob": gb.sim.state_blob(),  # repr floats — bit-exact (v2: + topology)
     }
 
@@ -483,7 +496,7 @@ async def replay(request: Request) -> dict:
         # wire events carry no ids — the game addresses windows by t_sim
         raise HTTPException(status_code=400, detail="t_sim required")
     t_sim = float(body["t_sim"])
-    window_s = min(float(body.get("window_s", 65.0)), 120.0)
+    window_s = min(float(body.get("window_s", 65.0)), REPLAY_WINDOW_MAX_S)
     hit = gb.sim.ring_lookup(s_to_us(t_sim))
     if hit is None:
         return {"status": "window_expired"}
@@ -535,7 +548,8 @@ async def replay(request: Request) -> dict:
 
 
 @router.get("/telemetry/ring")
-def telemetry_ring(request: Request, window_s: float = 120.0) -> dict:
+def telemetry_ring(request: Request,
+                   window_s: float = REPLAY_WINDOW_MAX_S) -> dict:
     gb = _gb(request)
     ring = gb.sim.integrator.rings[0]
     t, f = ring._ordered()

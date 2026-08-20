@@ -33,7 +33,18 @@ class Settings(BaseSettings):
     # --- solver ---
     warm_start: bool = True
 
-    # --- dynamics (consumed from P2 on; authority: docs/PHYSICS.md §4) ---
+    # --- dynamics (ModeConfig.from_settings; authority: docs/PHYSICS.md §4).
+    # These reach the engine via ModeConfig — the ledger-5 mode-hysteresis
+    # revisit surface. WARNING: changing any of them moves the tick/PF grid,
+    # so the bit-exact-pinned smokes stop comparing to their recorded numbers
+    # on that machine. Defaults are bit-equal to ModeConfig()'s.
+    # (An earlier version of this block also declared embedded_dg_frac,
+    # max_dt_s, trajectory_max_samples and snapshot_ring_interval_s — those
+    # were knobs wired to NOTHING and are gone: the DG fraction is a
+    # PARAMETERS §2.2 constant in dynamics/protection.py, the dt_s bounds are
+    # CONTRACT numbers in api/gamebridge.py, the trajectory cap is
+    # contract-adjacent (schema maxItems), and the ring cadence is
+    # dynamics.SNAP_MARK_US paired with the replay retention.)
     dt_alert: float = 0.010
     dt_calm: float = 0.250
     pf_interval_alert: float = 1.0
@@ -44,7 +55,3 @@ class Settings(BaseSettings):
     calm_rocof_mhz_s: float = 10.0
     calm_hold_s: float = 30.0
     d_load_pct_per_hz: float = 1.0
-    embedded_dg_frac: float = 0.15
-    max_dt_s: float = 900.0
-    trajectory_max_samples: int = 512
-    snapshot_ring_interval_s: float = 5.0

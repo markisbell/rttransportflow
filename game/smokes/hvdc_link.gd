@@ -35,7 +35,7 @@ func run() -> void:
 			link_id = str(dev["params"]["link_id"])
 			length_km = float(dev["params"]["length_km"])
 	check("link_paired", n_hvdc == 2 and link_id != "")
-	var loss_frac := 0.02 + 0.003 * length_km / 100.0
+	var loss_frac := hvdc_path_loss_frac(length_km)
 
 	# --- baseline: AC carries the Berlin import --------------------------
 	await p7_block("base")

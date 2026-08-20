@@ -12,6 +12,19 @@ from __future__ import annotations
 
 import hashlib
 
+import numpy as np
+
+
+def repr_floats(arr) -> list[str]:
+    """The ONE repr-float serializer (previously five hand-rolled copies).
+    `repr(float(v))` — the float() unwrap matters: NumPy 2's repr(np.float64)
+    prints the dtype wrapper and broke restore (P2 log)."""
+    return [repr(float(v)) for v in arr]
+
+
+def parse_floats(items) -> np.ndarray:
+    return np.array([float(v) for v in items])
+
 
 def model_hash(fleet) -> str:
     """Hash of the model structure+parameters (not state) — restore guard."""

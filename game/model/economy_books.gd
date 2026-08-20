@@ -75,16 +75,20 @@ func _on_plant_placed(_pid: String, kind: String, p_max_mw: float) -> void:
 func _on_corridor_placed(tile: Vector2i, kind: String) -> void:
 	var per_km: float = (cfg["line_cost_meur_per_km"] as Dictionary).get(kind, 1.0) * 1e6
 	var terrain := World.terrain_at(tile)
+	var terrain_factor: Dictionary = cfg.get("line_terrain_factor", {})
 	var factor := 1.0
 	if kind == "hvdc":
 		# submarine export cable has its own §1.16 price; no AC sea factor
 		if terrain == "s" or terrain == "S":
 			per_km = float(cfg.get("hvdc_submarine_meur_per_km", 2.0)) * 1e6
 	elif terrain == "s":
-		factor = 2.2  # submarine (GAME_DESIGN §1.5)
+		factor = float(terrain_factor.get("submarine_ac", 2.2))  # GAME_DESIGN §1.5
 	elif terrain == "m":
-		factor = 1.6  # mountain
-	_spend_capex(per_km * World.tile_km * 1.12 * factor)
+		factor = float(terrain_factor.get("mountain", 1.6))
+	# the billed kilometre IS the solved kilometre: one sinuosity, shared
+	# with the topology builder (tuning line routing can no longer leave
+	# capex on the old routing model)
+	_spend_capex(per_km * World.tile_km * GridTopology.SINUOSITY * factor)
 
 
 func _on_substation_placed(_tile: Vector2i) -> void:

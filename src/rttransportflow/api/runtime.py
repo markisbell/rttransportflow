@@ -65,6 +65,7 @@ def build_container(settings: Settings | None = None) -> App:
         simulator = NullSimulator(steps_per_day=settings.steps_per_day)
     elif settings.simulator == "dyn":
         from ..data_loader import load_bundle
+        from ..dynamics.integrator import ModeConfig
         from ..simulator import build_dyn_simulator
 
         simulator = build_dyn_simulator(
@@ -72,6 +73,7 @@ def build_container(settings: Settings | None = None) -> App:
             d_load_pct_per_hz=settings.d_load_pct_per_hz,
             warm_start=settings.warm_start,
             catalog_path=settings.catalog_path,
+            mode_cfg=ModeConfig.from_settings(settings),
         )
         network_meta = _network_meta(load_bundle(settings.data_dir))
     elif settings.simulator == "pf":

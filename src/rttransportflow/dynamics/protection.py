@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..snapshot import parse_floats, repr_floats
+
 
 @dataclass
 class FWindowConfig:
@@ -75,6 +77,12 @@ UFLS_STAGES: list[tuple[float, float]] = [
     (49.0, 0.075), (48.8, 0.075), (48.6, 0.075),
     (48.4, 0.075), (48.2, 0.075), (48.0, 0.075),
 ]
+# = 6 × 0.075 per PARAMETERS §2.2 (ledger 6). Deliberately a LITERAL, not the
+# float sum: six binary-inexact 0.075 additions need not equal 0.45 bit-for-
+# bit, and this clamp participates in pinned w trajectories. The assert keeps
+# a future stage-table edit from silently desynchronizing the floor.
+UFLS_CUM_SHED = 0.45
+assert abs(UFLS_CUM_SHED - sum(shed for _, shed in UFLS_STAGES)) < 1e-12
 UFLS_PICKUP_US = 150_000
 PUMP_SHED_HZ = 49.7  # all PHS pumping trips (automatic load relief)
 ELY_SHED_HZ = 49.6  # interruptible tier (proportional shed is already full)
@@ -168,7 +176,8 @@ class DefensePlan:
             for island in np.nonzero(self.stage_timer_us[k] > UFLS_PICKUP_US)[0]:
                 self.stage_armed[k, island] = False
                 self.stage_timer_us[k, island] = 0
-                islands.w[island] = max(islands.w[island] - shed, 1.0 - 0.45)
+                islands.w[island] = max(islands.w[island] - shed,
+                                        1.0 - UFLS_CUM_SHED)
                 self.restore_target_w[island] = islands.w[island]
                 events.append(("ufls_stage", f"island:{island}",
                                {"stage": k + 1, "shed_frac": shed,
@@ -246,7 +255,7 @@ class DefensePlan:
             "pump_latched": self.pump_latched.tolist(),
             "rocof_armed": self.rocof_armed.tolist(),
             "pole_armed": self.pole_armed.tolist(),
-            "restore_target_w": [repr(float(v)) for v in self.restore_target_w],
+            "restore_target_w": repr_floats(self.restore_target_w),
             "f_ok_since_us": self.f_ok_since_us.tolist(),
             "rng": self.rng.bit_generator.state,
         }
@@ -260,6 +269,6 @@ class DefensePlan:
         self.rocof_armed[:] = np.array(state["rocof_armed"], dtype=bool)
         self.pole_armed[:] = np.array(state["pole_armed"], dtype=bool)
         self.restore_target_w[:] = np.array(
-            [float(v) for v in state["restore_target_w"]])
+            parse_floats(state["restore_target_w"]))
         self.f_ok_since_us[:] = np.array(state["f_ok_since_us"], dtype=np.int64)
         self.rng.bit_generator.state = state["rng"]

@@ -714,7 +714,7 @@ static func _dispatch_profiles(world: Node, plant_ids: Array[String],
 static func _fill_profiles(world: Node, plant_ids: Array[String],
 		total_load: Array[float], out: Dictionary) -> void:
 	for step in range(STEPS):
-		var target: float = total_load[step] * 1.015
+		var target: float = total_load[step] * Dispatch.loss_margin
 		var fixed := 0.0
 		var dispatchable_cap := 0.0
 		var fixed_pids: Array[String] = []
@@ -747,8 +747,11 @@ static func _fill_profiles(world: Node, plant_ids: Array[String],
 			fixed = target
 		var residual := maxf(target - fixed, 0.0)
 		if dispatchable_cap > 0.0:
-			var share := minf(residual / dispatchable_cap, 0.92)
+			# ledger 30: the stub operating point uses the SAME deliverable
+			# cap the live dispatcher schedules against (stub-vs-live mismatch
+			# at t=0 collapsed a grid once — P6 discovery 3)
+			var share := minf(residual / dispatchable_cap, Dispatch.headroom_frac)
 			for pid: String in plant_ids:
 				var p: Dictionary = world.plants[pid]
-				if str(p["kind"]) in ["coal", "lignite", "gas_ccgt", "gas_ocgt", "hydro_ps"]:
+				if str(p["kind"]) in World.DISPATCHABLE_KINDS:
 					out[pid][step] = snappedf(share * float(p["p_max_mw"]), 0.1)

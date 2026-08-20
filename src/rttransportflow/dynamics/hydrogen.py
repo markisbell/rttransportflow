@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..snapshot import parse_floats, repr_floats
+
 LHV_KWH_PER_KG = 33.33
 ETA_SPEC_LOW = 48.0  # kWh/kg at 20 % load
 ETA_SPEC_HIGH = 52.0  # kWh/kg at 100 %
@@ -104,16 +106,14 @@ class H2Stores:
         return allowed
 
     def state_dict(self) -> dict:
-        def rf(a):
-            return [repr(float(v)) for v in a]
-
+        rf = repr_floats
         return {"level_kg": rf(self.level_kg), "injected_kg": rf(self.injected_kg),
                 "withdrawn_kg": rf(self.withdrawn_kg),
                 "compressor_mwh": rf(self.compressor_mwh)}
 
     def restore_state(self, state: dict) -> None:
         for name in ("level_kg", "injected_kg", "withdrawn_kg", "compressor_mwh"):
-            getattr(self, name)[:] = np.array([float(v) for v in state[name]])
+            getattr(self, name)[:] = parse_floats(state[name])
 
 
 def make_stores(specs: list[dict]) -> H2Stores:

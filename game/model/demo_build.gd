@@ -53,8 +53,10 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 ## `banned`: sites that already failed routing — never offer them again.
 ## Ring radii are given in TILES but tuned as distances: `tiles_for_km`
 ## keeps them honest when the grid resolution changes (ledger 38).
+## Delegates to the ONE converter on WorldModel — a second implementation is
+## how the sixth tile-count bite happens.
 static func tiles_for_km(km: float, world: Node) -> int:
-	return maxi(1, int(round(km / maxf(world.tile_km, 1.0))))
+	return world.tiles_for_km(km)
 
 
 static func find_site(world: Node, kind: String, anchor: Vector2i, max_r: int = 8,

@@ -57,6 +57,21 @@ class LinesDoc(_Doc):
     lines: list[LineSpec]
 
 
+# One mapping owns the kind vocabulary AND its sync/converter partition —
+# adding a kind to the Literal but neither set used to pass validation and
+# only fail at build time ("schema forbids this").
+_KIND_FAMILY: dict[str, str] = {
+    "nuclear": "sync",
+    "coal": "sync",
+    "lignite": "sync",
+    "gas_ccgt": "sync",
+    "gas_ocgt": "sync",
+    "hydro_ps": "sync",
+    "wind_onshore": "converter",
+    "wind_offshore": "converter",
+    "solar_pv": "converter",
+}
+
 PlantKind = Literal[
     "nuclear",
     "coal",
@@ -70,11 +85,17 @@ PlantKind = Literal[
 ]
 
 SYNC_KINDS: frozenset[str] = frozenset(
-    {"nuclear", "coal", "lignite", "gas_ccgt", "gas_ocgt", "hydro_ps"}
+    k for k, family in _KIND_FAMILY.items() if family == "sync"
 )
 CONVERTER_KINDS: frozenset[str] = frozenset(
-    {"wind_onshore", "wind_offshore", "solar_pv"}
+    k for k, family in _KIND_FAMILY.items() if family == "converter"
 )
+
+# import-time exhaustiveness guard: the Literal and the mapping must agree
+from typing import get_args as _get_args  # noqa: E402
+
+assert set(_get_args(PlantKind)) == set(_KIND_FAMILY), \
+    "PlantKind and _KIND_FAMILY drifted — add new kinds to BOTH"
 
 
 class PlantSpec(_Doc):

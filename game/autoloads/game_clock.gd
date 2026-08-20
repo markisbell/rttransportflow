@@ -9,7 +9,6 @@ signal speed_changed(speed: float)
 signal time_advanced(t_sim: float, dt_done_s: float)
 
 const SECONDS_PER_DAY := 86400.0
-const STEP_SECONDS := 900.0  # economy-layer cadence (96 steps/day)
 
 var speed := 1.0:
 	set(value):
@@ -38,7 +37,8 @@ func second_of_day() -> float:
 
 
 func step_index(steps_per_day: int = 96) -> int:
-	return int(t_sim / STEP_SECONDS) % steps_per_day
+	# economy-layer cadence: Dispatch.BLOCK_S is the ONE block length
+	return int(t_sim / Dispatch.BLOCK_S) % steps_per_day
 
 
 func time_of_day_string() -> String:

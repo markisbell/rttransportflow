@@ -3,11 +3,6 @@ extends Node
 ## europe_mini daily profiles as boundary conditions. GridCo's real
 ## demand/weather/dispatch models replace this in P6.
 
-const SYNC_KINDS: Array[String] = [
-	"nuclear", "coal", "lignite", "gas_ccgt", "gas_ocgt", "hydro_ps"]
-const CONVERTER_KINDS: Array[String] = [
-	"wind_onshore", "wind_offshore", "solar_pv"]
-
 var docs := {}  # grid / lines / plants / load_centers / scenario (verbatim)
 var loaded := false
 
@@ -57,7 +52,7 @@ func steps_per_day() -> int:
 
 
 func _step_index(t_sim: float) -> int:
-	return int(t_sim / 900.0) % steps_per_day()
+	return int(t_sim / Dispatch.BLOCK_S) % steps_per_day()
 
 
 ## Contract reset document: native bundle VERBATIM + zones (+ no device
@@ -147,7 +142,7 @@ func _zone_ids() -> Array:
 
 ## One dispatcher decision per 15-min block (GAME_DESIGN §3.3 cadence).
 func _ensure_decided(t_sim: float) -> void:
-	var block := int(t_sim / 900.0)
+	var block := int(t_sim / Dispatch.BLOCK_S)
 	if block == _decided_block:
 		return
 	_decided_block = block
@@ -184,7 +179,7 @@ func avail_mw(t_sim: float) -> Dictionary:
 	var idx := _step_index(t_sim)
 	var out := {}
 	for plant: Dictionary in docs["plants"].get("plants", []):
-		if CONVERTER_KINDS.has(str(plant["kind"])):
+		if World.CONVERTER_KINDS.has(str(plant["kind"])):
 			out[plant["id"]] = float(plant["profile_p_mw"][idx])
 	return out
 
@@ -230,6 +225,6 @@ func device_commands(t_sim: float, dt_s: float = 0.0) -> Dictionary:
 	var idx := _step_index(t_sim)
 	var out := {}
 	for plant: Dictionary in docs["plants"].get("plants", []):
-		if SYNC_KINDS.has(str(plant["kind"])):
+		if World.SYNC_KINDS.has(str(plant["kind"])):
 			out[plant["id"]] = {"dispatch_mw": float(plant["profile_p_mw"][idx])}
 	return out

@@ -60,7 +60,7 @@ const ITEMS := [
 		{"tool": "hvdc_converter", "label": "HVDC converter 2 GW",
 			"desc": "Both ends of a link, or the onshore end of a hub."},
 		{"tool": "offshore_platform", "label": "Offshore platform 2 GW",
-			"desc": "Collects far-shore farms within two tiles and exports by DC."},
+			"desc": "Collects far-shore farms within 100 km and exports by DC."},
 	]},
 ]
 
@@ -229,7 +229,7 @@ func _render_thumbnails() -> void:
 		if sample == null:
 			continue
 		vp.add_child(sample)
-		var bounds := _aabb_of(sample)
+		var bounds := PlantModels.aabb_of(sample)
 		var center := bounds.position + bounds.size / 2.0
 		cam.size = maxf(bounds.size.x, maxf(bounds.size.y, bounds.size.z)) * 1.25
 		cam.position = center + Vector3(-1, 0.85, -1).normalized() * 12.0
@@ -247,16 +247,6 @@ func _render_thumbnails() -> void:
 		button.expand_icon = true
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vp.queue_free()
-
-
-func _aabb_of(node: Node) -> AABB:
-	var total := AABB()
-	var first := true
-	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
-		var box := mesh.transform * mesh.get_aabb()
-		total = box if first else total.merge(box)
-		first = false
-	return total
 
 
 ## Clear the armed tool (e.g. after a build that consumes the selection).

@@ -97,7 +97,24 @@
     "_treasury_rationale": "sandbox/P6 default: room to build a starter grid; the campaign (P9) sets its own.",
     "reserve_margin_mw_min": 3000.0,
     "afrr_frac_of_load": 0.015,
-    "hvdc_submarine_meur_per_km": 2.0,
+    "dispatch_policy": {
+    "_rationale": "GridCo dispatcher policy numbers (GAME_DESIGN §3.3; ledger 30 makes deliverable_frac binding). They interact with the price columns above — when the campaign CO2 ratchet reprices the merit order, THESE are the thresholds that decide when batteries arbitrage and electrolyzers soak; balancing passes tune them here, not in dispatch.gd.",
+    "deliverable_frac": 0.92,
+    "loss_margin": 1.015,
+    "battery_discharge_price_eur_per_mwh": 200.0,
+    "battery_discharge_frac": 0.8,
+    "battery_charge_price_on_eur_per_mwh": 45.0,
+    "battery_charge_price_off_eur_per_mwh": 15.0,
+    "battery_charge_frac": 0.5,
+    "ely_price_on_eur_per_mwh": 80.0,
+    "ely_price_off_eur_per_mwh": 20.001
+  },
+  "line_terrain_factor": {
+    "_rationale": "GAME_DESIGN §1.5 corridor capex multipliers (billing only — physics does not care what the tower stands on). Route length itself is km × GridTopology.SINUOSITY, shared with the solved line length so the billed kilometre IS the electrical kilometre.",
+    "submarine_ac": 2.2,
+    "mountain": 1.6
+  },
+  "hvdc_submarine_meur_per_km": 2.0,
     "h2_cavern_meur": 93.0,
     "h2_cavern_fom_meur_a": 1.4
 }

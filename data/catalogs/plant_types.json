@@ -215,6 +215,15 @@
       "shed_full_hz": 0.2,
       "deadband_hz": 0.01,
       "rationale": "PARAMETERS §1.13 PEM: controllable load providing upward reserve BY SHEDDING — full shed at −200 mHz through a 0.3 s lag (the inverted lesson); 49.6 Hz auto-shed tier arrives with protection (P8)."
+    },
+    "offshore_hub": {
+      "model": "inverter",
+      "t_up_s": 0.1,
+      "t_down_s": 0.1,
+      "lfsm_o_from_hz": 50.2,
+      "lfsm_o_droop_pu": 0.05,
+      "avail_slew_pct_pn_min": 20.0,
+      "rationale": "PARAMETERS §1.16 offshore converter platform (ledgers 27/28): one aggregated far-shore injection at the onshore converter bus — fast converter lags (0.1 s), LFSM-O at the onshore terminal like every converter, 20 %/min availability slew (a front crosses the bight in minutes, same as the wind it collects). Path losses (2 stations + cable) and the 0.15 % no-load auxiliary stay with the DC model in dynamics/hvdc.py; the wire parser reads THIS entry — it was the one kind bypassing the catalog."
     }
   },
   "frequency_protection": {

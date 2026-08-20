@@ -35,7 +35,9 @@ func _ready() -> void:
 
 ## Configure the single transmission sidecar. Reads
 ## orchestration/sidecars.json when present, else the embedded default;
-## `port` (when > 0) overrides either.
+## `port` (when > 0) overrides either. The default MIRRORS the file (it had
+## silently drifted — a checkout missing the file ran without AUTOSTART=
+## false/LOG_LEVEL and behaved differently than dev for no visible reason).
 func configure(port: int = 0) -> void:
 	var cfg := {
 		"id": DEFAULT_ID,
@@ -47,6 +49,8 @@ func configure(port: int = 0) -> void:
 			"RTTRANSPORTFLOW_EXTERNAL_CLOCK": "true",
 			"RTTRANSPORTFLOW_HOST": "127.0.0.1",
 			"RTTRANSPORTFLOW_SIMULATOR": "null",
+			"RTTRANSPORTFLOW_AUTOSTART": "false",
+			"RTTRANSPORTFLOW_LOG_LEVEL": "warning",
 		},
 	}
 	var config_path := repo_root.path_join("orchestration/sidecars.json")

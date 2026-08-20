@@ -43,6 +43,11 @@ var _next_pid: int = 1
 const SYNC_KINDS: Array[String] = ["nuclear", "coal", "lignite", "gas_ccgt",
 	"gas_ocgt", "hydro_ps"]
 const CONVERTER_KINDS: Array[String] = ["wind_onshore", "wind_offshore", "solar_pv"]
+## SYNC_KINDS minus nuclear: what a dispatcher may actually move (nuclear is
+## must-run identity, ledger 9). The topology builder's stub dispatch used to
+## re-type this list inline.
+const DISPATCHABLE_KINDS: Array[String] = ["coal", "lignite", "gas_ccgt",
+	"gas_ocgt", "hydro_ps"]
 ## P7 wire devices: placed like plants but emitted on the reset `devices`
 ## channel, never in the native plants doc (contract v2 kinds table).
 const DEVICE_KINDS: Array[String] = ["battery", "electrolyzer", "h2_cavern",
@@ -170,9 +175,15 @@ func can_place_plant(kind: String, tile: Vector2i) -> bool:
 	return false
 
 
+## THE km→tiles conversion (ledger 38: every radius is a DISTANCE — a tile
+## count in a rule is a bug; write kilometres, convert at this one edge).
+func tiles_for_km(km: float) -> int:
+	return maxi(1, int(round(km / maxf(tile_km, 1.0))))
+
+
 ## Nearest offshore platform pid within the collector ring, "" if none.
 func hub_bind_tiles() -> int:
-	return maxi(1, int(round(HUB_BIND_KM / maxf(tile_km, 1.0))))
+	return tiles_for_km(HUB_BIND_KM)
 
 
 func platform_near(tile: Vector2i) -> String:

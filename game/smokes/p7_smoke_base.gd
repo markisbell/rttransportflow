@@ -8,6 +8,19 @@ extends SmokeBase
 
 const P7_PORT := 8034
 
+## PARAMETERS §1.16 HVDC path-loss model — mirrors dynamics/hvdc.py
+## (path_loss_frac). The P7 smokes cross-check the ENGINE against these, so
+## a §1.16 retune must land in hvdc.py and here together — a lone edit makes
+## the smoke assert the old model against itself.
+const HVDC_CONVERTER_LOSS_FRAC := 0.01  # per station, two stations per path
+const HVDC_CABLE_LOSS_FRAC_PER_100KM := 0.003
+
+
+static func hvdc_path_loss_frac(length_km: float) -> float:
+	return 2.0 * HVDC_CONVERTER_LOSS_FRAC \
+		+ HVDC_CABLE_LOSS_FRAC_PER_100KM * length_km / 100.0
+
+
 ## Fallback only — main.gd assigns the per-smoke port from SMOKE_PORTS.
 ## Stays clear of the reserved family ranges (8000-8002, 8010-8016,
 ## 8020-8029) and of 8030-8033 (game / acceptance smokes / contract tests /

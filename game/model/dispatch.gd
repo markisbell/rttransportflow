@@ -14,8 +14,21 @@ const BLOCK_S := 900.0
 ## How long a new schedule takes to replace the old one. Real dispatch ramps
 ## across the boundary; a step change made the whole fleet move at once.
 const RAMP_S := 300.0
-const HEADROOM_FRAC := 0.92  # committed thermal capped here (reserve withheld)
-const LOSS_MARGIN := 1.015
+
+## Policy numbers from economy.json's dispatch_policy block (defaults mirror
+## it for catalog-less fixtures). headroom_frac is ledger 30's binding rule:
+## commitment counts DELIVERABLE capacity, and the topology builder's stub
+## dispatch reads the same field so the reset operating point and the live
+## schedule can never diverge on it again.
+var headroom_frac := 0.92
+var loss_margin := 1.015
+var bat_discharge_price := 200.0
+var bat_discharge_frac := 0.8
+var bat_charge_price_on := 45.0
+var bat_charge_price_off := 15.0
+var bat_charge_frac := 0.5
+var ely_price_on := 80.0
+var ely_price_off := 20.001
 
 var economy_cfg: Dictionary = {}
 var plant_catalog: Dictionary = {}
@@ -60,6 +73,16 @@ var home_zone: Dictionary = {}
 func setup(economy: Dictionary, catalog: Dictionary) -> void:
 	economy_cfg = economy
 	plant_catalog = catalog
+	var policy: Dictionary = economy.get("dispatch_policy", {})
+	headroom_frac = float(policy.get("deliverable_frac", 0.92))
+	loss_margin = float(policy.get("loss_margin", 1.015))
+	bat_discharge_price = float(policy.get("battery_discharge_price_eur_per_mwh", 200.0))
+	bat_discharge_frac = float(policy.get("battery_discharge_frac", 0.8))
+	bat_charge_price_on = float(policy.get("battery_charge_price_on_eur_per_mwh", 45.0))
+	bat_charge_price_off = float(policy.get("battery_charge_price_off_eur_per_mwh", 15.0))
+	bat_charge_frac = float(policy.get("battery_charge_frac", 0.5))
+	ely_price_on = float(policy.get("ely_price_on_eur_per_mwh", 80.0))
+	ely_price_off = float(policy.get("ely_price_off_eur_per_mwh", 20.001))
 	wire_devices = []
 	hub_farms = {}
 	link_setpoints = {}
@@ -223,7 +246,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		if state == "online":
 			largest_infeed = maxf(largest_infeed, float(entry["p_max"]))
 	var reserve: float = maxf(largest_infeed, float(economy_cfg["reserve_margin_mw_min"]))
-	var need := forecast_peak * LOSS_MARGIN + reserve - renewable_mw * 0.5
+	var need := forecast_peak * loss_margin + reserve - renewable_mw * 0.5
 	var commands := {}
 	for pid: String in mothballed:
 		commands[pid] = {"dispatch_mw": 0.0, "breaker": "open"}
@@ -238,7 +261,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 			# count what a committed unit can actually DELIVER (the 8 %
 			# FCR-headroom cap): raw-p_max accounting left every Europe-scale
 			# evening ~5 % short — scarcity with the gas fleet never committed
-			committed_cap += entry["p_max"] * HEADROOM_FRAC
+			committed_cap += entry["p_max"] * headroom_frac
 			committed.append(entry)
 			if state == "offline" or state == "tripped":
 				commands[pid] = {"breaker": "close"}
@@ -281,7 +304,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	for entry: Dictionary in committed:
 		var pid: String = entry["id"]
 		var online_now := str(device_states.get(pid, {}).get("state", "online")) == "online"
-		var cap: float = entry["p_max"] * HEADROOM_FRAC
+		var cap: float = entry["p_max"] * headroom_frac
 		if not online_now or plant_mode.get(pid, "auto") == "reserve_only":
 			cap = 0.0
 		room[pid] = cap
@@ -384,10 +407,10 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 				# discharge only into genuine scarcity: a lower threshold let
 				# a sustained expensive tier drain the fleet to its SoC floor
 				# and the arrested MW vanished as one cliff (hydrogen_chain)
-				if scarcity or price >= 200.0:
-					bat_cmd = 0.8 * bat_max
-				elif price <= (45.0 if was_charging else 15.0):
-					bat_cmd = -0.5 * bat_max  # sticky through the self-bump
+				if scarcity or price >= bat_discharge_price:
+					bat_cmd = bat_discharge_frac * bat_max
+				elif price <= (bat_charge_price_on if was_charging else bat_charge_price_off):
+					bat_cmd = -bat_charge_frac * bat_max  # sticky through the self-bump
 				_bat_charging[did] = bat_cmd < 0.0
 				if bat_cmd < 0.0:
 					flex_next += -bat_cmd  # charging is load next block
@@ -395,7 +418,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 			"electrolyzer":
 				var was_on: bool = bool(_ely_on.get(did, false))
 				var run: bool = (not scarcity) \
-					and price < (80.0 if was_on else 20.001)
+					and price < (ely_price_on if was_on else ely_price_off)
 				_ely_on[did] = run
 				var ely_mw: float = float(dev_params.get("p_max_mw", 0.0)) if run else 0.0
 				flex_next += ely_mw
@@ -469,7 +492,7 @@ func _redispatch(commands: Dictionary, pf_lines: Dictionary,
 		var up: Dictionary = commands.get(cheapest_import["id"], {})
 		var down: Dictionary = commands.get(priciest_export["id"], {})
 		up["dispatch_mw"] = snappedf(minf(float(up.get("dispatch_mw", 0.0)) + shift_mw,
-			float(cheapest_import["p_max"]) * HEADROOM_FRAC), 0.1)
+			float(cheapest_import["p_max"]) * headroom_frac), 0.1)
 		down["dispatch_mw"] = snappedf(maxf(float(down.get("dispatch_mw", 0.0)) - shift_mw, 0.0), 0.1)
 		commands[cheapest_import["id"]] = up
 		commands[priciest_export["id"]] = down

@@ -28,7 +28,7 @@ func run() -> void:
 	check("hub_registered", not hub_params.is_empty())
 	var farms: Array = registered.get("hub_farms", {}).get(platform, [])
 	check("farms_bound", farms.size() == 3)
-	var loss_frac := 0.02 + 0.003 * float(hub_params.get("cable_km", 0.0)) / 100.0
+	var loss_frac := hvdc_path_loss_frac(float(hub_params.get("cable_km", 0.0)))
 
 	# NO wind force. The platform lands in the southern North Sea, whose
 	# region already draws ~17.7 m/s offshore — above rated, so the farms sit

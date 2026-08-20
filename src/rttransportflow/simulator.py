@@ -17,6 +17,24 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .dynamics import SNAP_MARK_US
+
+# Line overload protection at PF instants (PARAMETERS §2.2). Named here
+# beside the duty logic in _run_pf; the frequency-side siblings (UFLS,
+# interruptible tiers, RoCoF table) live in dynamics/protection.py.
+OVERLOAD_INSTANT_PCT = 150.0  # instant trip at/above
+DUTY_ARM_PCT = 120.0          # duty integrates above this loading
+DUTY_TRIP_PCT_S = 3000.0      # ∫(loading−100)dt trip threshold [%·s]
+DUTY_DECAY_PCT_S = 50.0       # duty decays below DUTY_CLEAR_PCT at this rate
+DUTY_CLEAR_PCT = 100.0
+RESYNC_MAX_DF_HZ = 0.2        # line_close between live islands (PHYSICS §2.7)
+
+# state_blob format version (v2: engine + line states + duty). The reset
+# guard in gamebridge imports THIS — the P8 v1→v2 bump had to edit two files
+# in lockstep, and a mismatch silently downgrades every restore to
+# refused_snapshot (which smokes read as a cold start, not an error).
+SIM_SNAPSHOT_VERSION = 2
+
 
 def _r(x: Any) -> Any:
     """Canonical wire rounding: floats to 6 digits, non-finite -> None.
@@ -282,12 +300,19 @@ def _parse_wire_devices(devices: list[dict], catalog: dict, bus_index: dict) -> 
                         spec[key] = float(params[key])
                 out["stores"].append(spec)
             elif kind == "offshore_hub":
+                # §1.16 physics numbers come from the catalog like every
+                # other kind (it was the ONE kind bypassing it — a
+                # PARAMETERS retune meant editing this parser)
+                hub_cat = catalog["offshore_hub"]
                 p_max = float(params["p_max_mw"])
                 out["hubs"].append({
                     "id": did, "island": 0, "p_rated": p_max, "avail": 0.0,
-                    "t_up": 0.1, "t_down": 0.1,
-                    "avail_slew_mw_s": 0.20 * p_max / 60.0,  # front-crossing rate
-                    "lfsm_from": 50.2, "lfsm_droop": 0.05,
+                    "t_up": hub_cat["t_up_s"], "t_down": hub_cat["t_down_s"],
+                    # front-crossing rate
+                    "avail_slew_mw_s": hub_cat["avail_slew_pct_pn_min"]
+                    / 100.0 * p_max / 60.0,
+                    "lfsm_from": hub_cat["lfsm_o_from_hz"],
+                    "lfsm_droop": hub_cat["lfsm_o_droop_pu"],
                     "aux_mw": NO_LOAD_AUX_FRAC * p_max,
                     # extra keys (ignored by make_fleet), kept for the sim maps
                     "loss_frac": path_loss_frac(float(params.get("cable_km", 0.0))),
@@ -331,13 +356,15 @@ class DynSimulator:
                  warm_start: bool = True,
                  catalog_path: str = "data/catalogs/plant_types.json",
                  wire_devices: list[dict] | None = None,
-                 protection_seed: int = 0) -> None:
+                 protection_seed: int = 0,
+                 mode_cfg=None) -> None:
         import numpy as np
 
         from .dynamics import F0
         from .dynamics.fleet import make_fleet
         from .dynamics.integrator import Integrator, IslandState
         from .dynamics.plant_types import inverter_spec, load_catalog, sync_spec
+        from .dynamics.protection import FWindowConfig
         from .models import CONVERTER_KINDS, SYNC_KINDS
 
         self.built = built
@@ -349,7 +376,17 @@ class DynSimulator:
         self._np = np
         self._f0 = F0
 
-        catalog = load_catalog(catalog_path)["kinds"]
+        catalog_doc = load_catalog(catalog_path)
+        catalog = catalog_doc["kinds"]
+        # the catalog's frequency_protection block is the trip-window
+        # authority (it used to be dead data shadowed by FWindowConfig's
+        # identical defaults — a knob wired to nothing)
+        fp = catalog_doc.get("frequency_protection")
+        fwindow = FWindowConfig(
+            low_hz=float(fp["sync_trip_low_hz"]),
+            high_hz=float(fp["sync_trip_high_hz"]),
+            delay_us=int(round(float(fp["sync_trip_delay_s"]) * 1e6)),
+        ) if fp is not None else None
         sync_specs, inv_specs = [], []
         for plant in data.plants.plants:
             params = catalog[plant.kind]
@@ -447,8 +484,10 @@ class DynSimulator:
             p_loss=np.zeros(1),
             d_pu=d_pu,
         )
-        self.integrator = Integrator(self.fleet, islands, pf_hook=self._run_pf,
-                                     protection_seed=protection_seed)
+        self.integrator = Integrator(self.fleet, islands, cfg=mode_cfg,
+                                     pf_hook=self._run_pf,
+                                     protection_seed=protection_seed,
+                                     fwindow=fwindow)
         self.integrator.topology_hook = self._on_line_event
 
         self._load_p_col = built.load_p[:, 0].copy()
@@ -624,7 +663,7 @@ class DynSimulator:
             islands = self.integrator.islands
             if ia != ib:
                 black = islands.blackout()
-                if not black[ia] and not black[ib]                         and abs(float(islands.f[ia] - islands.f[ib])) > 0.2:
+                if not black[ia] and not black[ib]                         and abs(float(islands.f[ia] - islands.f[ib])) > RESYNC_MAX_DF_HZ:
                     return [("resync_rejected", line_id,
                              {"df_hz": float(islands.f[ia] - islands.f[ib])})]
             self._line_in_service[line_id] = True
@@ -731,21 +770,21 @@ class DynSimulator:
             # on an energised, settled system.
             if reason == "warmup" or line_id in self._trip_scheduled:
                 continue
-            if loading >= 150.0:
+            if loading >= OVERLOAD_INSTANT_PCT:
                 self.integrator.queue.schedule(Event(
                     self.integrator.t_us + QUANTUM_US, "line_trip", line_id,
                     {"cause": "overload_instant", "loading": loading}))
                 self._trip_scheduled.add(line_id)
-            elif loading > 120.0:
+            elif loading > DUTY_ARM_PCT:
                 duty = self._line_duty.get(line_id, 0.0)                     + (loading - 100.0) * dt_pf
                 self._line_duty[line_id] = duty
-                if duty >= 3000.0:
+                if duty >= DUTY_TRIP_PCT_S:
                     self.integrator.queue.schedule(Event(
                         self.integrator.t_us + QUANTUM_US, "line_trip", line_id,
                         {"cause": "overload_duty", "loading": loading}))
                     self._trip_scheduled.add(line_id)
-            elif loading < 100.0 and line_id in self._line_duty:
-                duty = self._line_duty[line_id] - 50.0 * dt_pf
+            elif loading < DUTY_CLEAR_PCT and line_id in self._line_duty:
+                duty = self._line_duty[line_id] - DUTY_DECAY_PCT_S * dt_pf
                 if duty <= 0.0:
                     del self._line_duty[line_id]
                 else:
@@ -904,12 +943,14 @@ class DynSimulator:
         return notes
 
     def _cmd_hub(self, device_id: str, cmd: dict) -> list[str]:
+        from .dynamics.hvdc import Q_BAND_FRAC
+
         notes: list[str] = []
         row = self._inv_row[device_id]
         if cmd.get("curtail_to_mw") is not None:
             self.fleet.inv_curtail[row] = float(cmd["curtail_to_mw"])
         if cmd.get("q_mvar") is not None:
-            band = 0.40 * self._hub_p_max[device_id]  # STATCOM at any P (§1.16)
+            band = Q_BAND_FRAC * self._hub_p_max[device_id]  # STATCOM at any P (§1.16)
             hub_i = row - self._n_native_inv
             self._hub_q[hub_i] = float(self._np.clip(float(cmd["q_mvar"]), -band, band))
         breaker = cmd.get("breaker")
@@ -963,8 +1004,11 @@ class DynSimulator:
         return []
 
     # -- rolling snapshot ring (ledger 23): 5 s cadence, 120 s retention --
+    # 24 marks at the SNAP_MARK_US cadence = the 120 s replay window; the
+    # /gb/replay cap derives from this constant (a replay window longer than
+    # retention is a guaranteed window_expired).
 
-    RING_RETAIN_US = 120_000_000
+    RING_RETAIN_US = 24 * SNAP_MARK_US
 
     def enable_snapshot_ring(self) -> None:
         """Arm the /gb/replay state source (gamebridge mode only — the
@@ -992,7 +1036,7 @@ class DynSimulator:
 
     def state_blob(self) -> dict:
         return {
-            "version": 2,
+            "version": SIM_SNAPSHOT_VERSION,
             "engine": self.integrator.state_dict(),
             "line_in_service": {k: bool(v)
                                 for k, v in self._line_in_service.items()},
@@ -1086,7 +1130,8 @@ class DynSimulator:
 def build_dyn_simulator(data_dir: str, steps_per_day: int, *,
                         d_load_pct_per_hz: float = 1.0,
                         warm_start: bool = True,
-                        catalog_path: str = "data/catalogs/plant_types.json") -> DynSimulator:
+                        catalog_path: str = "data/catalogs/plant_types.json",
+                        mode_cfg=None) -> DynSimulator:
     from .data_loader import load_bundle
     from .network_builder import build_network
 
@@ -1097,4 +1142,4 @@ def build_dyn_simulator(data_dir: str, steps_per_day: int, *,
         )
     return DynSimulator(data, build_network(data), steps_per_day=steps_per_day,
                         d_load_pct_per_hz=d_load_pct_per_hz, warm_start=warm_start,
-                        catalog_path=catalog_path)
+                        catalog_path=catalog_path, mode_cfg=mode_cfg)

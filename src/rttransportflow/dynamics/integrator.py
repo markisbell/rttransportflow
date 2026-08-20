@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from . import F0, QUANTUM_US, US
+from . import F0, QUANTUM_US, SNAP_MARK_US, US
 from .events import Event, EventQueue
 from .fleet import Fleet
 from .telemetry import FineRing, TrajectoryBuffer
@@ -48,6 +48,27 @@ class ModeConfig:
     # AGC / aFRR (PHYSICS §2.8, ledger 19)
     agc_k_p: float = 0.1
     agc_k_i: float = 1.0 / 120.0
+
+    @classmethod
+    def from_settings(cls, settings) -> "ModeConfig":
+        """Build from the service Settings (env-overridable knobs — the
+        ledger-5 hysteresis revisit surface). Every default env produces a
+        config BIT-EQUAL to ModeConfig(): the unit conversions here are
+        exact for the default values, so wiring this changed nothing until
+        someone actually sets an RTTRANSPORTFLOW_DT_* variable — at which
+        point the bit-exact-pinned smokes on that machine no longer compare
+        to the recorded numbers (deliberate: the knobs exist to experiment)."""
+        return cls(
+            dt_alert_us=int(round(settings.dt_alert * US)),
+            dt_calm_us=int(round(settings.dt_calm * US)),
+            pf_alert_us=int(round(settings.pf_interval_alert * US)),
+            pf_calm_us=int(round(settings.pf_interval_calm * US)),
+            alert_df_hz=settings.alert_df_mhz / 1000.0,
+            alert_rocof_hz_s=settings.alert_rocof_mhz_s / 1000.0,
+            calm_df_hz=settings.calm_df_mhz / 1000.0,
+            calm_rocof_hz_s=settings.calm_rocof_mhz_s / 1000.0,
+            calm_hold_us=int(round(settings.calm_hold_s * US)),
+        )
 
 
 @dataclass
@@ -120,6 +141,7 @@ class Integrator:
         pf_hook: Callable[[str], None] | None = None,
         trajectory_max_samples: int = 512,
         protection_seed: int = 0,
+        fwindow=None,  # FWindowConfig | None — catalog frequency_protection
     ) -> None:
         from .protection import DefensePlan, FrequencyWindowRelays
 
@@ -128,7 +150,7 @@ class Integrator:
         self.cfg = cfg or ModeConfig()
         self.pf_hook = pf_hook  # called with reason "scheduled"|"event"; updates p_loss
         self.trajectory_max_samples = trajectory_max_samples
-        self.relays = FrequencyWindowRelays(fleet)
+        self.relays = FrequencyWindowRelays(fleet, fwindow)
         self.defense = DefensePlan(islands.n, protection_seed)
         # sim-layer topology callback: line_trip/line_close events land here
         # (the integrator knows nothing about pandapower); returns follow-up
@@ -472,7 +494,7 @@ class Integrator:
                 next_pf = self._next_multiple(self.t_us, self._pf_interval)
                 next_sample = self._next_multiple(self.t_us, self._sample_interval)
 
-            if self.snapshot_hook is not None and self.t_us % 5_000_000 == 0:
+            if self.snapshot_hook is not None and self.t_us % SNAP_MARK_US == 0:
                 self.snapshot_hook(self.t_us)
 
             for island in range(self.islands.n):

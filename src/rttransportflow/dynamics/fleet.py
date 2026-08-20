@@ -30,6 +30,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from . import F0, US
+from ..snapshot import parse_floats, repr_floats
+from .hydrogen import RECOVER_FRAC
 
 # commitment states
 OFFLINE, STARTING, ONLINE = 0, 1, 2
@@ -40,6 +42,38 @@ OFFLINE, STARTING, ONLINE = 0, 1, 2
 # block carries its own catalog-driven variant; this pair is the sync-side.
 LFSM_O_FROM_HZ = 50.2
 LFSM_O_GAIN_PER_HZ = 0.40
+
+# make_fleet fallback values for callers that bypass plant_types.py (the
+# analytic fixtures construct spec dicts directly). Each mirrors its catalog
+# counterpart — data/catalogs/plant_types.json is the AUTHORITY (PARAMETERS
+# §1); test_catalog_alignment asserts the mirrors stay equal, so a catalog
+# retune can no longer silently fork the direct-spec path.
+CCGT_T_FUEL_S = 0.4         # gas_ccgt.t_fuel_s
+CCGT_T_GT_S = 1.0           # gas_ccgt.t_gt_s
+CCGT_T_ST_S = 120.0         # gas_ccgt.t_st_s
+OCGT_T_FUEL_S = 0.3         # gas_ocgt.t_fuel_s
+OCGT_T_GT_S = 0.8           # gas_ocgt.t_gt_s
+HYDRO_T_R_S = 6.0           # hydro_ps.t_r_s
+HYDRO_R_T = 0.4             # hydro_ps.r_t
+HYDRO_R_PU = 0.04           # hydro_ps.r_pu
+HYDRO_T_SERVO_S = 0.5       # hydro_ps.t_servo_s
+HYDRO_GATE_RATE_PU_S = 0.1  # hydro_ps.gate_rate_pu_s
+HYDRO_T_W_S = 1.5           # hydro_ps.t_w_s
+HYDRO_ETA_PUMP = 0.88       # hydro_ps.eta_pump
+HYDRO_ETA_TURBINE = 0.90    # hydro_ps.eta_turbine
+BAT_T_B_S = 0.1             # battery.t_b_s
+BAT_FFR_FULL_HZ = 0.2       # battery.ffr_full_hz
+BAT_DB_HZ = 0.010           # battery.deadband_hz
+BAT_ETA_CH = 0.94           # battery.eta_ch
+BAT_ETA_DIS = 0.94          # battery.eta_dis
+BAT_SOC_MIN_FRAC = 0.05     # battery.soc_min_frac
+BAT_SOC_MAX_FRAC = 0.95     # battery.soc_max_frac
+BAT_SOC_TARGET_FRAC = 0.55  # battery.soc_target_frac
+BAT_RECHARGE_FRAC = 0.1     # battery.recharge_frac_pn
+BAT_QUIET_HZ = 0.05         # battery.recharge_quiet_hz
+ELY_T_E_S = 0.3             # electrolyzer.t_e_s
+ELY_DB_HZ = 0.010           # electrolyzer.deadband_hz
+ELY_SHED_FULL_HZ = 0.2      # electrolyzer.shed_full_hz
 
 
 @dataclass
@@ -517,7 +551,7 @@ class Fleet:
                         self.h2_starved[row] = True
                         self.notices.append(("fuel_starved", self.ids[row]))
                 elif self.h2_starved[row] \
-                        and level > 0.07 * self.h2.capacity_kg[store]:
+                        and level > RECOVER_FRAC * self.h2.capacity_kg[store]:
                     self.h2_starved[row] = False
                     self.notices.append(("fuel_recovered", self.ids[row]))
             y[rows] = allowed
@@ -615,9 +649,7 @@ class Fleet:
     # ------------------------------------------------------------------
 
     def state_dict(self) -> dict:
-        def rf(a):
-            return [repr(float(v)) for v in a]
-
+        rf = repr_floats
         return {
             "status": self.status.tolist(),
             "start_done_us": self.start_done_us.tolist(),
@@ -656,15 +688,14 @@ class Fleet:
                      "hy_xh", "y", "energy_mwh", "fuel_mwh_th", "inv_avail",
                      "inv_curtail", "inv_p", "inv_energy_mwh", "bat_p_set",
                      "bat_p", "bat_soc", "ely_p_set", "ely_p", "ely_energy_mwh"):
-            getattr(self, name)[:] = np.array([float(v) for v in state[name]])
+            getattr(self, name)[:] = parse_floats(state[name])
         # pre-slew snapshots lack the field: converged fallback
-        self.inv_avail_eff[:] = np.array(
-            [float(v) for v in state.get("inv_avail_eff", state["inv_avail"])])
+        self.inv_avail_eff[:] = parse_floats(
+            state.get("inv_avail_eff", state["inv_avail"]))
         self.black_start_rows = set(state.get("black_start_rows", []))
         for name in ("hy_soc_mwh", "hy_pump_set", "hy_pump_p", "pump_energy_mwh"):
             if name in state:
-                getattr(self, name)[:] = np.array(
-                    [float(v) for v in state[name]])
+                getattr(self, name)[:] = parse_floats(state[name])
 
 
 def make_fleet(
@@ -721,28 +752,28 @@ def make_fleet(
             f_hp = spec.get("f_hp", d.f_hp)
             w_b[i], w_c[i] = f_hp, 1.0 - f_hp
         elif model == "ccgt":
-            t_a[i] = spec.get("t_fuel", 0.4)
-            t_b[i] = spec.get("t_gt", 1.0)
-            t_c[i] = spec.get("t_st", 120.0)
+            t_a[i] = spec.get("t_fuel", CCGT_T_FUEL_S)
+            t_b[i] = spec.get("t_gt", CCGT_T_GT_S)
+            t_c[i] = spec.get("t_st", CCGT_T_ST_S)
             c_in[i], c_2[i] = 2.0 / 3.0, 0.5
             w_b[i] = w_c[i] = 1.0
         elif model == "ocgt":
-            t_a[i] = spec.get("t_fuel", 0.3)
-            t_b[i] = spec.get("t_gt", 0.8)
+            t_a[i] = spec.get("t_fuel", OCGT_T_FUEL_S)
+            t_b[i] = spec.get("t_gt", OCGT_T_GT_S)
             t_c[i] = 1e9  # unused stage, weight 0
             w_b[i] = 1.0
         elif model == "hydro":
             is_hydro[i] = True
             t_a[i] = t_b[i] = t_c[i] = 1e9  # chain unused
-            t_r = spec.get("t_r", 6.0)
-            r_t = spec.get("r_t", 0.4)
-            r_pu = spec.get("r", 0.04)
+            t_r = spec.get("t_r", HYDRO_T_R_S)
+            r_t = spec.get("r_t", HYDRO_R_T)
+            r_pu = spec.get("r", HYDRO_R_PU)
             hy_t_lag[i] = (r_t / r_pu) * t_r
             hy_k_lead[i] = t_r / hy_t_lag[i]
-            hy_t_srv[i] = spec.get("t_servo", 0.5)
+            hy_t_srv[i] = spec.get("t_servo", HYDRO_T_SERVO_S)
             p_max_i = float(spec.get("p_max", spec["s_n"] * 0.9))
-            hy_rate[i] = spec.get("gate_rate_pu_s", 0.1) * p_max_i
-            hy_t_w2[i] = 0.5 * spec.get("t_w", 1.5)
+            hy_rate[i] = spec.get("gate_rate_pu_s", HYDRO_GATE_RATE_PU_S) * p_max_i
+            hy_t_w2[i] = 0.5 * spec.get("t_w", HYDRO_T_W_S)
         else:
             raise ValueError(f"unknown sync model {model!r}")
 
@@ -775,8 +806,8 @@ def make_fleet(
         hy_t_lag=hy_t_lag, hy_k_lead=hy_k_lead, hy_t_srv=hy_t_srv,
         hy_rate_mw_s=hy_rate, hy_t_w2=hy_t_w2,
         hy_e_mwh=col("e_mwh", lambda s: 0.0),
-        hy_eta_ch=col("eta_pump", lambda s: 0.88),
-        hy_eta_dis=col("eta_turbine", lambda s: 0.90),
+        hy_eta_ch=col("eta_pump", lambda s: HYDRO_ETA_PUMP),
+        hy_eta_dis=col("eta_turbine", lambda s: HYDRO_ETA_TURBINE),
         status=status,
         start_done_us=np.zeros(n, dtype=np.int64),
         off_since_us=np.zeros(n, dtype=np.int64),
@@ -806,7 +837,7 @@ def make_fleet(
         inv_p_rated=np.array([float(i.get("p_rated", i.get("p_target", 0.0))) for i in inverters]),
         inv_t_up=np.array([float(i.get("t_up", 2.0)) for i in inverters]),
         inv_t_down=np.array([float(i.get("t_down", 0.2)) for i in inverters]),
-        inv_lfsm_from=np.array([float(i.get("lfsm_from", 50.2)) for i in inverters]),
+        inv_lfsm_from=np.array([float(i.get("lfsm_from", LFSM_O_FROM_HZ)) for i in inverters]),
         inv_lfsm_gain=np.array(
             [1.0 / (float(i.get("lfsm_droop", 0.05)) * F0) for i in inverters]
         ),
@@ -825,26 +856,26 @@ def make_fleet(
         bat_p_max=np.array([float(b["p_max"]) for b in batteries]),
         bat_e_mwh=np.array([float(b["e_mwh"]) for b in batteries]),
         bat_k_f=np.array(
-            [float(b.get("k_f", float(b["p_max"]) / float(b.get("ffr_full_hz", 0.2))))
+            [float(b.get("k_f", float(b["p_max"]) / float(b.get("ffr_full_hz", BAT_FFR_FULL_HZ))))
              for b in batteries]
         ),
-        bat_db=np.array([float(b.get("db", 0.010)) for b in batteries]),
-        bat_t=np.array([float(b.get("t_b", 0.1)) for b in batteries]),
-        bat_eta_ch=np.array([float(b.get("eta_ch", 0.94)) for b in batteries]),
-        bat_eta_dis=np.array([float(b.get("eta_dis", 0.94)) for b in batteries]),
+        bat_db=np.array([float(b.get("db", BAT_DB_HZ)) for b in batteries]),
+        bat_t=np.array([float(b.get("t_b", BAT_T_B_S)) for b in batteries]),
+        bat_eta_ch=np.array([float(b.get("eta_ch", BAT_ETA_CH)) for b in batteries]),
+        bat_eta_dis=np.array([float(b.get("eta_dis", BAT_ETA_DIS)) for b in batteries]),
         bat_soc_min=np.array(
-            [float(b.get("soc_min_frac", 0.05)) * float(b["e_mwh"]) for b in batteries]
+            [float(b.get("soc_min_frac", BAT_SOC_MIN_FRAC)) * float(b["e_mwh"]) for b in batteries]
         ),
         bat_soc_max=np.array(
-            [float(b.get("soc_max_frac", 0.95)) * float(b["e_mwh"]) for b in batteries]
+            [float(b.get("soc_max_frac", BAT_SOC_MAX_FRAC)) * float(b["e_mwh"]) for b in batteries]
         ),
         bat_soc_target=np.array(
-            [float(b.get("soc_target_frac", 0.55)) * float(b["e_mwh"]) for b in batteries]
+            [float(b.get("soc_target_frac", BAT_SOC_TARGET_FRAC)) * float(b["e_mwh"]) for b in batteries]
         ),
         bat_recharge_p=np.array(
-            [float(b.get("recharge_frac", 0.1)) * float(b["p_max"]) for b in batteries]
+            [float(b.get("recharge_frac", BAT_RECHARGE_FRAC)) * float(b["p_max"]) for b in batteries]
         ),
-        bat_quiet_hz=np.array([float(b.get("quiet_hz", 0.05)) for b in batteries]),
+        bat_quiet_hz=np.array([float(b.get("quiet_hz", BAT_QUIET_HZ)) for b in batteries]),
         bat_h_v=np.array([float(b.get("h_v", 0.0)) for b in batteries]),
         bat_p_set=np.array([float(b.get("p_set", 0.0)) for b in batteries]),
         bat_p=np.zeros(len(batteries)),
@@ -856,9 +887,9 @@ def make_fleet(
         ely_ids=[e["id"] for e in electrolyzers],
         ely_island=np.array([int(e.get("island", 0)) for e in electrolyzers], dtype=np.int64),
         ely_p_max=np.array([float(e["p_max"]) for e in electrolyzers]),
-        ely_t=np.array([float(e.get("t_e", 0.3)) for e in electrolyzers]),
-        ely_db=np.array([float(e.get("db", 0.010)) for e in electrolyzers]),
-        ely_shed_full=np.array([float(e.get("shed_full_hz", 0.2)) for e in electrolyzers]),
+        ely_t=np.array([float(e.get("t_e", ELY_T_E_S)) for e in electrolyzers]),
+        ely_db=np.array([float(e.get("db", ELY_DB_HZ)) for e in electrolyzers]),
+        ely_shed_full=np.array([float(e.get("shed_full_hz", ELY_SHED_FULL_HZ)) for e in electrolyzers]),
         ely_p_set=np.array([float(e.get("p_set", 0.0)) for e in electrolyzers]),
         ely_p=np.zeros(len(electrolyzers)),
         ely_online=np.ones(len(electrolyzers), dtype=bool),
