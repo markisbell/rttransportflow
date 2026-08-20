@@ -115,16 +115,25 @@ async def net_reset(request: Request) -> dict:
         raise HTTPException(status_code=400,
                             detail=f"unsupported reset device kinds: {unsupported}")
 
+    # ONE kwargs source for the live build AND the replay reconstruction —
+    # the split constructor was exactly the drift that produces a replay
+    # running with different sim options than the live run, silently
+    # (replay pins only compare replay-vs-replay).
+    protection_seed = _as_int(body.get("protection_seed", 0.0))
+    sim_kwargs = {
+        "steps_per_day": data.scenario.steps_per_day,
+        "d_load_pct_per_hz": container.settings.d_load_pct_per_hz,
+        "warm_start": container.settings.warm_start,
+        "catalog_path": container.settings.catalog_path,
+        "mode_cfg": ModeConfig.from_settings(container.settings),
+    }
+
     def build() -> DynSimulator:
         sim = DynSimulator(
             data, build_network(data),
-            steps_per_day=data.scenario.steps_per_day,
-            d_load_pct_per_hz=container.settings.d_load_pct_per_hz,
-            warm_start=container.settings.warm_start,
-            catalog_path=container.settings.catalog_path,
             wire_devices=wire_devices,
-            protection_seed=_as_int(body.get("protection_seed", 0.0)),
-            mode_cfg=ModeConfig.from_settings(container.settings),
+            protection_seed=protection_seed,
+            **sim_kwargs,
         )
         sim.warmup()
         return sim
@@ -149,14 +158,8 @@ async def net_reset(request: Request) -> dict:
     gb = GbState(sim, body.get("name", "unnamed"), hash_)
     gb.data = data
     gb.wire_devices = wire_devices
-    gb.protection_seed = _as_int(body.get("protection_seed", 0.0))
-    gb.sim_kwargs = {
-        "steps_per_day": data.scenario.steps_per_day,
-        "d_load_pct_per_hz": container.settings.d_load_pct_per_hz,
-        "warm_start": container.settings.warm_start,
-        "catalog_path": container.settings.catalog_path,
-        "mode_cfg": ModeConfig.from_settings(container.settings),
-    }
+    gb.protection_seed = protection_seed
+    gb.sim_kwargs = sim_kwargs
     sim.enable_snapshot_ring()
     request.app.state.gb = gb
     island = sim.integrator.islands
@@ -213,170 +216,95 @@ def _handle_step(gb: GbState, body: dict) -> tuple[dict | None, dict | None]:
 
     sim = gb.sim
     t0 = time.perf_counter()
-    notes = sim.apply_wire_boundary(
-        body.get("zone_demand"), body.get("avail_mw"), body.get("device_commands"))
-    for zone_id, zcmd in (body.get("zone_commands") or {}).items():
-        restore = zcmd.get("restore_load")
-        if restore is not None:
-            # restore_load targets island 0; multi-island targeting is NOT
-            # wired — resolve via _zone_bus/_bus_island (as _step_body's zone
-            # report does) when a black-start flow needs it. Masked today
-            # because the black-start smokes restore single-island worlds.
-            sim.integrator.defense.request_restore(0, float(restore))
-    notes += sim.set_watch(body.get("watch", []))
-    line_events = sim.apply_line_commands(body.get("line_commands"))
-    for ev in body.get("scheduled_events", []):
-        kind = ev.get("kind")
-        if kind not in ("trip", "load_step", "line_trip", "line_close"):
-            notes.append(f"scheduled_events: unsupported kind {kind!r}")
-            continue
-        at_us = sim.integrator.t_us + s_to_us(float(ev.get("at_s_rel", 0.0)))
-        data = {"island": 0, "delta_mw": float(ev.get("delta_mw", 0.0))} \
-            if kind == "load_step" else {}
-        sim.integrator.queue.schedule(Event(max(at_us, sim.integrator.t_us + QUANTUM_US),
-                                            kind, ev.get("element", ""), data))
-
-    # From here on, ANY engine exception is DATA (family never-crash rule):
-    # a raised step used to kill the WS handler while /health stayed green —
-    # the game then froze forever against a live-but-deaf backend.
+    # From here on, ANY exception is DATA (family never-crash rule, ledger
+    # 36): a raised step used to kill the WS handler while /health stayed
+    # green — the game then froze forever against a live-but-deaf backend.
+    # The guard covers the BOUNDARY PROLOGUE too: its old start line was an
+    # accident of where _step_body was cut, so a prologue exception 500ed
+    # over HTTP and produced a third, undocumented error shape over WS. A
+    # failed frame after a partially applied boundary is the documented
+    # semantic — engine exceptions leave applied boundary state as well,
+    # and sample-and-hold covers the next step.
     try:
+        notes = sim.apply_wire_boundary(
+            body.get("zone_demand"), body.get("avail_mw"), body.get("device_commands"))
+        for zone_id, zcmd in (body.get("zone_commands") or {}).items():
+            restore = zcmd.get("restore_load")
+            if restore is not None:
+                bus = sim._zone_bus.get(zone_id)
+                if bus is None:
+                    notes.append(f"zone_commands: unknown zone {zone_id!r}")
+                    continue
+                # route to the zone's ACTUAL island (a stale pre-P8 comment
+                # used to guard a hardcoded island 0 — restore_load on a
+                # split island silently ramped island 0's defense plan)
+                island = sim._bus_island[sim.built.bus_index[bus]]
+                sim.integrator.defense.request_restore(island, float(restore))
+        notes += sim.set_watch(body.get("watch", []))
+        line_events = sim.apply_line_commands(body.get("line_commands"))
+        for ev in body.get("scheduled_events", []):
+            kind = ev.get("kind")
+            if kind not in ("trip", "load_step", "line_trip", "line_close"):
+                notes.append(f"scheduled_events: unsupported kind {kind!r}")
+                continue
+            at_us = sim.integrator.t_us + s_to_us(float(ev.get("at_s_rel", 0.0)))
+            data = {"island": 0, "delta_mw": float(ev.get("delta_mw", 0.0))} \
+                if kind == "load_step" else {}
+            sim.integrator.queue.schedule(Event(max(at_us, sim.integrator.t_us + QUANTUM_US),
+                                                kind, ev.get("element", ""), data))
         return _step_body(gb, body, t, dt_s, interrupt, notes, line_events, t0)
     except Exception as exc:  # noqa: BLE001 — the loop must survive anything
-        import traceback
-        result = _r({
-            "t": t, "status": "failed", "solve_ms": 0.0,
-            "dt_done_s": 0.0, "t_sim_end": sim.integrator.t_us / US,
-            "mode": sim.integrator.mode,
-            "islands": {}, "trajectory": {"t_rel_s": [], "islands": {}, "watched": {}},
-            "pf": {"latest": {}, "window_extremes": {}},
-            "devices": {}, "zones": {}, "events": [],
-            "violations": [{"element": "engine", "kind": "exception",
-                            "severity": "critical",
-                            "value": f"{type(exc).__name__}: {exc}"}],
-            "summary": {"balance_err": 0.0,
-                        "traceback": traceback.format_exc()[-2000:]},
-        })
+        result = _failed_frame(t, sim, exc)
         gb.last_t = t
         gb.last_result = result
         return result, None
 
 
+def _failed_frame(t: int, sim, exc: Exception) -> dict:
+    """The contract 'failed' frame — kept skeleton-key-identical to
+    _step_body's result (a new top-level key must appear in BOTH)."""
+    import traceback
+    return _r({
+        "t": t, "status": "failed", "solve_ms": 0.0,
+        "dt_done_s": 0.0, "t_sim_end": sim.integrator.t_us / US,
+        "mode": sim.integrator.mode,
+        "islands": {}, "trajectory": {"t_rel_s": [], "islands": {}, "watched": {}},
+        "pf": {"latest": {}, "window_extremes": {}},
+        "devices": {}, "zones": {}, "events": [],
+        "violations": [{"element": "engine", "kind": "exception",
+                        "severity": "critical",
+                        "value": f"{type(exc).__name__}: {exc}"}],
+        "summary": {"balance_err": 0.0,
+                    "traceback": traceback.format_exc()[-2000:]},
+    })
+
+
+def _events_wire(res) -> list[dict]:
+    """AdvanceResult events -> wire shape (shared by _step_body and replay —
+    'physics exactly once' now covers the wire assembly around it too)."""
+    return [{"t_sim": e.t_us / US, "kind": e.kind,
+             "element": e.element, "data": e.data} for e in res.events]
+
+
 def _step_body(gb: GbState, body: dict, t: int, dt_s: float, interrupt: bool,
                notes: list, line_events: list,
                t0: float) -> tuple[dict | None, dict | None]:
+    """Frame assembly only: the state projection lives ON the simulator
+    (ReportingMixin) — this layer keeps _r(), the idempotency cache, and the
+    request-scoped notes. Result key order is contract-observable (goldens
+    compare serialized frames): keep it."""
     sim = gb.sim
 
-    # meters before, for per-step deltas
-    e_before = sim.fleet.energy_mwh.copy()
-    fuel_before = sim.fleet.fuel_mwh_th.copy()
-    inv_e_before = sim.fleet.inv_energy_mwh.copy()
-    ely_e_before = sim.fleet.ely_energy_mwh.copy()
-    h2 = sim.fleet.h2
-    h2_wd_before = h2.withdrawn_kg.copy() if h2 is not None else None
-    h2_in_before = h2.injected_kg.copy() if h2 is not None else None
-    sim._pf_window_max = {}
-
+    meters = sim.begin_step()
     res = sim.integrator.advance(s_to_us(dt_s), interrupt_on_event=interrupt)
 
-    island = sim.integrator.islands
-    n_islands = island.n
-    s_online_arr = sim.fleet.s_online_per_island(n_islands)
-    agc_up, _agc_dn = sim.fleet.agc_headroom(n_islands)
-    fcr_arr = getattr(sim.fleet, "fcr_used", None)
-
-    devices: dict[str, Any] = {}
-    status_names = {0: "offline", 1: "starting", 2: "online"}
-    for pid, row in sim._sync_row.items():
-        state = status_names[int(sim.fleet.status[row])]
-        if state == "offline" and sim.fleet.tripped_at_us[row] >= 0:
-            state = "tripped"
-        if state == "online" and sim.fleet.h2_starved is not None \
-                and bool(sim.fleet.h2_starved[row]):
-            state = "starved"
-        devices[pid] = {
-            "p_mw": float(sim.fleet.y[row] - sim.fleet.hy_pump_p[row]),
-            "state": state,
-            "headroom_mw": max(0.0, float(sim.fleet.p_max[row] - sim.fleet.y[row])),
-            "energy_mwh_step": float(sim.fleet.energy_mwh[row] - e_before[row]),
-            "fuel_mwh_th_step": float(sim.fleet.fuel_mwh_th[row] - fuel_before[row]),
-        }
-        if bool(sim.fleet.is_hydro[row]) and float(sim.fleet.hy_e_mwh[row]) > 0:
-            devices[pid]["soc"] = float(sim.fleet.hy_soc_mwh[row]
-                                        / sim.fleet.hy_e_mwh[row])
-            devices[pid]["soc_mwh"] = float(sim.fleet.hy_soc_mwh[row])
-    for pid, row in sim._inv_row.items():
-        devices[pid] = {
-            "p_mw": float(sim.fleet.inv_p[row]),
-            "state": "online" if sim.fleet.inv_online[row] else "tripped",
-            "avail_mw": float(sim.fleet.inv_avail[row]),
-            "energy_mwh_step": float(sim.fleet.inv_energy_mwh[row] - inv_e_before[row]),
-        }
-    for pid, row in sim._bat_row.items():
-        e_cap = float(sim.fleet.bat_e_mwh[row])
-        devices[pid] = {
-            "p_mw": float(sim.fleet.bat_p[row]),
-            "state": "online" if sim.fleet.bat_online[row] else "tripped",
-            "soc": float(sim.fleet.bat_soc[row]) / e_cap if e_cap > 0 else 0.0,
-            "soc_mwh": float(sim.fleet.bat_soc[row]),
-            "clamped": bool(sim.fleet.bat_clamped[row]),
-        }
-    for pid, row in sim._ely_row.items():
-        devices[pid] = {
-            "p_mw": -float(sim.fleet.ely_p[row]),  # a load: negative injection
-            "state": "online" if sim.fleet.ely_online[row] else "tripped",
-            "energy_mwh_step": float(sim.fleet.ely_energy_mwh[row] - ely_e_before[row]),
-        }
-    for sid, row in sim._store_row.items():
-        devices[sid] = {
-            "h2_kg": float(h2.level_kg[row]),
-            "capacity_kg": float(h2.capacity_kg[row]),
-            "injected_kg_step": float(h2.injected_kg[row] - h2_in_before[row]),
-            "withdrawn_kg_step": float(h2.withdrawn_kg[row] - h2_wd_before[row]),
-            "state": "online",
-        }
-    if sim.fleet.hvdc is not None:
-        term_p = sim.fleet.hvdc.term_p()
-        for tid, i in sim._term_row.items():
-            link = int(sim.fleet.hvdc.term_link[i])
-            devices[tid] = {
-                "p_mw": float(term_p[i]),
-                "q_mvar": float(sim.fleet.hvdc.term_q[i]),
-                "state": "online" if sim.fleet.hvdc.online[link] else "tripped",
-                "link_id": sim.fleet.hvdc.link_ids[link],
-            }
-
-    pf = sim._latest_pf
-    zones = {}
-    blackout = sim.integrator.islands.blackout()
-    for zone_id, bus in sim._zone_bus.items():
-        zone_island = sim._bus_island[sim.built.bus_index[bus]]
-        detail = {}
-        if pf.get("buses", {}).get(bus):
-            detail["v_pu"] = pf["buses"][bus]["vm_pu"]
-        zones[zone_id] = {"supplied": (0.0 if blackout[zone_island]
-                                       else float(island.w[zone_island])),
-                          "detail": detail}
-
-    violations: list[dict[str, Any]] = []
-    for line_id, vals in pf.get("lines", {}).items():
-        loading = vals["loading_percent"]
-        if loading > 120.0:
-            violations.append({"element": line_id, "kind": "loading",
-                               "severity": "critical", "value": loading})
-        elif loading > 100.0:
-            violations.append({"element": line_id, "kind": "loading",
-                               "severity": "warning", "value": loading})
-    for bus, vals in pf.get("buses", {}).items():
-        vm = vals["vm_pu"]
-        if vm < 0.90 or vm > 1.10:
-            violations.append({"element": bus, "kind": "voltage",
-                               "severity": "critical", "value": vm})
-        elif vm < 0.95 or vm > 1.05:
-            violations.append({"element": bus, "kind": "voltage",
-                               "severity": "warning", "value": vm})
+    devices = sim.device_report(meters)
+    zones = sim.zone_report()
+    violations = sim.pf_violations()
     for note in notes:
         violations.append({"element": "request", "kind": "tolerated",
                            "severity": "info", "value": note})
+    pf_latest, pf_window = sim.pf_report()
 
     result = _r({
         "t": t,
@@ -385,36 +313,17 @@ def _step_body(gb: GbState, body: dict, t: int, dt_s: float, interrupt: bool,
         "dt_done_s": res.dt_done_us / US,
         "t_sim_end": sim.integrator.t_us / US,
         "mode": res.mode,
-        "islands": {str(i): {
-            "f_hz": float(res.f_end[i]) if i < len(res.f_end) else float(island.f[i]),
-            "rocof_hz_s": float(sim.integrator.rings[i].rocof_window(sim.integrator.t_us)),
-            "f_min": float(res.f_min[i]) if i < len(res.f_min) else float(island.f[i]),
-            "f_max": float(res.f_max[i]) if i < len(res.f_max) else float(island.f[i]),
-            "rocof_max": float(res.rocof_max[i]) if i < len(res.rocof_max) else 0.0,
-            "e_k_mj": float(island.e_k[i]),
-            "s_online_mva": float(s_online_arr[i]),
-            "h_sys_s": (float(island.e_k[i] / s_online_arr[i])
-                        if s_online_arr[i] > 0 else 0.0),
-            "blackout": bool(island.blackout()[i]),
-            "fcr_used_mw": (float(fcr_arr[i])
-                            if fcr_arr is not None and i < len(fcr_arr) else 0.0),
-            "afrr_used_mw": (float(sim.integrator.agc_mw[i])
-                             if i < len(sim.integrator.agc_mw) else 0.0),
-            "afrr_headroom_up_mw": float(agc_up[i]) if i < len(agc_up) else 0.0,
-            "w": float(island.w[i]),
-        } for i in range(n_islands)},
+        "islands": sim.islands_report(res),
         "trajectory": res.trajectory,
         "pf": {
-            "latest": {k: v for k, v in pf.items()},
-            "window_extremes": dict(sim._pf_window_max),
+            "latest": pf_latest,
+            "window_extremes": pf_window,
         },
         "devices": devices,
         "zones": zones,
         "events": ([{"t_sim": sim.integrator.t_us / US, "kind": k,
                      "element": el, "data": d} for k, el, d in line_events]
-                   + [{"t_sim": e.t_us / US, "kind": e.kind,
-                       "element": e.element, "data": e.data}
-                      for e in res.events]),
+                   + _events_wire(res)),
         "violations": violations,
         "summary": {"balance_err": res.balance_err,
                     "pf_failures": sim._pf_fail_count},
@@ -541,8 +450,7 @@ async def replay(request: Request) -> dict:
                              "blackout": bool(islands2.blackout()[i]),
                              "w": float(islands2.w[i])}
                     for i in range(islands2.n)},
-        "events": [{"t_sim": e.t_us / US, "kind": e.kind, "element": e.element,
-                    "data": e.data} for e in res.events],
+        "events": _events_wire(res),
         "notes": notes,
     })
 

@@ -68,21 +68,28 @@ def build_container(settings: Settings | None = None) -> App:
         from ..dynamics.integrator import ModeConfig
         from ..simulator import build_dyn_simulator
 
+        # load ONCE: the simulator and /network metadata must describe the
+        # same bytes (two independent reads could straddle a dev edit),
+        # and the europe bundles are multi-MB pydantic-validated documents
+        data = load_bundle(settings.data_dir)
         simulator = build_dyn_simulator(
             settings.data_dir, settings.steps_per_day,
             d_load_pct_per_hz=settings.d_load_pct_per_hz,
             warm_start=settings.warm_start,
             catalog_path=settings.catalog_path,
             mode_cfg=ModeConfig.from_settings(settings),
+            data=data,
         )
-        network_meta = _network_meta(load_bundle(settings.data_dir))
+        network_meta = _network_meta(data)
     elif settings.simulator == "pf":
         from ..data_loader import load_bundle
 
+        data = load_bundle(settings.data_dir)
         simulator = build_pf_simulator(
-            settings.data_dir, settings.steps_per_day, warm_start=settings.warm_start
+            settings.data_dir, settings.steps_per_day,
+            warm_start=settings.warm_start, data=data,
         )
-        network_meta = _network_meta(load_bundle(settings.data_dir))
+        network_meta = _network_meta(data)
     else:
         simulator = NullSimulator(steps_per_day=settings.steps_per_day)
 

@@ -313,3 +313,36 @@ def test_island_born_without_a_source_blacks_out(client) -> None:
     for i in dead:
         assert res["islands"][i]["w"] == 0.0  # load disconnected by the collapse
     assert res["zones"]["copenhagen"]["supplied"] == 0.0
+
+
+def test_restore_load_routes_to_the_zones_island(client) -> None:
+    """Stage 4: restore_load used to hardcode island 0 under a stale pre-P8
+    comment — on a split system a copenhagen restore silently ramped island
+    0's defense plan. It now resolves the zone's ACTUAL island (and notes
+    unknown zones instead of ignoring them)."""
+    _reset(client, reset_with_devices())
+    _step(client, 0, dt_s=30.0)
+    r1 = _step(client, 1, dt_s=60.0, interrupt_on_event=False,
+               scheduled_events=[{"at_s_rel": 5.0, "kind": "line_trip",
+                                  "element": "berlin-copenhagen"}])
+    assert len(r1["islands"]) == 2
+    gb = client.app.state.gb
+    cph_bus = gb.sim._zone_bus["copenhagen"]
+    cph_island = gb.sim._bus_island[gb.sim.built.bus_index[cph_bus]]
+    assert cph_island != 0  # the split put copenhagen on its own island
+
+    # make the routing observable: targets start at 1.0 and clip there, so
+    # pre-set a shed state on BOTH islands and watch which one the command
+    # raises (white-box, but the routing is exactly what is under test)
+    defense = gb.sim.integrator.defense
+    defense.restore_target_w[0] = 0.5
+    defense.restore_target_w[cph_island] = 0.5
+    _step(client, 2, dt_s=1.0,
+          zone_commands={"copenhagen": {"restore_load": 0.1}})
+    assert defense.restore_target_w[cph_island] == pytest.approx(0.6)
+    assert defense.restore_target_w[0] == pytest.approx(0.5)  # untouched
+
+    res = _step(client, 3, dt_s=1.0,
+                zone_commands={"atlantis": {"restore_load": 0.1}})
+    assert any("unknown zone" in str(v.get("value", ""))
+               for v in res["violations"])

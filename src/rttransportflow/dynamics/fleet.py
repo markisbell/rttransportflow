@@ -228,6 +228,13 @@ class Fleet:
     # rows whose pending start is a BLACK START (bypasses the sick-island
     # hold; the integrator re-energizes a dead island on completion)
     black_start_rows: set = None
+    # id -> row maps, built once in make_fleet (ids are fixed per reset).
+    # The event path used to pay O(n) ids.index scans exactly during
+    # cascades, and DynSimulator kept a second parallel copy of the maps.
+    sync_row: dict = None
+    inv_row: dict = None
+    bat_row: dict = None
+    ely_row: dict = None
 
     _coeff_cache: dict[int, dict[str, np.ndarray]] = field(default_factory=dict, repr=False)
 
@@ -289,36 +296,44 @@ class Fleet:
 
     # ------------------------------------------------------------------
 
+    def _zero_sync_outputs(self, row: int) -> None:
+        """Shared by trip/command_stop (they had drifted into two copies)."""
+        self.p_disp[row] = self.x_g[row] = self.x_1[row] = self.x_2[row] = 0.0
+        self.hy_xc[row] = self.hy_g[row] = self.hy_xh[row] = 0.0
+        self.y[row] = 0.0
+
     def trip(self, device_id: str, t_us: int = 0) -> None:
-        if device_id in self.ids:
-            row = self.ids.index(device_id)
+        row = self.sync_row.get(device_id) if self.sync_row else None
+        if row is not None:
             self.status[row] = OFFLINE
             self.off_since_us[row] = t_us
             self.tripped_at_us[row] = t_us
-            self.p_disp[row] = self.x_g[row] = self.x_1[row] = self.x_2[row] = 0.0
-            self.hy_xc[row] = self.hy_g[row] = self.hy_xh[row] = 0.0
+            self._zero_sync_outputs(row)
             self.p_set[row] = 0.0
-            self.y[row] = 0.0
-        elif device_id in self.inv_ids:
-            row = self.inv_ids.index(device_id)
+            return
+        row = self.inv_row.get(device_id) if self.inv_row else None
+        if row is not None:
             self.inv_online[row] = False
             self.inv_p[row] = 0.0
-        elif device_id in self.bat_ids:
-            row = self.bat_ids.index(device_id)
+            return
+        row = self.bat_row.get(device_id) if self.bat_row else None
+        if row is not None:
             self.bat_online[row] = False
             self.bat_p[row] = 0.0
-        elif device_id in self.ely_ids:
-            row = self.ely_ids.index(device_id)
+            return
+        row = self.ely_row.get(device_id) if self.ely_row else None
+        if row is not None:
             self.ely_online[row] = False
             self.ely_p[row] = 0.0
-        elif self.hvdc is not None and self.hvdc.has(device_id):
+            return
+        if self.hvdc is not None and self.hvdc.has(device_id):
             self.hvdc.trip(device_id)
-        else:
-            raise KeyError(device_id)
+            return
+        raise KeyError(device_id)
 
     def command_start(self, device_id: str, t_us: int) -> float:
         """Begin a start sequence; returns the lead time [s]. Raises if locked out."""
-        row = self.ids.index(device_id)
+        row = self.sync_row[device_id]
         if self.status[row] != OFFLINE:
             return 0.0
         if self.tripped_at_us[row] >= 0:
@@ -340,13 +355,11 @@ class Fleet:
         return float(lead)
 
     def command_stop(self, device_id: str, t_us: int) -> None:
-        row = self.ids.index(device_id)
+        row = self.sync_row[device_id]
         if self.status[row] == ONLINE:
             self.status[row] = OFFLINE
             self.off_since_us[row] = t_us
-            self.p_disp[row] = self.x_g[row] = self.x_1[row] = self.x_2[row] = 0.0
-            self.hy_xc[row] = self.hy_g[row] = self.hy_xh[row] = 0.0
-            self.y[row] = 0.0
+            self._zero_sync_outputs(row)
 
     def poll_commitment(self, t_us: int, f_island: np.ndarray | None = None,
                         blackout: np.ndarray | None = None) -> list[str]:
@@ -407,11 +420,11 @@ class Fleet:
         self.ely_store_row = np.full(len(self.ely_ids), -1, dtype=np.int64)
         self.notices = []
         for pid, store_id in sync_store_ids.items():
-            row = self.ids.index(pid)
+            row = self.sync_row[pid]
             self.fuel_is_h2[row] = True
             self.h2_store_row[row] = stores.row(store_id)
         for pid, store_id in ely_store_ids.items():
-            self.ely_store_row[self.ely_ids.index(pid)] = stores.row(store_id)
+            self.ely_store_row[self.ely_row[pid]] = stores.row(store_id)
 
     def attach_hvdc(self, links) -> None:
         """Wire the HVDC block (HVDCLinks); its per-island injection joins
@@ -647,6 +660,25 @@ class Fleet:
         return p_mech, p_inv
 
     # ------------------------------------------------------------------
+
+    def attachments_state(self) -> dict:
+        """The h2/hvdc attachment state, under the integrator snapshot's
+        historical TOP-LEVEL keys (splice — the on-disk layout is pinned by
+        the bit-replay tests and existing saves)."""
+        return {
+            "h2": self.h2.state_dict() if self.h2 is not None else None,
+            "h2_starved": self.h2_starved.tolist()
+            if self.h2_starved is not None else None,
+            "hvdc": self.hvdc.state_dict() if self.hvdc is not None else None,
+        }
+
+    def restore_attachments(self, state: dict) -> None:
+        if state.get("h2") is not None and self.h2 is not None:
+            self.h2.restore_state(state["h2"])
+        if state.get("h2_starved") is not None and self.h2_starved is not None:
+            self.h2_starved[:] = np.array(state["h2_starved"], dtype=bool)
+        if state.get("hvdc") is not None and self.hvdc is not None:
+            self.hvdc.restore_state(state["hvdc"])
 
     def state_dict(self) -> dict:
         rf = repr_floats
@@ -895,4 +927,8 @@ def make_fleet(
         ely_online=np.ones(len(electrolyzers), dtype=bool),
         ely_energy_mwh=np.zeros(len(electrolyzers)),
     )
+    fleet.sync_row = {pid: i for i, pid in enumerate(fleet.ids)}
+    fleet.inv_row = {pid: i for i, pid in enumerate(fleet.inv_ids)}
+    fleet.bat_row = {pid: i for i, pid in enumerate(fleet.bat_ids)}
+    fleet.ely_row = {pid: i for i, pid in enumerate(fleet.ely_ids)}
     return fleet

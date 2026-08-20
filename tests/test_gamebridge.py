@@ -224,3 +224,31 @@ def test_engine_exception_is_data_not_a_dead_channel(client, monkeypatch) -> Non
     monkeypatch.undo()
     ok = do_step(client, 2, dt_s=30.0)
     assert ok["status"] in ("converged", "degraded")
+
+
+def test_prologue_exception_is_data_too(client, monkeypatch) -> None:
+    """Stage-4 extension of the never-crash rule: the guard used to begin
+    where _step_body happened to be cut, so an exception in the BOUNDARY
+    PROLOGUE (apply_wire_boundary, line/scheduled-event parsing) escaped as
+    HTTP 500 — and as an undocumented third error shape over WS. Now every
+    post-idempotency exception is the contract 'failed' frame."""
+    do_reset(client)
+    do_step(client, 0, dt_s=30.0)
+    gb = client.app.state.gb
+
+    def boom(*args, **kwargs):
+        raise TypeError("boundary prologue exploded")
+
+    monkeypatch.setattr(gb.sim, "apply_wire_boundary", boom)
+    response = client.post("/gb/step", json={"t": 1, "dt_s": 30.0,
+                                             **boundary_for_step(1)})
+    assert response.status_code == 200  # failed frames are data, never 500
+    frame = response.json()
+    assert frame["status"] == "failed"
+    assert frame["dt_done_s"] == 0.0
+    assert any(v["kind"] == "exception" for v in frame["violations"])
+
+    # and the channel keeps working once the fault clears
+    monkeypatch.undo()
+    ok = do_step(client, 2, dt_s=30.0)
+    assert ok["status"] in ("converged", "degraded")

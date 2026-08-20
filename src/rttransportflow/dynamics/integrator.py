@@ -549,11 +549,10 @@ class Integrator:
             "energy_load_mj": repr(self.energy_load_mj),
             "f_start": [repr(float(v)) for v in self.f_start],
             "fleet": self.fleet.state_dict(),
-            "h2": self.fleet.h2.state_dict() if self.fleet.h2 is not None else None,
-            "h2_starved": self.fleet.h2_starved.tolist()
-            if self.fleet.h2_starved is not None else None,
-            "hvdc": self.fleet.hvdc.state_dict()
-            if self.fleet.hvdc is not None else None,
+            # attachment state is FLEET-owned; spliced at the same top-level
+            # keys so the snapshot layout stays byte-identical (each new
+            # attachment used to mean editing the Integrator in two places)
+            **self.fleet.attachments_state(),
             "p_extra": [repr(float(v)) for v in self.islands.p_extra],
             "defense": self.defense.state_dict(),
             "relays": self.relays.state_dict(),
@@ -578,12 +577,7 @@ class Integrator:
         self.energy_load_mj = float(state["energy_load_mj"])
         self.f_start = np.array([float(v) for v in state["f_start"]])
         self.fleet.restore_state(state["fleet"])
-        if state.get("h2") is not None and self.fleet.h2 is not None:
-            self.fleet.h2.restore_state(state["h2"])
-        if state.get("h2_starved") is not None and self.fleet.h2_starved is not None:
-            self.fleet.h2_starved[:] = np.array(state["h2_starved"], dtype=bool)
-        if state.get("hvdc") is not None and self.fleet.hvdc is not None:
-            self.fleet.hvdc.restore_state(state["hvdc"])
+        self.fleet.restore_attachments(state)
         if state.get("p_extra") is not None:
             self.islands.p_extra = np.array([float(v) for v in state["p_extra"]])
         if state.get("defense") is not None:
