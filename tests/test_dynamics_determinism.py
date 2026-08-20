@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 
 from rttransportflow.dynamics import s_to_us
 from rttransportflow.dynamics.events import Event
-from rttransportflow.snapshot import capture, from_json, restore, to_json
 from tests.helpers.dyn import make_fixture
+
+
+def capture(integ) -> dict:
+    return integ.state_dict()
+
+
+def through_json(snap: dict) -> dict:
+    """The bit-exactness claim under test: repr-floats survive a JSON trip."""
+    return json.loads(json.dumps(snap, separators=(",", ":"), sort_keys=True))
 
 
 def run_sliced(chunks_s: list[float], total_s: float = 10.0):
@@ -44,9 +54,9 @@ def test_snapshot_bit_replay() -> None:
     # Run to 150 s, snapshot through JSON, restore into a FRESH integrator,
     # continue to 300 s.
     half = run_sliced([150.0], total_s=150.0)
-    snap = from_json(to_json(capture(half)))
+    snap = through_json(capture(half))
     fresh = make_fixture()
-    restore(fresh, snap)
+    fresh.restore_state(snap)
     while fresh.t_us < s_to_us(total):
         fresh.advance(s_to_us(total) - fresh.t_us, interrupt_on_event=False)
     assert capture(fresh) == capture(ref)

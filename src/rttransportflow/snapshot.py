@@ -1,31 +1,16 @@
-"""Snapshot capture/restore: versioned, JSON-safe, bit-exact.
+"""Model-structure hash — the snapshot restore guard.
 
-Floats travel as `repr` strings (binary64-exact round-trip) — the ONE
-exemption from the `_r()` wire rule — so restore + continue reproduces the
-uninterrupted run bit for bit (pinned by test_snapshot_replay).
+Snapshot capture/restore itself lives on the Integrator (state_dict /
+restore_state; floats travel as `repr` strings, the ONE exemption from the
+`_r()` wire rule — pinned by the bit-replay tests). This module keeps only
+the hash of the model structure+parameters (not state): a mismatch on reset
+means the snapshot describes a different model and is refused
+(`refused_snapshot`).
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
-from typing import Any
-
-
-def capture(integrator) -> dict[str, Any]:
-    return integrator.state_dict()
-
-
-def restore(integrator, snap: dict[str, Any]) -> None:
-    integrator.restore_state(snap)
-
-
-def to_json(snap: dict[str, Any]) -> str:
-    return json.dumps(snap, separators=(",", ":"), sort_keys=True)
-
-
-def from_json(text: str) -> dict[str, Any]:
-    return json.loads(text)
 
 
 def model_hash(fleet) -> str:

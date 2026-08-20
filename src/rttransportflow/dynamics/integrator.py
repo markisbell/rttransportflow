@@ -26,7 +26,7 @@ import numpy as np
 from . import F0, QUANTUM_US, US
 from .events import Event, EventQueue
 from .fleet import Fleet
-from ..telemetry import FineRing, TrajectoryBuffer
+from .telemetry import FineRing, TrajectoryBuffer
 
 INF_US = 1 << 62
 

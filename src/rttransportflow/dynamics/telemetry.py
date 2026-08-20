@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .dynamics import US
+from . import US
 
 
 class FineRing:
