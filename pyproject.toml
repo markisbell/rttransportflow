@@ -32,10 +32,10 @@ rttransportflow = "rttransportflow.main:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
-# "." as well as "src": two test modules import helpers from sibling test
-# modules (`from tests.test_gamebridge import ...`), which only resolves
-# when the repo root is on sys.path. `python -m pytest` inserts the CWD and
-# hid this locally for weeks; CI runs bare `pytest` and does not, so main
-# was red on a green-looking local suite.
+# "." as well as "src": shared fixtures live in tests/helpers/ (a plain
+# package, never collected) and are imported as `from tests.helpers... import`,
+# which needs the repo root on sys.path. `python -m pytest` inserts the CWD
+# and hid a missing root for weeks; CI runs bare `pytest` and does not, so
+# main was red on a green-looking local suite — hence the explicit entry.
 pythonpath = [".", "src"]
 testpaths = ["tests"]

@@ -11,12 +11,14 @@ import pytest
 from rttransportflow.dynamics import F0, s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
 from rttransportflow.dynamics.protection import (
     ELY_SHED_HZ,
     RESTORE_F_OK_US,
     UFLS_STAGES,
 )
+
+from tests.helpers.dyn import make_island
 
 
 def worked_example_island(h_sys: float = 1.5, fcr_mw: float = 1500.0,
@@ -35,9 +37,7 @@ def worked_example_island(h_sys: float = 1.5, fcr_mw: float = 1500.0,
     }]
     fleet = make_fleet(sync)
     fleet.init_steady_state()
-    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                          p_l0=np.array([p_l0 + 3000.0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
+    islands = make_island(p_l0 + 3000.0)
     integ = Integrator(fleet, islands, protection_seed=protection_seed)
     # model the 3 GW infeed as extra generation that vanishes at t = 5 s
     integ.islands.p_l0[0] = p_l0
@@ -96,9 +96,7 @@ def test_electrolyzer_interruptible_tier() -> None:
     ely = [{"id": "e1", "island": 0, "p_max": 500.0, "p_set": 400.0}]
     fleet = make_fleet(sync, electrolyzers=ely)
     fleet.init_steady_state()
-    islands = IslandState(f=np.array([49.55]), e_k=np.zeros(1),
-                          p_l0=np.array([8000.0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
+    islands = make_island(8000.0, f_hz=49.55)
     assert 49.55 < ELY_SHED_HZ
     integ = Integrator(fleet, islands)
     res = integ.advance(s_to_us(1.0), interrupt_on_event=False)
@@ -127,10 +125,7 @@ def test_pole_slip_draws_are_seeded() -> None:
                 for i in range(10)]
         fleet = make_fleet(sync)
         fleet.init_steady_state()
-        islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                              p_l0=np.array([4000.0]), w=np.ones(1),
-                              p_loss=np.zeros(1), d_pu=0.5)
-        integ = Integrator(fleet, islands, protection_seed=seed)
+        integ = Integrator(fleet, make_island(4000.0), protection_seed=seed)
         integ.queue.schedule(Event(s_to_us(1.0), "load_step", "shock",
                                    {"island": 0, "delta_mw": 2500.0}))
         res = integ.advance(s_to_us(10.0), interrupt_on_event=False)
@@ -175,9 +170,7 @@ def test_black_start_reenergizes_a_dead_island() -> None:
              "ramp_mw_s": np.inf, "p_set": 150.0, "start_hot_s": 60.0}]
     fleet = make_fleet(sync)
     fleet.init_steady_state()
-    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                          p_l0=np.array([150.0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
+    islands = make_island(150.0)
     integ = Integrator(fleet, islands)
     integ.queue.schedule(Event(s_to_us(1.0), "trip", "o"))
     integ.advance(s_to_us(5.0), interrupt_on_event=False)

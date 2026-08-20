@@ -8,66 +8,26 @@ from __future__ import annotations
 import copy
 
 import pytest
-from fastapi.testclient import TestClient
 
-from rttransportflow.api.runtime import create_app
-from rttransportflow.config import Settings
 from rttransportflow.dynamics.hvdc import path_loss_frac
 
-from test_gamebridge import NATIVE, boundary_for_step, reset_doc
+from tests.helpers.wire import (
+    NATIVE,
+    devices_full,
+    do_reset,
+    do_step,
+    reset_doc,
+    reset_with_devices,
+)
 
 HUB_LOSS = path_loss_frac(300.0)  # 2 GW hub 300 km out delivers ≈ 97.1 %
 
-
-def devices_full() -> list[dict]:
-    return [
-        {"id": "bat_paris", "kind": "battery", "node": "paris",
-         "params": {"p_max_mw": 600.0, "e_mwh": 2400.0, "soc": 0.55}},
-        {"id": "gfm_berlin", "kind": "grid_forming", "node": "berlin",
-         "params": {"p_max_mw": 400.0, "e_mwh": 1600.0, "h_v_s": 6.0}},
-        {"id": "cavern_north", "kind": "h2_store",
-         "params": {"capacity_kg": 4_000_000.0, "level_kg": 2_000_000.0}},
-        {"id": "ely_hamburg", "kind": "electrolyzer", "node": "frankfurt",
-         "params": {"p_max_mw": 500.0, "h2_store_id": "cavern_north"}},
-        {"id": "hvdc_suedlink_n", "kind": "hvdc", "node": "frankfurt",
-         "params": {"link_id": "suedlink", "p_max_mw": 2000.0, "length_km": 700.0}},
-        {"id": "hvdc_suedlink_s", "kind": "hvdc", "node": "milan",
-         "params": {"link_id": "suedlink", "p_max_mw": 2000.0, "length_km": 700.0}},
-        {"id": "hub_dogger", "kind": "offshore_hub", "node": "copenhagen",
-         "params": {"p_max_mw": 2000.0, "platform_mw": 2000.0, "cable_km": 300.0}},
-    ]
-
-
-def reset_with_devices(extra_devices: list[dict] | None = None) -> dict:
-    doc = reset_doc()
-    doc["devices"] = extra_devices if extra_devices is not None else devices_full()
-    return doc
-
-
-@pytest.fixture()
-def client():
-    app = create_app(Settings(external_clock=True, autostart=False))
-    with TestClient(app) as c:
-        yield c
-
-
-def _reset(client, doc: dict) -> dict:
-    response = client.post("/gb/net/reset", json=doc)
-    assert response.status_code == 200, response.text
-    return response.json()
+_reset = do_reset
 
 
 def _step(client, t: int, dt_s: float = 30.0, **extra) -> dict:
-    body = {"t": t, "dt_s": dt_s, "interrupt_on_event": False,
-            **boundary_for_step(0)}
-    for key, value in extra.items():
-        if key in ("zone_demand", "avail_mw", "device_commands"):
-            body[key] = {**body.get(key, {}), **value}  # merge, don't clobber
-        else:
-            body[key] = value
-    response = client.post("/gb/step", json=body)
-    assert response.status_code == 200, response.text
-    return response.json()
+    # device suites step against the FIXED step-0 boundary, not the per-t one
+    return do_step(client, t, dt_s, boundary_step=0, **extra)
 
 
 # --- reset validation ----------------------------------------------------

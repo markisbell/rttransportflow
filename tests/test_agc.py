@@ -11,7 +11,9 @@ import pytest
 from rttransportflow.dynamics import F0, s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
+
+from tests.helpers.dyn import make_island
 
 
 def island(participants: list[dict] | None = None, p_l0: float = 4000.0):
@@ -32,11 +34,8 @@ def island(participants: list[dict] | None = None, p_l0: float = 4000.0):
         specs.append(spec)
     fleet = make_fleet(specs)
     fleet.init_steady_state()
-    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                          p_l0=np.array([p_l0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
-    integ = Integrator(fleet, islands)
-    integ.defense_enabled = False  # isolate the control loop
+    integ = Integrator(fleet, make_island(p_l0))
+    integ.defense_enabled = False  # isolate the control loop (AGC stays ON)
     return fleet, integ
 
 

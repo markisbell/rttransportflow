@@ -8,8 +8,10 @@ import pytest
 
 from rttransportflow.dynamics import F0, s_to_us
 from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
 from rttransportflow.dynamics.plant_types import load_catalog, sync_spec
+
+from tests.helpers.dyn import make_island, pin_mode
 
 
 def phs_island(pump_mw: float = 0.0, soc_frac: float = 0.5,
@@ -25,12 +27,7 @@ def phs_island(pump_mw: float = 0.0, soc_frac: float = 0.5,
     fleet = make_fleet(specs)
     fleet.init_steady_state()
     fleet.hy_pump_set[1] = pump_mw
-    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                          p_l0=np.array([p_l0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
-    integ = Integrator(fleet, islands)
-    integ.defense_enabled = False
-    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
+    integ = pin_mode(Integrator(fleet, make_island(p_l0)))
     return fleet, integ
 
 

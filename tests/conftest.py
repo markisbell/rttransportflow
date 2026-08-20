@@ -1,9 +1,19 @@
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 from rttransportflow.api.runtime import create_app
 from rttransportflow.config import Settings
+
+
+@pytest.fixture()
+def client():
+    """External-clock gamebridge client — shared by the gamebridge, wire-device
+    and replay suites (previously three identical module-level copies)."""
+    app = create_app(Settings(external_clock=True, autostart=False))
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture

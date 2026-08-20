@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import copy
-import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,66 +10,14 @@ from fastapi.testclient import TestClient
 from rttransportflow.api.runtime import create_app
 from rttransportflow.config import Settings
 
-BUNDLE_DIR = Path(__file__).resolve().parent.parent / "data" / "grids" / "europe_mini"
-
-
-def load_native() -> dict:
-    return {
-        name: json.loads((BUNDLE_DIR / f"{name}.json").read_text())
-        for name in ("grid", "lines", "plants", "load_centers", "scenario")
-    }
-
-
-NATIVE = load_native()
-SYNC_KINDS = {"nuclear", "coal", "lignite", "gas_ccgt", "gas_ocgt", "hydro_ps"}
-
-
-def reset_doc(native: dict | None = None) -> dict:
-    native = native or NATIVE
-    return {
-        "contract": "2.0",
-        "network_kind": "transmission",
-        "name": "europe_mini",
-        "native": native,
-        "zones": [{"id": z["id"], "node": z["bus"]} for z in native["grid"]["zones"]],
-        "devices": [],
-    }
-
-
-def boundary_for_step(step: int, native: dict | None = None) -> dict:
-    native = native or NATIVE
-    zone_demand = {
-        item["zone"]: {"value_mw": item["p_mw"][step]}
-        for item in native["load_centers"]["items"]
-    }
-    avail, commands = {}, {}
-    for plant in native["plants"]["plants"]:
-        if plant["kind"] in SYNC_KINDS:
-            commands[plant["id"]] = {"dispatch_mw": plant["profile_p_mw"][step]}
-        else:
-            avail[plant["id"]] = plant["profile_p_mw"][step]
-    return {"zone_demand": zone_demand, "avail_mw": avail, "device_commands": commands}
-
-
-@pytest.fixture()
-def client():
-    app = create_app(Settings(external_clock=True, autostart=False))
-    with TestClient(app) as c:
-        yield c
-
-
-def do_reset(client, doc: dict | None = None) -> dict:
-    response = client.post("/gb/net/reset", json=doc or reset_doc())
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def do_step(client, t: int, dt_s: float = 900.0, **extra) -> dict:
-    body = {"t": t, "dt_s": dt_s, "interrupt_on_event": False,
-            **boundary_for_step(min(t, 95)), **extra}
-    response = client.post("/gb/step", json=body)
-    assert response.status_code == 200, response.text
-    return response.json()
+from tests.helpers.wire import (
+    BUNDLE_DIR,
+    NATIVE,
+    boundary_for_step,
+    do_reset,
+    do_step,
+    reset_doc,
+)
 
 
 def test_version_handshake(client) -> None:

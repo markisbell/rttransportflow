@@ -16,7 +16,7 @@ import pytest
 from rttransportflow.dynamics import F0, US, s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
 from rttransportflow.dynamics.plant_types import (
     battery_spec,
     inverter_spec,
@@ -24,14 +24,11 @@ from rttransportflow.dynamics.plant_types import (
     sync_spec,
 )
 
+from tests.helpers.dyn import make_island, pin_mode
+
 CATALOG = load_catalog()["kinds"]
 LOAD = 40_000.0
 TRIP = 1_000.0
-
-
-def _island() -> IslandState:
-    return IslandState(f=np.array([F0]), e_k=np.zeros(1), p_l0=np.array([LOAD]),
-                       w=np.ones(1), p_loss=np.zeros(1), d_pu=0.5)
 
 
 def _syncs(kind: str, n: int, p_max: float, p_set: float) -> list[dict]:
@@ -72,9 +69,8 @@ def build_fleet(which: str):
 
 def run(which: str) -> dict:
     fleet = build_fleet(which)
-    integ = Integrator(fleet, _island())
-    integ.defense_enabled = False  # comparative pins predate the defense layer
-    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
+    # comparative pins predate the defense layer: droop-only pin mode
+    integ = pin_mode(Integrator(fleet, make_island(LOAD)))
     integ.queue.schedule(Event(s_to_us(1.0), "trip", "infeed"))
     integ.advance(s_to_us(1.0), interrupt_on_event=False)
     f_before = float(integ.islands.f[0])

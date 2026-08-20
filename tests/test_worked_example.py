@@ -15,7 +15,9 @@ import pytest
 from rttransportflow.dynamics import F0, US, s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
+
+from tests.helpers.dyn import make_island, pin_mode
 
 S_SYS = 150_000.0  # MVA
 LOAD = 150_000.0  # MW
@@ -41,15 +43,9 @@ def build_case(h_sys: float, fcr_mw: float, battery_gw: float = 0.0) -> Integrat
                       "soc_frac": 0.55, "quiet_hz": 0.0}]  # recharge off
     fleet = make_fleet(sync, inverters=inverters, batteries=batteries)
     fleet.init_steady_state()
-    islands = IslandState(
-        f=np.array([F0]), e_k=np.zeros(1), p_l0=np.array([LOAD]),
-        w=np.ones(1), p_loss=np.zeros(1),
-        d_pu=0.5,  # 1 %/Hz on 150 GW = 1500 MW/Hz
-    )
-    integ = Integrator(fleet, islands)
-    integ.defense_enabled = False  # §2.3 pins are PRE-shed numbers (fixture rule)
-    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
-    return integ
+    islands = make_island(LOAD, d_pu=0.5)  # 1 %/Hz on 150 GW = 1500 MW/Hz
+    # §2.3 pins are PRE-shed, droop-only numbers (fixture rule)
+    return pin_mode(Integrator(fleet, islands))
 
 
 def run_case(h_sys: float, fcr_mw: float, battery_gw: float = 0.0) -> dict:

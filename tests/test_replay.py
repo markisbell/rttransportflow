@@ -3,30 +3,11 @@ counterfactuals, and the isolation guarantee (replay NEVER moves live state)."""
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
-
-from rttransportflow.api.runtime import create_app
-from rttransportflow.config import Settings
-
-from test_gamebridge import boundary_for_step, reset_doc
-from test_wire_devices import devices_full, reset_with_devices
-
-
-@pytest.fixture()
-def client():
-    app = create_app(Settings(external_clock=True, autostart=False))
-    with TestClient(app) as c:
-        yield c
+from tests.helpers.wire import do_step, reset_doc, reset_with_devices
 
 
 def _step(client, t, dt_s=30.0, **extra):
-    body = {"t": t, "dt_s": dt_s, "interrupt_on_event": False,
-            **boundary_for_step(0)}
-    body.update(extra)
-    response = client.post("/gb/step", json=body)
-    assert response.status_code == 200, response.text
-    return response.json()
+    return do_step(client, t, dt_s, boundary_step=0, **extra)
 
 
 def test_ring_fills_at_5s_cadence(client) -> None:

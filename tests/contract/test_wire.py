@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from tests.test_gamebridge import boundary_for_step, reset_doc
+from tests.helpers.wire import boundary_for_step, reset_doc
 
 
 def test_handshake_over_the_wire(backend) -> None:

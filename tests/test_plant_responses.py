@@ -9,12 +9,14 @@ import pytest
 from rttransportflow.dynamics import F0, US, s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.dynamics.fleet import ONLINE, STARTING, make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
 from rttransportflow.dynamics.plant_types import (
     CatalogError,
     load_catalog,
     sync_spec,
 )
+
+from tests.helpers.dyn import make_fixture, make_island, pin_mode
 
 CATALOG = load_catalog()["kinds"]
 
@@ -106,9 +108,7 @@ def test_hydro_nonminimum_phase_kick() -> None:
 
 
 def battery_fixture(extra_batteries=None, h: float = 5.0):
-    from tests.test_dynamics_analytic import make_fixture  # reuse the P2 fixture
-
-    integ = make_fixture(h=h)
+    integ = make_fixture(h=h)  # reuse the P2 fixture
     if extra_batteries:
         # Rebuild with batteries attached (same sync fixture).
         sync = [
@@ -122,12 +122,7 @@ def battery_fixture(extra_batteries=None, h: float = 5.0):
         ]
         fleet = make_fleet(sync, batteries=extra_batteries)
         fleet.init_steady_state()
-        islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                              p_l0=np.array([8000.0]), w=np.ones(1),
-                              p_loss=np.zeros(1), d_pu=1.0)
-        integ = Integrator(fleet, islands)
-        integ.defense_enabled = False  # pinned pre-defense dynamics
-        integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
+        integ = pin_mode(Integrator(fleet, make_island(8000.0, d_pu=1.0)))
     return integ
 
 
@@ -350,12 +345,7 @@ def test_h2_starvation_chain() -> None:
     fleet = make_fleet([h2_ccgt] + coal, electrolyzers=ely)
     fleet.attach_h2(stores, {"h2gt": "cavern"}, {"ely1": "cavern"})
     fleet.init_steady_state()
-    islands = IslandState(f=np.array([F0]), e_k=np.zeros(1),
-                          p_l0=np.array([4000.0]), w=np.ones(1),
-                          p_loss=np.zeros(1), d_pu=0.5)
-    integ = Integrator(fleet, islands)
-    integ.defense_enabled = False  # pinned pre-defense dynamics
-    integ.agc_enabled = False  # droop-only pins (PHYSICS §6)
+    integ = pin_mode(Integrator(fleet, make_island(4000.0)))
 
     # Draw at 200 MW: ~10.2 t/h; the 400 kg above the floor lasts ~2.4 min
     # -> starvation, early return, ALERT; the coal FCR arrests the loss.
@@ -368,7 +358,7 @@ def test_h2_starvation_chain() -> None:
     # the lost 200 MW is a real frequency event the coal fleet arrests
     # (assert past the ~10 s reheat transient — QSS ≈ −0.11 Hz)
     integ.advance(s_to_us(60.0), interrupt_on_event=False)
-    assert 49.6 < float(islands.f[0]) < 49.99
+    assert 49.6 < float(integ.islands.f[0]) < 49.99
 
     # The dispatcher's job (P6): redispatch the coal fleet to cover the lost
     # unit — frequency recovers, the UF-shed electrolyzer un-sheds and

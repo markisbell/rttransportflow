@@ -7,7 +7,7 @@ import numpy as np
 from rttransportflow.dynamics import s_to_us
 from rttransportflow.dynamics.events import Event
 from rttransportflow.snapshot import capture, from_json, restore, to_json
-from tests.test_dynamics_analytic import make_fixture
+from tests.helpers.dyn import make_fixture
 
 
 def run_sliced(chunks_s: list[float], total_s: float = 10.0):

@@ -16,34 +16,9 @@ import pytest
 
 from rttransportflow.dynamics import F0, US, s_to_us
 from rttransportflow.dynamics.events import Event
-from rttransportflow.dynamics.fleet import make_fleet
-from rttransportflow.dynamics.integrator import Integrator, IslandState
+from rttransportflow.dynamics.integrator import Integrator
 
-
-def make_fixture(h: float = 5.0, n_machines: int = 4, s_n: float = 2500.0,
-                 load_mw: float = 8000.0, d_pu: float = 1.0) -> Integrator:
-    p_each = load_mw / n_machines
-    sync = [
-        {
-            "id": f"g{i}", "island": 0, "s_n": s_n, "h": h, "r": 0.05,
-            "db": 0.0, "fcr_band": np.inf, "p_max": np.inf, "p_min": 0.0,
-            "t_g": 0.2, "t_ch": 0.4, "t_rh": 8.0, "f_hp": 1.0,
-            "ramp_mw_s": np.inf, "p_set": p_each,
-        }
-        for i in range(n_machines)
-    ]
-    fleet = make_fleet(sync)
-    fleet.init_steady_state()
-    islands = IslandState(
-        f=np.array([F0]), e_k=np.zeros(1), p_l0=np.array([load_mw]),
-        w=np.ones(1), p_loss=np.zeros(1), d_pu=d_pu,
-    )
-    integrator = Integrator(fleet, islands)
-    # the §6 pins predate the P8 defense layer and run with it OFF (the
-    # fixture family's "clamps disabled" rule)
-    integrator.defense_enabled = False
-    integrator.agc_enabled = False  # droop-only pins (PHYSICS §6)
-    return integrator
+from tests.helpers.dyn import make_fixture
 
 
 def run_trip(integ: Integrator, until_s: float = 60.0) -> dict:
