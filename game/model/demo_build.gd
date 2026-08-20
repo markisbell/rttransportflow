@@ -242,7 +242,7 @@ static func auto_build(world: Node, lc_ids: Array[String] = []) -> bool:
 		# 1.35: the LIVE demand model's weather-driven peak runs above the
 		# map's static peak_mw — a 1.2 build blacked out at 10:00 (found by
 		# the dispatch_day DBG trace: 10.4 GW fleet, 11.5 GW forecast peak).
-		var need: float = lc["peak_mw"] * 1.35
+		var need: float = lc["peak_mw"] * GridTopology.LIVE_PEAK_MARGIN
 		var placed := 0.0
 		var placed_count := 0
 		# unroutable sites — retrying them loops forever; seeded with the

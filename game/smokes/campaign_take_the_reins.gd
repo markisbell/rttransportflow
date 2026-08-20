@@ -50,8 +50,14 @@ func run() -> void:
 	var ufls_events := 0
 	var trip_seen := false
 	var blocks := 0
-	# 2 sim-days + 2 blocks so the window-close evaluation lands
-	while blocks < 194:
+	# Loop on SIM TIME, not a block count: every significant event
+	# early-returns (step_once requests interrupt_on_event) and eats block
+	# time, so a fixed 194-iteration cap carried only ~2 blocks of margin —
+	# the corrected map projection (colder true regions, steeper morning
+	# ramp, more shed events) consumed it and the milestone's day-2.0
+	# window-close evaluation never ran. The hard cap below is a hang
+	# guard, not the schedule.
+	while Campaign.day_now() < 2.03 and blocks < 240:
 		if blocks % 16 == 0:
 			print("CAMPAIGN block ", blocks, " day %.2f" % Campaign.day_now())
 		var result: Dictionary = await Orchestrator.step_once(900.0)

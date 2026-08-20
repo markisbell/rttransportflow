@@ -63,6 +63,14 @@ func load_map() -> bool:
 		push_error("BuildSession: cannot parse map " + map_path())
 		return false
 	_map_doc = parsed
+	# The MAP's projection block is the one truth for tile->lat/lon. Demand
+	# kept the europe_v1 numbers as its live default and nothing ever
+	# assigned the real block, so on the 10x-finer v3 grid every zone's
+	# weather region resolved from garbage coordinates (deterministic — and
+	# wrong; Dispatch used the live projection, so the two disagreed). The
+	# sixth instance of the ledger-38 resolution trap, as a stale default.
+	if _map_doc.has("projection"):
+		Demand.projection = _map_doc["projection"]
 	return World.load_map(_map_doc)
 
 

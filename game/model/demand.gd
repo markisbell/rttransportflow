@@ -7,7 +7,7 @@ extends Node
 ## Zone data comes from World.load_centers (peak_mw, season, temp_coeff,
 ## tiles) unless a test injects `zone_override`; the zone's weather region
 ## resolves via Weather.region_of_tile with the map projection (`projection`
-## property; defaults to the shipped europe_v1 block).
+## property — assigned from the map document by BuildSession.load_map).
 ##
 ## Documented interpretations of §2.2 (the spec leaves these to the
 ## implementation): weekend scales the SHAPED part around the 0.62 valley
@@ -39,7 +39,10 @@ const ANCHORS_SUMMER: Array = [
 
 var weather: Node = null  # injected (the Weather autoload in-game)
 var zone_override: Dictionary = {}  # tests: id -> {peak_mw, season, temp_coeff, tiles}
-var projection: Dictionary = {  # shipped europe_v1.json projection block
+## FIXTURE fallback only (v1-era numbers): BuildSession.load_map assigns
+## the real map's projection block on every boot; a test fixture without
+## one keeps this default so region resolution stays deterministic.
+var projection: Dictionary = {
 	"lon0": -20.0, "lat0": 71.0,
 	"deg_lon_per_tile": 0.72955, "deg_lat_per_tile": 0.449156,
 }

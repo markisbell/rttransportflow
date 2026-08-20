@@ -26,6 +26,16 @@ const DEFAULT_PARALLEL := 4
 ## branch's circuit count from the capacity it joins.
 const CIRCUIT_MVA := 625.0
 const CIRCUIT_UTILISATION := 0.9
+## Ledger 29's fleet-sizing margin: the LIVE weather-driven peak runs above
+## the map's static peak_mw_2025, so builds size generation at 1.35x the
+## static peak. Named HERE (one definition; DemoBuild references it).
+## Deliberately NOT applied to branch sizing: the corrected-projection
+## overload event (day 1.34, L116/L108 at ~121 %) sits on branches whose
+## sizing is generation-bound/meshed — a load-side margin measurably
+## changed nothing there while silently re-sizing every load-bound spur in
+## other worlds. Meshed-trunk flow estimation is a modeling project, not a
+## margin (see the re-baseline ledger entry).
+const LIVE_PEAK_MARGIN := 1.35
 ## A corridor tile stands for a bundle of rights-of-way, not an unbounded
 ## one: past this the answer is another corridor, not a wider one.
 const MAX_PARALLEL := 12

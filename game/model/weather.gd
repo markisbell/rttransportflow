@@ -271,7 +271,7 @@ func region_of_latlon(lat: float, lon: float) -> String:
 	return best
 
 
-## Inverse of the map's projection block (data/map/europe_v1.json):
+## Inverse of the map document's `projection` block:
 ## lon = lon0 + (x+0.5)·deg_lon_per_tile, lat = lat0 − (y+0.5)·deg_lat_per_tile.
 func region_of_tile(tile: Vector2i, projection: Dictionary) -> String:
 	var lon: float = float(projection.get("lon0", -20.0)) \

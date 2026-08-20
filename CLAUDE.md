@@ -372,6 +372,36 @@ docs/GAME_DESIGN.md.
     On the wire any negative injection is load, which covers both device
     kinds without a sign special case.
 
+45. **The map's projection block is the ONE tile→lat/lon truth** (refactor
+    campaign re-baseline, 2026-08-20): Demand kept the europe_v1 projection
+    as its live default and nothing ever assigned the v3 block, so on the
+    10×-finer grid every zone's weather region resolved from garbage
+    coordinates — deterministic, green, and wrong (Dispatch used the live
+    projection, so demand-side and availability-side regions disagreed).
+    The sixth ledger-38 instance, as a stale default rather than a tile
+    count. BuildSession.load_map now assigns the map's block; the literal
+    remains only as the documented fixture fallback. The corrected (colder)
+    regions raise heating demand: night price 7.7 → 53.8 €/MWh (gas now
+    commits at night), delivered energy +14 %, CO2 124 → 163 g/kWh —
+    economy_windows.csv regenerated; dispatch_day/economy/calm_week hold on
+    their windowed assertions; the campaign's scripted trip lands at nadir
+    49.92 and milestone 1 stays ★★★. Two consequences worth their own
+    lines: (a) the campaign smoke now loops on SIM TIME (its fixed
+    194-iteration cap carried ~2 blocks of margin; every significant event
+    early-returns and eats block time, and the corrected demand's extra
+    shed events consumed the margin, so the day-2.0 milestone evaluation
+    never ran); (b) OPEN ITEM for balancing: under true demand the
+    inherited world's evening peak duty-trips two meshed continental
+    trunks at day 1.34 (L116/L108 at ~121 %) — a generation pocket
+    (nuclear_116/117) islands and blacks out before the graded window.
+    Those branches are meshed/generation-bound, so a load-side sizing
+    margin measurably changes nothing (tried, loadings byte-identical,
+    reverted); the honest fixes are authored corridor upgrades on that
+    pocket or a meshed-trunk flow estimator (a modeling project, not a
+    margin). The campaign rubric is untouched (pre-window, ungraded), but
+    the player now inherits a world with a real day-2 incident — arguably
+    a teaching moment, explicitly an owner decision.
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
