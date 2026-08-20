@@ -3,11 +3,38 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
+import jsonschema
 import pytest
 
 from tests.helpers.wire import boundary_for_step, reset_doc
+
+SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "contract" / "schemas"
+
+
+def _schema(name: str) -> dict:
+    return json.loads((SCHEMA_DIR / name).read_text())
+
+
+def test_schemas_validate_the_live_wire(backend) -> None:
+    """The P4 freeze artifact, finally ENFORCED: until this test the three
+    schema files were referenced by nothing and free to rot. The bodies this
+    suite sends and the frames the backend answers must satisfy the
+    machine-readable contract. Corrections go INTO the schemas from the live
+    wire, never the reverse (the wire is frozen at 2.0)."""
+    reset_body = reset_doc()
+    jsonschema.validate(reset_body, _schema("reset.schema.json"))
+    r = httpx.post(f"{backend}/gb/net/reset", json=reset_body, timeout=60.0)
+    assert r.status_code == 200
+
+    body = {"t": 0, "dt_s": 60.0, "interrupt_on_event": False,
+            **boundary_for_step(0)}
+    jsonschema.validate(body, _schema("step-request.schema.json"))
+    res = httpx.post(f"{backend}/gb/step", json=body, timeout=60.0)
+    assert res.status_code == 200
+    jsonschema.validate(res.json(), _schema("step-result.schema.json"))
 
 
 def test_handshake_over_the_wire(backend) -> None:
@@ -57,6 +84,8 @@ def test_ws_step_channel_over_the_wire(backend) -> None:
         assert res["t"] == 0
         assert res["dt_done_s"] == pytest.approx(30.0)
         assert res["islands"]["0"]["f_hz"] > 49.5
+        # the WS frame is the SAME shape as the HTTP result (contract rule)
+        jsonschema.validate(res, _schema("step-result.schema.json"))
 
         ws.send(json.dumps({"t": 4, "dt_s": 1.0}))
         err = json.loads(ws.recv(timeout=30))

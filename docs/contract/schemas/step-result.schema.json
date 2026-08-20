@@ -26,8 +26,11 @@
           "s_online_mva": { "type": "number" },
           "h_sys_s": { "type": "number" },
           "blackout": { "type": "boolean" },
+          "w": { "type": "number", "minimum": 0, "maximum": 1, "description": "connected-load fraction after UFLS shed / blackout (P8)" },
           "fcr_used_mw": { "type": "number" },
-          "afrr_used_mw": { "type": "number" }
+          "afrr_used_mw": { "type": "number" },
+          "afrr_headroom_up_mw": { "type": "number" },
+          "p_load_mw": { "type": "number" }
         }
       }
     },
