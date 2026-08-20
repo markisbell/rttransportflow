@@ -10,7 +10,6 @@ const TAG := "SMOKE_RIDE_THROUGH"
 
 
 func run() -> void:
-	p7_port = 8038
 	if not await p7_boot(TAG):
 		return
 	# wind lull so the gas fleet carries real load (and the trip removes it)
@@ -30,7 +29,8 @@ func run() -> void:
 		_fail(TAG, "settle step failed")
 		return
 
-	var victim := _largest_sync(settle.get("devices", {}))
+	var ranked: Array = online_sync_ranked(settle.get("devices", {}))
+	var victim: String = str(ranked.front()) if not ranked.is_empty() else ""
 	var wind_pids := _wind_pids(settle.get("devices", {}))
 	if victim == "" or wind_pids.is_empty():
 		print("RIDE devices=", (settle.get("devices", {}) as Dictionary).keys())
@@ -40,30 +40,26 @@ func run() -> void:
 		" devices=", (settle.get("devices", {}) as Dictionary).keys().size())
 	Orchestrator.inject([{"at_s_rel": 20.0, "kind": "trip", "element": victim}])
 
-	var f_min := 100.0
+	var acc := {"wind_mwh": 0.0}
+	var chased := await chase_event(300.0, 40, "event",
+		func(result: Dictionary) -> void:
+			for pid: String in wind_pids:
+				var device: Dictionary = result.get("devices", {}).get(pid, {})
+				acc["wind_mwh"] = float(acc["wind_mwh"]) \
+					+ numf(device, "energy_mwh_step", 0.0),
+		60.0)
+	var f_min := float(chased["f_min"])
+	var wind_energy := float(acc["wind_mwh"])
 	var wind_tripped := false
-	var wind_energy := 0.0
 	var ufls_stages := 0
-	var results: Array = [await Orchestrator.step_once(300.0)]
-	for _i in range(40):
-		results.append(await Orchestrator.step_once(1.0))
-	results.append(await Orchestrator.step_once(60.0))
+	for event: Dictionary in chased["events"]:
+		var kind := str(event.get("kind", ""))
+		if kind == "trip" and str(event.get("element", "")).begins_with("wind"):
+			wind_tripped = true
+		elif kind == "ufls_stage":
+			ufls_stages += 1
+	var tail: Dictionary = chased["tail"]
 	var wind_online_end := true
-	var tail: Dictionary = {}
-	for result: Dictionary in results:
-		if result.get("_status", 0) != 200:
-			continue
-		tail = result
-		f_min = minf(f_min, numf(result.get("islands", {}).get("0", {}), "f_min", 100.0))
-		for event: Dictionary in result.get("events", []):
-			var kind := str(event.get("kind", ""))
-			if kind == "trip" and str(event.get("element", "")).begins_with("wind"):
-				wind_tripped = true
-			elif kind == "ufls_stage":
-				ufls_stages += 1
-		for pid: String in wind_pids:
-			var device: Dictionary = result.get("devices", {}).get(pid, {})
-			wind_energy += numf(device, "energy_mwh_step", 0.0)
 	for pid: String in wind_pids:
 		var device: Dictionary = tail.get("devices", {}).get(pid, {})
 		if str(device.get("state", "")) != "online":
@@ -77,18 +73,6 @@ func run() -> void:
 	check("wind_kept_delivering", wind_energy > 1.0)
 	_finish(TAG, {"f_min": f_min, "ufls_stages": ufls_stages,
 		"wind_mwh": wind_energy, "wind_units": wind_pids.size()})
-
-
-func _largest_sync(devices: Dictionary) -> String:
-	var best := ""
-	var best_p := 0.0
-	for pid: String in devices:
-		var device: Dictionary = devices[pid]
-		if str(device.get("state", "")) == "online" and device.has("headroom_mw") \
-				and numf(device, "p_mw", 0.0) > best_p:
-			best_p = numf(device, "p_mw", 0.0)
-			best = pid
-	return best
 
 
 func _wind_pids(devices: Dictionary) -> Array:

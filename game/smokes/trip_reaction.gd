@@ -36,14 +36,11 @@ func run() -> void:
 	check("trip_event_present", tripped)
 	check("auto_slowed_to_1x", GameClock.speed == 1.0)
 
-	# the dip lives in the NEXT window's trajectory (and this one's tail)
-	var f_min := 100.0
-	for _i in range(30):
-		var follow: Dictionary = await Orchestrator.step_once(1.0)
-		if follow.get("_status", 0) != 200:
-			break
-		var island: Dictionary = follow.get("islands", {}).get("0", {})
-		f_min = minf(f_min, numf(island, "f_min", 100.0))
+	# the dip lives in the NEXT window's trajectory (and this one's tail):
+	# 30 × 1 s chase (shared pattern; the old loop broke on the first
+	# non-200 while every sibling continued — accidental, now unified)
+	var chased := await chase_event(1.0, 29, "follow")
+	var f_min := float(chased["f_min"])
 	check("frequency_dove", f_min < 49.9)
 	check("frequency_not_collapsed", f_min > 47.5)
 	_finish(TAG, {"dt_done_s": dt_done, "f_min": f_min,

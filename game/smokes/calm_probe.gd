@@ -4,9 +4,7 @@ const TAG := "SMOKE_CALM_PROBE"
 
 
 func run() -> void:
-	var boot := preload("res://smokes/dispatch_day.gd").new()
-	add_child(boot)
-	if not await boot.gridco_boot():
+	if not await gridco_boot(TAG):
 		return
 	var cw := preload("res://smokes/calm_week.gd").new()
 	add_child(cw)

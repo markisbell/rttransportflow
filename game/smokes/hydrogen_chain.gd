@@ -10,7 +10,6 @@ const TAG := "SMOKE_HYDROGEN_CHAIN"
 
 
 func run() -> void:
-	p7_port = 8034
 	if not await p7_boot(TAG):
 		return
 	var built := _build()

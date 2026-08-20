@@ -18,12 +18,7 @@ func run() -> void:
 	if not BuildSession.load_map():
 		_fail(TAG, "map load failed")
 		return
-	Weather.setup(42)
-	Demand.setup(42)
-	Demand.weather = Weather
-	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
-		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
-	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
+	GridcoBoot.setup_models()
 
 	var hud: CanvasLayer = (load("res://views/hud.gd") as GDScript).new()
 	add_child(hud)

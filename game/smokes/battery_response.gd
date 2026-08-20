@@ -10,7 +10,6 @@ const TAG := "SMOKE_BATTERY_RESPONSE"
 
 
 func run() -> void:
-	p7_port = 8035
 	if not await p7_boot(TAG):
 		return
 
@@ -29,7 +28,8 @@ func run() -> void:
 	# and tripping an idle one removes nothing (the pids stay deterministic,
 	# so run B can insist on the same machine).
 	var settle_a := await _settle()
-	var victim := _largest_online(settle_a)
+	var ranked: Array = online_sync_ranked(settle_a.get("devices", {}))
+	var victim: String = str(ranked.front()) if not ranked.is_empty() else ""
 	if victim == "":
 		_fail(TAG, "no online unit to trip")
 		return
@@ -83,39 +83,20 @@ func _settle() -> Dictionary:
 	return result
 
 
-func _largest_online(result: Dictionary) -> String:
-	var best := ""
-	var best_p := 0.0
-	for pid: String in result.get("devices", {}):
-		var device: Dictionary = result["devices"][pid]
-		if str(device.get("state", "")) == "online" \
-				and numf(device, "p_mw", 0.0) > best_p:
-			best_p = numf(device, "p_mw", 0.0)
-			best = pid
-	return best
-
-
 ## Inject the trip, then chase the nadir through 30 s of 1 s steps
 ## (trip_reaction pattern — the dip lives AFTER the early return).
 func _trip_measure(victim: String, bats: Array) -> float:
 	Orchestrator.inject([{"at_s_rel": 30.0, "kind": "trip", "element": victim}])
-	var f_min := 100.0
-	var result: Dictionary = await Orchestrator.step_once(600.0)
-	if result.get("_status", 0) == 200:
-		f_min = minf(f_min, numf(result.get("islands", {}).get("0", {}), "f_min", 100.0))
-	for _i in range(30):
-		var follow: Dictionary = await Orchestrator.step_once(1.0)
-		if follow.get("_status", 0) != 200:
-			continue
-		f_min = minf(f_min, numf(follow.get("islands", {}).get("0", {}), "f_min", 100.0))
-		for pid: String in bats:
-			var device: Dictionary = follow.get("devices", {}).get(pid, {})
-			var p := numf(device, "p_mw", 0.0)
-			_bat_p_peak = maxf(_bat_p_peak, p)
-			if p > 10.0:
-				_bat_discharged = true
-			_bat_soc_min = minf(_bat_soc_min, numf(device, "soc", 1.0))
-	return f_min
+	var out := await chase_event(600.0, 30, "trip",
+		func(result: Dictionary) -> void:
+			for pid: String in bats:
+				var device: Dictionary = result.get("devices", {}).get(pid, {})
+				var p := numf(device, "p_mw", 0.0)
+				_bat_p_peak = maxf(_bat_p_peak, p)
+				if p > 10.0:
+					_bat_discharged = true
+				_bat_soc_min = minf(_bat_soc_min, numf(device, "soc", 1.0)))
+	return float(out["f_min"])
 
 
 ## Hamburg island: coal x5 + ccgt x2 (identical both runs — clear_build

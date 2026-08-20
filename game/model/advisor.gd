@@ -32,9 +32,9 @@ static func assess(result: Dictionary) -> Array[String]:
 		var device: Dictionary = devices[pid]
 		if str(device.get("state", "")) != "online":
 			continue
-		var p := _numf(device, "p_mw", 0.0)
+		var p := Wire.numf(device, "p_mw", 0.0)
 		if device.has("headroom_mw"):  # synchronous units carry headroom
-			headroom += _numf(device, "headroom_mw", 0.0)
+			headroom += Wire.numf(device, "headroom_mw", 0.0)
 			if p > incident:
 				incident = p
 				incident_id = pid
@@ -55,7 +55,7 @@ static func assess(result: Dictionary) -> Array[String]:
 		var island: Dictionary = result["islands"][island_id]
 		if bool(island.get("blackout", false)):
 			continue
-		var e_k := _numf(island, "e_k_mj", 0.0)
+		var e_k := Wire.numf(island, "e_k_mj", 0.0)
 		if e_k > 1.0:
 			worst_rocof = maxf(worst_rocof, incident * F0 / (2.0 * e_k))
 	if worst_rocof >= ROCOF_WARN_HZ_S and lines.size() < 2:
@@ -63,7 +63,3 @@ static func assess(result: Dictionary) -> Array[String]:
 			% [int(incident), worst_rocof])
 	return lines
 
-
-static func _numf(data: Dictionary, key: String, default: float) -> float:
-	var value: Variant = data.get(key, default)
-	return default if value == null else float(value)

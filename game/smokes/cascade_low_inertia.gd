@@ -30,7 +30,6 @@ const GAS_UNITS_LOW := 10
 
 
 func run() -> void:
-	p7_port = 8039
 	if not await p7_boot(TAG):
 		return
 	# Same weather for both fleets, unscaled (lambda 1.0). The old x0.7 lull
@@ -86,7 +85,7 @@ func _run_fleet(low_inertia: bool) -> Dictionary:
 		return {}
 
 	# the SAME script: trip the two largest online sync units, 10 s apart
-	var victims := _two_largest_sync(settle.get("devices", {}))
+	var victims: Array = online_sync_ranked(settle.get("devices", {})).slice(0, 2)
 	if victims.size() < 2:
 		_fail(TAG, "fewer than 2 online sync units after settle")
 		return {}
@@ -123,43 +122,19 @@ func _run_fleet(low_inertia: bool) -> Dictionary:
 		"h_sys": numf(island_pre, "h_sys_s", 0.0),
 		"e_k_mj": numf(island_pre, "e_k_mj", 0.0),
 		"dp_mw": victim_mw, "online_sync": online_sync}
-	var result: Dictionary = await p7_step(300.0, "event")
-	_collect(result, victims, out)
-	for _i in range(45):  # chase both trips + the UFLS pickups at 1 s
-		_collect(await Orchestrator.step_once(1.0), victims, out)
-	var tail: Dictionary = await p7_step(60.0, "tail")
-	_collect(tail, victims, out)
-	var island: Dictionary = tail.get("islands", {}).get("0", {})
-	out["w"] = numf(island, "w", 1.0)
-	out["blackout"] = bool(island.get("blackout", false))
-	return out
-
-
-func _collect(result: Dictionary, victims: Array, out: Dictionary) -> void:
-	if result.get("_status", 0) != 200:
-		return
-	var island: Dictionary = result.get("islands", {}).get("0", {})
-	out["f_min"] = minf(out["f_min"], numf(island, "f_min", 100.0))
-	out["rocof_max"] = maxf(out["rocof_max"], absf(numf(island, "rocof_max", 0.0)))
-	for event: Dictionary in result.get("events", []):
+	# 45 chase steps: both trips + the UFLS pickups at 1 s
+	var chased := await chase_event(300.0, 45, "event", Callable(), 60.0)
+	out["f_min"] = chased["f_min"]
+	out["rocof_max"] = chased["rocof_max"]
+	for event: Dictionary in chased["events"]:
 		var kind := str(event.get("kind", ""))
 		if kind == "trip" and str(event.get("element", "")) in victims:
 			out["trips"] = int(out["trips"]) + 1
 		elif kind == "ufls_stage":
 			out["ufls_stages"] = int(out["ufls_stages"]) + 1
-
-
-func _two_largest_sync(devices: Dictionary) -> Array:
-	var sync: Array = []
-	for pid: String in devices:
-		var device: Dictionary = devices[pid]
-		if str(device.get("state", "")) == "online" and device.has("headroom_mw"):
-			sync.append([numf(device, "p_mw", 0.0), pid])
-	sync.sort_custom(func(a: Array, b: Array) -> bool:
-		return a[0] > b[0] or (a[0] == b[0] and str(a[1]) < str(b[1])))
-	var out: Array = []
-	for entry: Array in sync.slice(0, 2):
-		out.append(entry[1])
+	var island: Dictionary = (chased["tail"] as Dictionary).get("islands", {}).get("0", {})
+	out["w"] = numf(island, "w", 1.0)
+	out["blackout"] = bool(island.get("blackout", false))
 	return out
 
 

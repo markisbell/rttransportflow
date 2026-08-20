@@ -47,8 +47,8 @@ func _on_step(_t: int, result: Dictionary) -> void:
 
 	# RoCoF peak-hold across every island (events are why the player looks)
 	for island_id: String in _islands:
-		var rocof: float = absf(numf(_islands[island_id], "rocof_max",
-			numf(_islands[island_id], "rocof_hz_s", 0.0)))
+		var rocof: float = absf(Wire.numf(_islands[island_id], "rocof_max",
+			Wire.numf(_islands[island_id], "rocof_hz_s", 0.0)))
 		if rocof >= _rocof_peak or \
 				Time.get_ticks_msec() / 1000.0 - _rocof_peak_wall > ROCOF_HOLD_S:
 			_rocof_peak = rocof
@@ -110,7 +110,7 @@ func _draw_dial(font: Font, island: Dictionary) -> void:
 			"%.0f" % tick, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.6, 0.65, 0.7))
 
 	var blackout := bool(island.get("blackout", false))
-	var f_now := numf(island, "f_hz", 50.0)
+	var f_now := Wire.numf(island, "f_hz", 50.0)
 	var needle_angle := _f_to_angle(clampf(f_now, DIAL_F_MIN, DIAL_F_MAX))
 	var needle_color := Color(0.45, 0.45, 0.5) if blackout else Color.WHITE
 	draw_line(center, center + Vector2(cos(needle_angle), sin(needle_angle)) * (radius - 14),
@@ -132,15 +132,15 @@ func _draw_readouts(font: Font, island: Dictionary) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, mode_color)
 
 	# RoCoF, §2.2 threshold colors, peak-hold
-	var rocof := absf(numf(island, "rocof_hz_s", 0.0))
+	var rocof := absf(Wire.numf(island, "rocof_hz_s", 0.0))
 	draw_string(font, Vector2(x, 22), "RoCoF %.2f Hz/s" % rocof,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, _rocof_color(rocof))
 	draw_string(font, Vector2(x, 40), "peak  %.2f Hz/s" % _rocof_peak,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, _rocof_color(_rocof_peak))
 
 	# inertia gauge: H_sys bar, GAME_DESIGN bands (>5 / 3–5 / <3 / <2)
-	var h_sys := numf(island, "h_sys_s", 0.0)
-	var e_k_gws := numf(island, "e_k_mj", 0.0) / 1000.0
+	var h_sys := Wire.numf(island, "h_sys_s", 0.0)
+	var e_k_gws := Wire.numf(island, "e_k_mj", 0.0) / 1000.0
 	draw_string(font, Vector2(x, 66), "inertia H %.2f s   E_k %.0f GWs" % [h_sys, e_k_gws],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.8, 0.85, 0.9))
 	var bar := Rect2(x, 72, 220, 10)
@@ -161,7 +161,7 @@ func _draw_readouts(font: Font, island: Dictionary) -> void:
 	# reserve stack: FCR deployed vs procured
 	var fcr_used := 0.0
 	for island_id: String in _islands:
-		fcr_used += numf(_islands[island_id], "fcr_used_mw", 0.0)
+		fcr_used += Wire.numf(_islands[island_id], "fcr_used_mw", 0.0)
 	var procured := 3000.0
 	if not Dispatch.economy_cfg.is_empty():
 		procured = float(Dispatch.economy_cfg.get("reserve_margin_mw_min", 3000.0))
@@ -175,7 +175,7 @@ func _draw_readouts(font: Font, island: Dictionary) -> void:
 		reserve_color)
 
 	# UFLS state of the main island, prominent when load is shed
-	var w := numf(island, "w", 1.0)
+	var w := Wire.numf(island, "w", 1.0)
 	if w < 0.9995:
 		draw_string(font, Vector2(x, 140), "UFLS: %.1f %% LOAD SHED" % ((1.0 - w) * 100.0),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.35, 0.25))
@@ -200,8 +200,8 @@ func _draw_island_rows(font: Font) -> float:
 			color = Color(0.6, 0.3, 0.3)
 		else:
 			line = "island %s  %.3f Hz  H %.1f s" % [island_id,
-				numf(island, "f_hz", 0.0), numf(island, "h_sys_s", 0.0)]
-			var w := numf(island, "w", 1.0)
+				Wire.numf(island, "f_hz", 0.0), Wire.numf(island, "h_sys_s", 0.0)]
+			var w := Wire.numf(island, "w", 1.0)
 			if w < 0.9995:
 				line += "  shed %.0f%%" % ((1.0 - w) * 100.0)
 		draw_rect(Rect2(14, y - 9, 8, 8), color)
@@ -262,8 +262,3 @@ func _rocof_color(rocof: float) -> Color:
 		return Color(0.9, 0.8, 0.2)
 	return Color(0.8, 0.85, 0.9)
 
-
-## Null-tolerant getter (the wire nulls non-finite floats).
-static func numf(data: Dictionary, key: String, default: float) -> float:
-	var value: Variant = data.get(key, default)
-	return default if value == null else float(value)

@@ -2,9 +2,7 @@ extends SmokeBase
 const TAG := "SMOKE_PROBE"
 
 func run() -> void:
-	var boot := preload("res://smokes/dispatch_day.gd").new()
-	add_child(boot)
-	if not await boot.gridco_boot():
+	if not await gridco_boot(TAG):
 		return
 	var t0 := Time.get_ticks_msec()
 	DemoBuild.auto_build(World)

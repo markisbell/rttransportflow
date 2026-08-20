@@ -54,10 +54,12 @@ docs/GAME_DESIGN.md.
 - **Never crash the loop**: catch-all in the solve path, non-convergence is
   data, never 500.
 - **Ports**: backend 8003 / InfluxDB 8089 / Grafana 3003 (no web UI in v1 —
-  ledger 25; 5176/8083 reserved-unused); game 8030 / smokes 8031 / contract
-  tests 8032 / freeze smoke 8033 / P7 smokes 8034 (hydrogen_chain,
-  battery_response, hvdc_link, north_sea_hub — kept off 8031 so P6 and P7
-  smoke runs can overlap). NEVER 8000–8002 (user dev instances), 8010–8016
+  ledger 25; 5176/8083 reserved-unused); game 8030 / acceptance smokes 8031
+  (sequential by design) / contract tests 8032 / freeze smoke 8033 /
+  backend-driving smokes 8034–8043, ONE port per smoke — the registry is
+  `SMOKE_PORTS` in `game/main.gd` (kept off 8031 so smoke runs can overlap;
+  four smokes silently sharing 8034 was the adopt-a-stale-backend failure).
+  NEVER 8000–8002 (user dev instances), 8010–8016
   (infrastruct sidecars + smokes), or 8020–8029 (infrastruct contract tests).
 - **License**: no code from gridedit/gridgen (AGPL) — pattern reuse only.
 - **Commit/push only on explicit authorization.**

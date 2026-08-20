@@ -11,7 +11,6 @@ const SETPOINT_MW := 800.0
 
 
 func run() -> void:
-	p7_port = 8036
 	if not await p7_boot(TAG):
 		return
 	var built := _build()

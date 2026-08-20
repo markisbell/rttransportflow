@@ -6,30 +6,8 @@ extends SmokeBase
 const TAG := "SMOKE_DISPATCH_DAY"
 
 
-func gridco_boot() -> bool:
-	SidecarManager.configure(SMOKE_PORT)
-	SidecarManager.start_all()
-	if not await _wait_healthy(120.0):
-		_fail(TAG, "health timeout")
-		return false
-	if not BuildSession.load_map():
-		_fail(TAG, "map load failed")
-		return false
-	Weather.setup(42)
-	Demand.setup(42)
-	Demand.weather = Weather
-	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
-		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
-	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
-	BuildSession.use_gridco = true
-	if not await CosimBridge.handshake(Orchestrator.ID):
-		_fail(TAG, "handshake failed")
-		return false
-	return true
-
-
 func run() -> void:
-	if not await gridco_boot():
+	if not await gridco_boot(TAG):
 		return
 	DemoBuild.auto_build(World)
 	BuildSession.rebuild_now()

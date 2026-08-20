@@ -28,22 +28,16 @@ func run() -> void:
 		return
 
 	# trip the largest online sync unit; chase the live nadir
-	var victim := _largest_sync(settle.get("devices", {}))
+	var ranked: Array = online_sync_ranked(settle.get("devices", {}))
+	var victim: String = str(ranked.front()) if not ranked.is_empty() else ""
 	Orchestrator.inject([{"at_s_rel": 20.0, "kind": "trip", "element": victim}])
-	var live_nadir := 100.0
+	var chased := await chase_event(300.0, 40, "trip")
+	var live_nadir := float(chased["f_min"])
 	var trip_event := {}
-	var results: Array = [await Orchestrator.step_once(300.0)]
-	for _i in range(40):
-		results.append(await Orchestrator.step_once(1.0))
-	for result: Dictionary in results:
-		if result.get("_status", 0) != 200:
-			continue
-		live_nadir = minf(live_nadir,
-			numf(result.get("islands", {}).get("0", {}), "f_min", 100.0))
-		for event: Dictionary in result.get("events", []):
-			if str(event.get("kind", "")) == "trip" \
-					and str(event.get("element", "")) == victim:
-				trip_event = event
+	for event: Dictionary in chased["events"]:
+		if str(event.get("kind", "")) == "trip" \
+				and str(event.get("element", "")) == victim:
+			trip_event = event
 	if trip_event.is_empty():
 		_fail(TAG, "trip event never arrived")
 		return
@@ -80,18 +74,6 @@ func run() -> void:
 	check("old_window_expired", bool(stale["expired"]))
 	_finish(TAG, {"live_nadir": live_nadir, "plain_nadir": plain_nadir,
 		"cf_nadir": cf_nadir, "battery_bought_hz": plain_nadir - cf_nadir})
-
-
-func _largest_sync(devices: Dictionary) -> String:
-	var best := ""
-	var best_p := 0.0
-	for pid: String in devices:
-		var device: Dictionary = devices[pid]
-		if str(device.get("state", "")) == "online" and device.has("headroom_mw") \
-				and numf(device, "p_mw", 0.0) > best_p:
-			best_p = numf(device, "p_mw", 0.0)
-			best = pid
-	return best
 
 
 ## Battery-backed hamburg island: 6 must-run CCGT + 2 batteries (no wind —

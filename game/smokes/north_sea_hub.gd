@@ -10,7 +10,6 @@ const TAG := "SMOKE_NORTH_SEA_HUB"
 
 
 func run() -> void:
-	p7_port = 8037
 	if not await p7_boot(TAG):
 		return
 	var built := _build()
@@ -59,22 +58,15 @@ func run() -> void:
 
 	# --- hub trip: ONE infeed-loss ΔP event ------------------------------
 	Orchestrator.inject([{"at_s_rel": 30.0, "kind": "trip", "element": platform}])
-	var f_min := 100.0
-	var trip_step: Dictionary = await p7_step(600.0, "trip")
-	if trip_step.get("_status", 0) == 200:
-		f_min = minf(f_min, numf(trip_step.get("islands", {}).get("0", {}),
-			"f_min", 100.0))
-	var hub_dead := false
-	for _i in range(30):
-		var follow: Dictionary = await Orchestrator.step_once(1.0)
-		if follow.get("_status", 0) != 200:
-			continue
-		f_min = minf(f_min, numf(follow.get("islands", {}).get("0", {}),
-			"f_min", 100.0))
-		var hub_dev: Dictionary = follow.get("devices", {}).get(platform, {})
-		if str(hub_dev.get("state", "")) == "tripped" \
-				and numf(hub_dev, "p_mw", 1.0) == 0.0:
-			hub_dead = true
+	var acc := {"hub_dead": false}
+	var chased := await chase_event(600.0, 30, "trip",
+		func(result: Dictionary) -> void:
+			var hub_dev: Dictionary = result.get("devices", {}).get(platform, {})
+			if str(hub_dev.get("state", "")) == "tripped" \
+					and numf(hub_dev, "p_mw", 1.0) == 0.0:
+				acc["hub_dead"] = true)
+	var f_min := float(chased["f_min"])
+	var hub_dead := bool(acc["hub_dead"])
 	print("HUB trip f_min=", f_min)
 	check("hub_trip_removes_delivery", hub_dead)
 	check("hub_trip_is_infeed_loss", f_min < 49.95)

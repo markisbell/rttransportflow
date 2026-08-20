@@ -67,7 +67,7 @@ func _fetch_and_cache(event: Dictionary) -> void:
 ## {event, plain, cf, cf_label, expired}; plain/cf are raw /gb/replay
 ## responses ({} when the fetch failed entirely).
 func fetch_counterfactuals(event: Dictionary) -> Dictionary:
-	var t_sim := _numf(event, "t_sim", 0.0)
+	var t_sim := Wire.numf(event, "t_sim", 0.0)
 	var plain: Dictionary = await CosimBridge.replay(Orchestrator.ID,
 		{"t_sim": t_sim, "window_s": WINDOW_S})
 	var target := counterfactual_target(event)
@@ -89,7 +89,7 @@ func counterfactual_target(event: Dictionary) -> Dictionary:
 	for dev: Dictionary in Boundary.wire_devices:
 		var kind := str(dev.get("kind", ""))
 		if kind == "battery" or kind == "grid_forming":
-			var p_max := _numf(dev.get("params", {}), "p_max_mw", 0.0)
+			var p_max := Wire.numf(dev.get("params", {}), "p_max_mw", 0.0)
 			if p_max > best_bat_mw:
 				best_bat_mw = p_max
 				best_bat = str(dev.get("id", ""))
@@ -102,8 +102,8 @@ func counterfactual_target(event: Dictionary) -> Dictionary:
 	for pid: String in devices:
 		var device: Dictionary = devices[pid]
 		if pid != victim and str(device.get("state", "")) == "online" \
-				and device.has("headroom_mw") and _numf(device, "p_mw", 0.0) > best_p:
-			best_p = _numf(device, "p_mw", 0.0)
+				and device.has("headroom_mw") and Wire.numf(device, "p_mw", 0.0) > best_p:
+			best_p = Wire.numf(device, "p_mw", 0.0)
 			best = pid
 	if best != "":
 		return {"id": best, "label": "without %s" % best}
@@ -114,7 +114,7 @@ func counterfactual_target(event: Dictionary) -> Dictionary:
 static func replay_f_min(response: Dictionary) -> float:
 	var f_min := 100.0
 	for island_id: String in response.get("islands", {}):
-		f_min = minf(f_min, _numf(response["islands"][island_id], "f_min", 100.0))
+		f_min = minf(f_min, Wire.numf(response["islands"][island_id], "f_min", 100.0))
 	var traj: Dictionary = response.get("trajectory", {})
 	for island_id: String in traj.get("islands", {}):
 		for value: Variant in traj["islands"][island_id].get("f", []):
@@ -140,7 +140,7 @@ func _draw() -> void:
 	var event: Dictionary = entry["event"]
 	draw_string(font, Vector2(16, 26), "REPLAY — %s %s @ t=%.1f s   (R closes)" % [
 		str(event.get("kind", "?")), str(event.get("element", "")),
-		_numf(event, "t_sim", 0.0)],
+		Wire.numf(event, "t_sim", 0.0)],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
 
 	if bool(entry["expired"]):
@@ -218,7 +218,3 @@ func _f_to_y(f: float, plot: Rect2) -> float:
 	return remap(clampf(f, TRACE_F_MIN, TRACE_F_MAX), TRACE_F_MAX, TRACE_F_MIN,
 		plot.position.y, plot.end.y)
 
-
-static func _numf(data: Dictionary, key: String, default: float) -> float:
-	var value: Variant = data.get(key, default)
-	return default if value == null else float(value)

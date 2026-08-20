@@ -29,7 +29,7 @@ func quiesced() -> bool:
 		var island: Dictionary = islands[island_id]
 		if bool(island.get("blackout", false)):
 			continue  # a dead island is as settled as it gets
-		if absf(SmokeBase.numf(island, "f_hz", 50.0) - 50.0) > QUIESCE_DF_HZ:
+		if absf(Wire.numf(island, "f_hz", 50.0) - 50.0) > QUIESCE_DF_HZ:
 			return false
 	return true
 

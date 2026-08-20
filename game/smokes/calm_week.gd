@@ -12,9 +12,7 @@ const TAG := "SMOKE_CALM_WEEK"
 
 
 func run() -> void:
-	var boot := preload("res://smokes/dispatch_day.gd").new()
-	add_child(boot)
-	if not await boot.gridco_boot():
+	if not await gridco_boot(TAG):
 		return
 	_renewables_heavy_build()
 	BuildSession.rebuild_now()
@@ -101,6 +99,9 @@ func _run_day() -> Dictionary:
 
 
 ## Hamburg-anchored: lots of wind + a little gas — deliberately calm-fragile.
+## Built with the shared place_ring (connect-or-remove + site banning): the
+## old inline loops predated that hardening and could silently count plants
+## the topology builder later dropped as orphans.
 func _renewables_heavy_build() -> void:
 	World.clear_build()
 	var lc_id: String = "hamburg" if World.load_centers.has("hamburg") else \
@@ -110,47 +111,20 @@ func _renewables_heavy_build() -> void:
 	# foreign-footprint avoid rings: without them the wind spurs brushed FIVE
 	# neighboring cities and dragged their load onto a 5 GW island (the P5
 	# 47.4 Hz lesson, refound — the fleet tripped at t=0.25 s)
-	var avoid := {}
-	for other_id: String in World.load_centers:
-		if other_id == lc_id:
-			continue
-		for tile: Vector2i in World.load_centers[other_id]["tiles"]:
-			avoid[tile] = true
-			for offset: Vector2i in GridTopology.NEIGHBORS:
-				avoid[tile + offset] = true
+	var avoid := foreign_avoid([lc_id])
 	var lc_tap := DemoBuild.tap_for(World, lc["tiles"], avoid)
 	World.place_corridor(lc_tap)
 	var peak: float = lc["peak_mw"]
-	var placed_wind := 0.0
 	# 1.6×: block-to-block CF jitter on the nameplate is the island's ΔP
 	# excitation — 2.5× peak stepped ±1.5 GW per block and tripped the grid
 	# even on the NORMAL day (pre-aFRR small island, fork finding)
-	while placed_wind < peak * 1.6:
-		var site := DemoBuild.find_site(World, "wind_onshore", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
-		if site == Vector2i(-1, -1):
-			break
-		World.place_plant("wind_onshore", site)
-		placed_wind += World.PLANT_SIZES["wind_onshore"]
-		var tap := DemoBuild.tap_for(World, [site], avoid)
-		if tap != Vector2i(-1, -1):
-			for tile: Vector2i in DemoBuild.route(World, tap, lc_tap, true, avoid):
-				World.place_corridor(tile)
-	var placed_gas := 0.0
-	var gas_pids: Array[String] = []
+	place_ring("wind_onshore", units_for("wind_onshore", peak * 1.6),
+		anchor, lc_tap, avoid)
 	# 1.28×: pre-UFLS the island survives only while the dark-day deficit
 	# stays inside FCR band + load damping (~150 MW here) — sized so the
 	# evening residual is ~80 MW: real scarcity pricing, sag, no collapse
-	while placed_gas < peak * 1.28:
-		var site := DemoBuild.find_site(World, "gas_ccgt", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
-		if site == Vector2i(-1, -1):
-			break
-		var gas_pid := World.place_plant("gas_ccgt", site)
-		gas_pids.append(gas_pid)
-		placed_gas += World.PLANT_SIZES["gas_ccgt"]
-		var tap := DemoBuild.tap_for(World, [site], avoid)
-		if tap != Vector2i(-1, -1):
-			for tile: Vector2i in DemoBuild.route(World, tap, lc_tap, true, avoid):
-				World.place_corridor(tile)
+	var gas_pids := place_ring("gas_ccgt", units_for("gas_ccgt", peak * 1.28),
+		anchor, lc_tap, avoid)
 	# must_run: decommitting the gas fleet at night left a near-zero-inertia
 	# island where ordinary wind steps tripped everything — the operator of
 	# a renewables-heavy island keeps the synchronous fleet spinning
@@ -160,14 +134,5 @@ func _renewables_heavy_build() -> void:
 	# hold a sustained wind ramp between decisions — even slewed, a normal
 	# frontal passage killed the island 64 s into a block. FFR + arbitrage
 	# is exactly the storage role P7 ships (battery_response proves it).
-	var placed_bat := 0.0
-	while placed_bat < peak * 0.3:
-		var site := DemoBuild.find_site(World, "battery", anchor, DemoBuild.tiles_for_km(200.0, World), avoid)
-		if site == Vector2i(-1, -1):
-			break
-		World.place_plant("battery", site)
-		placed_bat += World.PLANT_SIZES["battery"]
-		var tap := DemoBuild.tap_for(World, [site], avoid)
-		if tap != Vector2i(-1, -1):
-			for tile: Vector2i in DemoBuild.route(World, tap, lc_tap, true, avoid):
-				World.place_corridor(tile)
+	place_ring("battery", units_for("battery", peak * 0.3),
+		anchor, lc_tap, avoid)

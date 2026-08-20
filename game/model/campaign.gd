@@ -234,7 +234,7 @@ func _unit_nearest_mw(target_mw: float) -> String:
 		var device: Dictionary = devices[pid]
 		if str(device.get("state", "")) != "online" or not device.has("headroom_mw"):
 			continue  # sync units only (converters carry no headroom field)
-		var p: float = SmokeBase.numf(device, "p_mw", 0.0)
+		var p: float = Wire.numf(device, "p_mw", 0.0)
 		if p <= 0.0:
 			continue
 		var key := absf(p - target_mw)
@@ -296,13 +296,13 @@ func _accumulate(result: Dictionary, day: float) -> void:
 	if bool(acc.get("scripted_trip_seen", false)):
 		for island_id: String in result.get("islands", {}):
 			acc["trip_f_min"] = minf(float(acc["trip_f_min"]),
-				SmokeBase.numf(result["islands"][island_id], "f_min", 100.0))
+				Wire.numf(result["islands"][island_id], "f_min", 100.0))
 	# SAIDI: (1 − mean supplied) × block minutes, dt-weighted
 	var zones: Dictionary = result.get("zones", {})
 	if not zones.is_empty():
 		var supplied_sum := 0.0
 		for zone_id: String in zones:
-			supplied_sum += SmokeBase.numf(zones[zone_id], "supplied", 1.0)
+			supplied_sum += Wire.numf(zones[zone_id], "supplied", 1.0)
 		var unserved := 1.0 - supplied_sum / zones.size()
 		var minutes := float(result.get("dt_done_s", 0.0)) / 60.0
 		acc["saidi_min"] = float(acc["saidi_min"]) + unserved * minutes

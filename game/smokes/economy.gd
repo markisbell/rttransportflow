@@ -8,9 +8,7 @@ const TAG := "SMOKE_ECONOMY"
 
 
 func run() -> void:
-	var boot := preload("res://smokes/dispatch_day.gd").new()
-	add_child(boot)
-	if not await boot.gridco_boot():
+	if not await gridco_boot(TAG):
 		return
 	DemoBuild.auto_build(World)
 	var capex_after_build := Economy.capex_spent

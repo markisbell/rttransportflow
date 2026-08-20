@@ -34,6 +34,25 @@ const SMOKES := {
 	"ui_boot": "res://smokes/ui_boot.gd",
 }
 
+## ONE port per backend-driving smoke (previously six inline assignments plus
+## four smokes silently sharing 8034 — two runs on one port make the loser
+## adopt the winner's backend and report someone else's grid, CLAUDE.md §8).
+## Reserved elsewhere: 8000-8002, 8010-8016, 8020-8029 (family), 8030 game,
+## 8031 acceptance set (sequential by design), 8032 contract tests, 8033
+## freeze smoke. RTTF_PORT_OFFSET still composes on top for parallel sweeps.
+const SMOKE_PORTS := {
+	"hydrogen_chain": 8034,
+	"battery_response": 8035,
+	"hvdc_link": 8036,
+	"north_sea_hub": 8037,
+	"ride_through": 8038,
+	"cascade_low_inertia": 8039,
+	"replay_panel": 8040,
+	"save_load_replay": 8041,
+	"campaign_take_the_reins": 8042,
+	"soak": 8043,
+}
+
 
 var _screenshot_path := ""
 
@@ -64,12 +83,7 @@ func _take_screenshot() -> void:
 		push_error("map load failed")
 		get_tree().quit(1)
 		return
-	Weather.setup(42)
-	Demand.setup(42)
-	Demand.weather = Weather
-	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
-		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
-	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
+	GridcoBoot.setup_models()
 	var view := WorldView3D.new()
 	add_child(view)
 	var hud := preload("res://views/hud.gd").new()
@@ -94,6 +108,8 @@ func _take_screenshot() -> void:
 
 func _run_smoke(smoke_name: String) -> void:
 	var runner: SmokeBase = (load(SMOKES[smoke_name]) as GDScript).new()
+	if runner is P7SmokeBase and SMOKE_PORTS.has(smoke_name):
+		(runner as P7SmokeBase).p7_port = SMOKE_PORTS[smoke_name]
 	add_child(runner)
 	runner.run()
 
@@ -107,12 +123,7 @@ func _boot_game(campaign: bool = false) -> void:
 	BuildSession.enabled = true
 	# GridCo models (P6): seeded deterministically; the catalogs are the
 	# single source of truth for every constant.
-	Weather.setup(42)
-	Demand.setup(42)
-	Demand.weather = Weather
-	Dispatch.setup(BuildSession.load_repo_json("data/catalogs/economy.json"),
-		BuildSession.load_repo_json("data/catalogs/plant_types.json").get("kinds", {}))
-	Economy.setup(BuildSession.load_repo_json("data/catalogs/economy.json"))
+	GridcoBoot.setup_models()
 	BuildSession.use_gridco = true
 	var view := WorldView3D.new()
 	add_child(view)
