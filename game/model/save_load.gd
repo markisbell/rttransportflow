@@ -87,6 +87,9 @@ func load_game(path: String = DEFAULT_PATH) -> Dictionary:
 	Orchestrator.stop()
 
 	if not World.restore(envelope.get("world", {})):
+		# the world is half-clobbered here — a stopped clock is honest, but
+		# it must be LOUD, not a silent freeze
+		print("LOAD FAILED: world_restore_failed — clock stopped deliberately")
 		load_completed.emit(false, "world_restore_failed")
 		return {"ok": false, "reason": "world_restore_failed"}
 	Weather.from_dict(envelope.get("weather", {}))

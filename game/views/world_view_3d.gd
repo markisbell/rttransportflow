@@ -395,7 +395,13 @@ func _build_city_lights() -> void:
 
 
 func _process(delta: float) -> void:
-	for rotor: Node3D in _rotors.keys():
+	# UNTYPED on purpose: chunk eviction frees rotor nodes while their keys
+	# are still here, and assigning a freed instance to a TYPED loop variable
+	# throws at the for-statement itself — aborting _process before the
+	# validity guard below can erase the stale key. That error then repeats
+	# every frame forever (freeze #3: 47 errors/s of backtrace formatting
+	# read as a frozen game). A Variant accepts the freed ref; the guard runs.
+	for rotor in _rotors.keys():
 		if is_instance_valid(rotor):
 			rotor.rotate_z(float(_rotors[rotor]) * delta)
 		else:

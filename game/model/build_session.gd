@@ -123,17 +123,29 @@ func _rebuild() -> void:
 
 func _register_async(built: Dictionary) -> void:
 	Orchestrator.stop()
+	# EVERY failure below must RESTART the orchestrator: the previous
+	# registration is still live backend-side, so play continues on the
+	# old grid exactly as it does when GridTopology refuses a build. A
+	# bare return after stop() froze the clock FOREVER with a healthy
+	# backend and zero errors — three player-reported freezes, finally
+	# named by the heartbeat (its trail ends the moment the timer stops).
 	var deadline := Time.get_ticks_msec() + 120_000
 	while not SidecarManager.all_healthy():
 		if Time.get_ticks_msec() > deadline:
+			print("REGISTER FAILED: backend not healthy — resuming old grid")
+			Orchestrator.start()
 			_emit_status(false, "backend not healthy", built["warnings"])
 			return
 		await get_tree().create_timer(0.5).timeout
 	if not CosimBridge.info.has(Orchestrator.ID) \
 			and not await CosimBridge.handshake(Orchestrator.ID):
+		print("REGISTER FAILED: handshake — resuming old grid")
+		Orchestrator.start()
 		_emit_status(false, "contract handshake failed", built["warnings"])
 		return
 	if not await Orchestrator.register(Boundary.reset_doc()):
+		print("REGISTER FAILED: backend rejected the build — resuming old grid")
+		Orchestrator.start()
 		_emit_status(false, "backend rejected the build", built["warnings"])
 		return
 	registered = true
