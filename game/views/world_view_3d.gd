@@ -119,6 +119,9 @@ var _dragging := false
 var _map_ready := false
 var _stream_dirty := false
 var _components_dirty := false
+## chunks awaiting component population (nearest-first), drained under the
+## frame budget — see _sync_components for why this is never done inline
+var _populate_queue: Array[Vector2i] = []
 var _models_shown := true
 var _strategic: MeshInstance3D
 var _strategic_dirty := false
@@ -459,7 +462,7 @@ func _drain_pending_budgeted() -> void:
 		if _chunks.has(key):
 			_free_chunk(key)
 		freed += 1
-	if _pending.is_empty():
+	if _pending.is_empty() and _populate_queue.is_empty():
 		return
 	var budget := BUILD_BUDGET_DEEP_MS if _pending.size() > 12 else BUILD_BUDGET_MS
 	var t0 := Time.get_ticks_usec()
@@ -469,6 +472,15 @@ func _drain_pending_budgeted() -> void:
 			break
 		_build_chunk(_pending.pop_front())
 		built += 1
+	# component population shares the same frame budget (guaranteed ≥1 per
+	# frame so chunk builds can never starve it); a queued key whose chunk
+	# was evicted meanwhile is skipped by _populate_chunk's guard
+	var populated := 0
+	while not _populate_queue.is_empty():
+		if populated > 0 and (Time.get_ticks_usec() - t0) / 1000.0 > budget:
+			break
+		_populate_chunk(_populate_queue.pop_front())
+		populated += 1
 
 
 ## Turbine rotors spin IN THE WIND: speed from the live weather at the
@@ -686,6 +698,8 @@ func _free_chunk(key: Vector2i) -> void:
 func _populate_chunk(key: Vector2i) -> void:
 	if not _models_wanted():
 		return  # above the model band the strategic layer is the grid
+	if not _chunks.has(key):
+		return  # queued for population, evicted before its turn
 	var chunk: Dictionary = _chunks[key]
 	var root := chunk["root"] as Node3D
 	var plants := chunk["plants"] as Dictionary
@@ -767,6 +781,7 @@ func _models_wanted() -> bool:
 ## band where individual buildings and pylons are legible — the strategic
 ## ribbon layer carries the grid above it).
 func _drop_models() -> void:
+	_populate_queue.clear()
 	for key: Vector2i in _chunks:
 		var chunk: Dictionary = _chunks[key]
 		for group: String in ["cities", "corridors", "plants"]:
@@ -792,9 +807,18 @@ func _sync_components() -> void:
 				(nodes[tile] as Node3D).queue_free()
 				nodes.erase(tile)
 				keys.erase(tile)
-		# the tile scan re-keys every resident corridor, which also catches
-		# the shape change a NEW neighbour causes in an existing tile
-		_populate_chunk(key)
+	# Population is QUEUED, never inline, and only for chunks the CURRENT
+	# view wants. Crossing the model band after birdview left ~120 resident
+	# chunks spanning central Europe, ~95 of them already queued for
+	# eviction — populating all of them synchronously built the whole
+	# continental grid's pylons, conductors and city blocks in ONE frame
+	# (a minutes-long stall, freeze #4) and then threw most of it away.
+	# _wanted_chunks() is nearest-first, so visible ground fills in first;
+	# evicted or re-dirtied keys fall out harmlessly in the drain.
+	_populate_queue.clear()
+	for key: Vector2i in _wanted_chunks():
+		if _chunks.has(key):
+			_populate_queue.append(key)
 
 
 func redraw() -> void:
