@@ -24,7 +24,9 @@ divergence-is-data, Docker/Grafana stack.
 
 ## 2. State
 
-**P0–P10 complete; refactoring campaign landed (2026-08-20).**
+**P0–P10 complete; refactoring campaign landed (2026-08-20);
+strategic-zoom arc merged (2026-08-22)** — the real-grid look, the
+freeze campaign and the site-note weekly graphs; see the last §6 entry.
 Ten commits on `refactor/campaign` restructured tests, smokes, constants,
 the API seam, the simulator file, and the game model layer with every
 behavior pin held; ledger 45 records the one deliberate re-baseline (map
@@ -1264,6 +1266,81 @@ tuning against it.
 sweep (dispatch_day's identical prices bound the economics); WRI GPPD
 plant re-siting queued (CC-BY; OpenInfraMap/OSM stays excluded per
 ledger 38).
+
+### Strategic-zoom arc — look, real grid, freeze campaign, site notes (2026-08-21/22)
+
+**Built:** twenty commits on `ui/strategic-zoom`, merged fast-forward
+after a full green sweep. The Europe LOOK: ETOPO-derived relief sidecar
+(smooth shorelines, lakes, satellite palette), real overhead lines
+(silver three-phase conductors, faced towers, diagonal spans),
+NE-urban-footprint cities with Kenney sprawl and night glow, day/night
+cycle, mouse camera (RMB rotate / MMB pan). The REAL GRID: Germany's
+380 kV seed, then the European-plan campaign world with the GPPD fleet
+(ledgers 46/47), and underground cables (`cable_400` corridor kind
+end-to-end: real cable parameters, charging into the shunt machinery,
+trench rendering); wind rotors spin from live regional weather.
+PERFORMANCE: shared primitive meshes (after an RID-exhaustion boot
+crash), budgeted chunk streaming (6/14 ms/frame), staggered eviction,
+strategic ribbon layer above zoom 30 / model band below 34. Voltage
+bands corrected to transmission practice (warn outside [0.93, 1.08] pu,
+critical outside [0.90, 1.105] — the reported "violations" were
+distribution defaults judging a transmission grid; PARAMETERS §5). THE
+FREEZE CAMPAIGN — four user-reported live freezes, four distinct
+mechanisms, each named by evidence and fixed: (1) untimed step await +
+sidecar hair-trigger restarts → step timeout counted as transport
+failures, health-probe tolerance; (2) unexplained at the time → the
+ORCH heartbeat (10 s gate-state log line) + a 60 s recovery unwedge;
+(3) rotor nodes freed by chunk eviction while still keyed in the spin
+dict — a TYPED for-loop variable throws on a freed instance at the
+for-statement itself, before the body's validity guard, so one
+backtrace-formatted error per frame forever (~60/s read as a frozen
+game); untyped loop, guard now self-heals — found alongside the
+register STOP-LEAK (every `_register_async` failure path left the
+orchestrator stopped forever; each now restarts it onto the still-live
+previous registration, loudly); (4) crossing the model band after
+birdview populated ~120 resident chunks spanning central Europe in ONE
+synchronous call — minutes of model building, most for chunks already
+queued for eviction; population is now a nearest-first queue drained
+under the frame budget. SITE NOTES (the energy-charts request):
+ZoneHistory autoload (a measured 7-day ring of 15-min blocks from every
+applied wire result — ledger 44 discipline), ZoneChart (generation
+stacked by source with charging/electrolysis/pumping/export below the
+zero line, measured load solid, forecast dashed, a now-slider with
+timestamp), SiteNote billboards above cities (zoom ≤ 70) and plants
+(≤ 16), nearest-first under hard caps, SubViewports rendered once per
+block; `SHOT_FAKE_WEEK` joins the screenshot probe as the look harness.
+
+**Tests:** backend 152; GdUnit 43 (ZoneHistory ring semantics new); the
+FULL §8 smoke sweep green in 52 min — all 21 smokes, run while the
+interactive game played on 8030.
+
+**Acceptance evidence:** dispatch_day prices unchanged to the cent
+(night 53.83 / evening 63.12 €/MWh); campaign ★★★ with zero
+trips/blackouts/UFLS; save_load bit-identical; hvdc_link 9/9 for the
+second consecutive full pass (ac_relieved 23.2); hydrogen_chain round
+trip 0.3681 against the ≈ 35 % §1.14 window (the GPPD fleet moved it
+from 0.3645); north_sea_hub delivery ratio 0.9506; soak RSS
+333.7 → 333.9 MB, step 2385 → 2604 ms (ratio 1.09 vs the P10 1.32
+reference) — measured beside the running game.
+
+**Discoveries:** (1) the heartbeat is the load-bearing lesson: one 10 s
+gate-state print turned "it froze again" from unfalsifiable into a
+named cause within minutes — freeze #4's trail ending at a HEALTHY beat
+itself named the class (a single synchronous main-thread call). (2) A
+typed GDScript for-loop variable is an assignment — freed instances
+throw before the loop body can guard. (3) `dict[key][i] = v` on a
+packed array mutates a discarded copy — ZoneHistory stores plain
+Arrays. (4) ptrace and perf are locked down on this box (yama=1,
+perf_event_paranoid=4): external stack capture needs sudo, so
+in-process instrumentation is the tool that actually answers.
+
+**Deviations (deliberate):** site-note charts carry no legend (the
+palette is the identity) and the slider is an indicator, not a
+scrubber; the measured week is not in the save (a load clears the
+ring); h2 caverns get no note (no power trace — a fill-level note is a
+candidate). Freezes #1/#2 were never conclusively attributed — the
+fixed mechanisms cover every found candidate, and the heartbeat plus
+the REGISTER FAILED prints will name any recurrence directly.
 
 ## 7. Open questions for the project owner
 
