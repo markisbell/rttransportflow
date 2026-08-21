@@ -2,11 +2,11 @@ metric,value,unit
 delivered,330637.778644,MWh
 unserved,0.000000,MWh
 revenue,31410588.971166,EUR
-fuel_cost,4432021.628010,EUR
-co2_cost,1618110.868512,EUR
-vom_cost,932295.390207,EUR
+fuel_cost,4432631.318188,EUR
+co2_cost,1618268.598566,EUR
+vom_cost,932326.264710,EUR
 fom_cost,4407123.287671,EUR
 capex,91240272000.000000,EUR
 reserve_income,576000.000000,EUR
-avg_cost,34.447217,EUR/MWh
-co2_intensity,163.130267,g/kWh
+avg_cost,34.449631,EUR/MWh
+co2_intensity,163.146168,g/kWh
