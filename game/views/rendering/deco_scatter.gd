@@ -64,7 +64,21 @@ static func placements_region(world: Node, x0: int, y0: int,
 			var kind := world.terrain_at(tile) as String
 			var prop := ""
 			var count := 0
-			if kind == "p" or kind == "h" or kind == "c":
+			if world.get("has_relief"):
+				# the relief sidecar carries REAL vegetation density — the
+				# tree cover follows it, so the scattered forests and the
+				# dark-green terrain tint are the same forests
+				var veg: float = world.green_at(tile)
+				if kind == "m" and veg < 0.30:
+					# stone fields only above the treeline-ish, and sparse
+					if world.elev_at(tile) > 1400.0 \
+							and noise.get_noise_2d(float(x), float(y)) > 0.35:
+						prop = "rocks"
+						count = ROCK_DENSITY
+				elif veg > 0.42 and kind != "S" and kind != "s":
+					prop = "tree"
+					count = 1 + int(veg * 2.6)
+			elif kind == "p" or kind == "h" or kind == "c":
 				if noise.get_noise_2d(float(x), float(y)) > FOREST_LEVEL:
 					prop = "tree"
 					count = FOREST_DENSITY if kind != "c" else 1
@@ -74,7 +88,7 @@ static func placements_region(world: Node, x0: int, y0: int,
 					count = ROCK_DENSITY
 			if prop == "" or count == 0:
 				continue
-			var base_y := EuropeTerrain.height_of(kind)
+			var base_y := EuropeTerrain.ground_of(world, tile)
 			for i in range(count):
 				# deterministic jitter: a cheap integer hash, not RNG state,
 				# so a re-streamed chunk reproduces its forest exactly

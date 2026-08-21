@@ -303,7 +303,7 @@ func _build_backdrop() -> void:
 	plane.size = Vector2(World.width + 8, World.height + 8)
 	_water = MeshInstance3D.new()
 	_water.mesh = plane
-	_water.position = Vector3(World.width / 2.0, EuropeTerrain.water_level(),
+	_water.position = Vector3(World.width / 2.0, EuropeTerrain.water_level(World),
 		World.height / 2.0)
 	var water_material := StandardMaterial3D.new()
 	water_material.albedo_color = Color(0.16, 0.40, 0.62, 0.82)
@@ -588,7 +588,7 @@ func redraw() -> void:
 
 
 func ground_y(tile: Vector2i) -> float:
-	return EuropeTerrain.height_of(World.terrain_at(tile))
+	return EuropeTerrain.ground_of(World, tile)
 
 
 func _tile_origin(tile: Vector2i) -> Vector3:
@@ -679,10 +679,20 @@ func mouse_tile() -> Vector2i:
 	var direction := camera.project_ray_normal(mouse)
 	if absf(direction.y) < 1e-6:
 		return Vector2i(-1, -1)
-	# intersect the average land plane; good enough at this tile size
-	var t := -origin.y / direction.y
-	var hit := origin + direction * t
-	return Vector2i(int(floor(hit.x)), int(floor(hit.z)))
+	# intersect the ground: start on the sea-level plane, then refine
+	# against the hit tile's real height — on relief slopes a flat-plane
+	# pick can land tiles away (fixed-point converges in 2-3 rounds)
+	var h := 0.0
+	var tile := Vector2i(-1, -1)
+	for _pass in 3:
+		var t := (h - origin.y) / direction.y
+		var hit := origin + direction * t
+		var next := Vector2i(int(floor(hit.x)), int(floor(hit.z)))
+		if next == tile:
+			break
+		tile = next
+		h = ground_y(tile) if World.in_bounds(tile) else 0.0
+	return tile
 
 
 func _unhandled_input(event: InputEvent) -> void:

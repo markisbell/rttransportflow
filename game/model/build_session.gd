@@ -71,7 +71,18 @@ func load_map() -> bool:
 	# sixth instance of the ledger-38 resolution trap, as a stale default.
 	if _map_doc.has("projection"):
 		Demand.projection = _map_doc["projection"]
-	return World.load_map(_map_doc)
+	if not World.load_map(_map_doc):
+		return false
+	# Render-only relief sidecar (<map>_relief.json) — optional by design:
+	# fixture maps render on the class fallback, and a size mismatch is
+	# rejected inside load_relief rather than rendering garbage.
+	var relief_path := map_path().trim_suffix(".json") + "_relief.json"
+	if FileAccess.file_exists(relief_path):
+		var relief: Variant = JSON.parse_string(
+			FileAccess.get_file_as_string(relief_path))
+		if relief is Dictionary and not World.load_relief(relief):
+			push_warning("BuildSession: relief sidecar rejected: " + relief_path)
+	return true
 
 
 func _on_world_changed() -> void:

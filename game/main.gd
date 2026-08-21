@@ -95,8 +95,12 @@ func _take_screenshot() -> void:
 			World.place_plant(kind, site)
 	view.redraw()
 	var focus: Vector2i = (World.load_centers["berlin"]["tiles"] as Array)[0]
+	if OS.get_environment("SHOT_TILE") != "":  # "x,y" — aim the probe anywhere
+		var parts := OS.get_environment("SHOT_TILE").split(",")
+		focus = Vector2i(int(parts[0]), int(parts[1]))
 	view.focus_tile(focus, float(OS.get_environment("SHOT_ZOOM")) \
 		if OS.get_environment("SHOT_ZOOM") != "" else 17.0)
+	print("PROBE focus=", focus, " view_focus=", view._focus, " zoom=", view._zoom)
 	await get_tree().create_timer(1.5).timeout
 	get_viewport().get_texture().get_image().save_png(_screenshot_path)
 	print("SCREENSHOT saved to ", _screenshot_path)

@@ -231,8 +231,8 @@ class MiniMap:
 		var image := Image.create(_px.x, _px.y, false, Image.FORMAT_RGBA8)
 		for py in range(_px.y):
 			for px in range(_px.x):
-				var kind := World.terrain_at(Vector2i(px * _step, py * _step))
-				image.set_pixel(px, py, EuropeTerrain.color_of(kind))
+				image.set_pixel(px, py, EuropeTerrain.map_pixel(World,
+					Vector2i(px * _step, py * _step)))
 		_base = ImageTexture.create_from_image(image)
 		print("NAV base %dx%d px (step %d) from %dx%d tiles in %d ms" % [
 			_px.x, _px.y, _step, World.width, World.height,

@@ -22,6 +22,20 @@ var width: int = 0
 var height: int = 0
 var tile_km: float = 50.0
 
+## RENDER-ONLY relief sidecar (tools/map_authoring/relief.py): real per-tile
+## elevation, vegetation density and a lake mask. Terrain CLASSES stay the
+## gameplay truth — the relief only changes what the ground looks like, and
+## a map without a sidecar (fixtures, europe_mini) renders on the class
+## fallback. Row-major byte layers, read through the accessors below.
+var has_relief := false
+var _relief_elev: PackedByteArray = PackedByteArray()
+var _relief_green: PackedByteArray = PackedByteArray()
+var _relief_flags: PackedByteArray = PackedByteArray()
+var _relief_elev_step := 22.0
+var _relief_elev_offset := -900.0
+var _relief_lat0 := 71.0
+var _relief_dlat := 0.044916
+
 ## resources: kind -> {Vector2i: params Dictionary} (coal_basin, salt_cavern,
 ## phs_site, wind_resource, river); solar bands kept separately
 var resources: Dictionary = {}
@@ -76,6 +90,7 @@ func load_map(doc: Dictionary) -> bool:
 	solar_bands.clear()
 	load_centers.clear()
 	_load_center_tiles.clear()
+	has_relief = false  # a new map never inherits the old map's relief
 	width = int(doc.get("width", 0))
 	height = int(doc.get("height", 0))
 	tile_km = float(doc.get("tile_km", 50.0))
@@ -120,6 +135,54 @@ func terrain_at(tile: Vector2i) -> String:
 	if not in_bounds(tile):
 		return "S"  # off-map reads as open sea
 	return terrain_rows[tile.y][tile.x]
+
+
+## Attach the relief sidecar for the CURRENT map. Rejects a layer whose
+## size disagrees with the loaded grid rather than rendering garbage.
+func load_relief(doc: Dictionary) -> bool:
+	var n := width * height
+	if int(doc.get("width", 0)) != width or int(doc.get("height", 0)) != height:
+		return false
+	var elev := Marshalls.base64_to_raw(str(doc.get("elev_b64", "")))
+	var green := Marshalls.base64_to_raw(str(doc.get("green_b64", "")))
+	var flags := Marshalls.base64_to_raw(str(doc.get("flags_b64", "")))
+	if elev.size() != n or green.size() != n or flags.size() != n:
+		return false
+	_relief_elev = elev
+	_relief_green = green
+	_relief_flags = flags
+	_relief_elev_step = float(doc.get("elev_step_m", 22.0))
+	_relief_elev_offset = float(doc.get("elev_offset_m", -900.0))
+	_relief_lat0 = float(doc.get("lat0", 71.0))
+	_relief_dlat = float(doc.get("deg_lat_per_tile", 0.044916))
+	has_relief = true
+	return true
+
+
+## Real elevation in metres (off-map and relief-less read as open sea).
+func elev_at(tile: Vector2i) -> float:
+	if not has_relief or not in_bounds(tile):
+		return -400.0
+	return _relief_elev[tile.y * width + tile.x] * _relief_elev_step \
+		+ _relief_elev_offset
+
+
+## Vegetation density 0..1 — drives forest tint and tree scatter.
+func green_at(tile: Vector2i) -> float:
+	if not has_relief or not in_bounds(tile):
+		return 0.0
+	return _relief_green[tile.y * width + tile.x] / 255.0
+
+
+func lake_at(tile: Vector2i) -> bool:
+	if not has_relief or not in_bounds(tile):
+		return false
+	return (_relief_flags[tile.y * width + tile.x] & 1) != 0
+
+
+## Latitude of a row's tile centres — snow and rock lines fall with it.
+func lat_of_row(y: int) -> float:
+	return _relief_lat0 - (float(y) + 0.5) * _relief_dlat
 
 
 func is_land(tile: Vector2i) -> bool:
