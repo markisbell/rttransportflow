@@ -39,9 +39,63 @@ const KENNEY := "res://assets/kenney/"
 
 static var _material_cache := {}
 static var _scene_cache := {}
+static var _mesh_cache := {}
 
 
 # ─── primitive factories ───────────────────────────────────────────────
+#
+# Meshes are SHARED, keyed by their shape parameters. Procedural models
+# repeat the same primitive thousands of times — every corridor pylon is
+# the same lattice, every turbine the same spinner — and a fresh Mesh
+# resource per call is a fresh set of RenderingDevice buffers: the
+# continental boot allocated tens of thousands that way and exhausted the
+# renderer's RID pool at first build ("Element limit reached",
+# 2026-08-21) — every draw errored, the error spam saturated the main
+# thread, and the process eventually crashed. Parameter-keyed sharing
+# collapses the count to one mesh per DISTINCT shape (a few dozen) with
+# zero geometry change. Consequence: never mutate a mesh after it leaves
+# a factory — per-instance looks go through material_override and the
+# node transform. Keys round to 1e-4 tile (~0.5 m) to absorb float noise
+# between equivalent computations.
+
+
+static func _box_mesh(size: Vector3) -> BoxMesh:
+	var key := "b|%.4f|%.4f|%.4f" % [size.x, size.y, size.z]
+	var mesh: BoxMesh = _mesh_cache.get(key)
+	if mesh == null:
+		mesh = BoxMesh.new()
+		mesh.size = size
+		_mesh_cache[key] = mesh
+	return mesh
+
+
+static func _cyl_mesh(top_r: float, bottom_r: float, height: float,
+		segments: int) -> CylinderMesh:
+	var key := "c|%.4f|%.4f|%.4f|%d" % [top_r, bottom_r, height, segments]
+	var mesh: CylinderMesh = _mesh_cache.get(key)
+	if mesh == null:
+		mesh = CylinderMesh.new()
+		mesh.top_radius = top_r
+		mesh.bottom_radius = bottom_r
+		mesh.height = height
+		mesh.radial_segments = segments
+		_mesh_cache[key] = mesh
+	return mesh
+
+
+static func _sphere_mesh(radius: float, height: float, radial: int,
+		rings: int, hemisphere: bool) -> SphereMesh:
+	var key := "s|%.4f|%.4f|%d|%d|%s" % [radius, height, radial, rings, hemisphere]
+	var mesh: SphereMesh = _mesh_cache.get(key)
+	if mesh == null:
+		mesh = SphereMesh.new()
+		mesh.radius = radius
+		mesh.height = height
+		mesh.radial_segments = radial
+		mesh.rings = rings
+		mesh.is_hemisphere = hemisphere
+		_mesh_cache[key] = mesh
+	return mesh
 
 static func flat(color: Color, transparent: bool = false,
 		unshaded: bool = false) -> StandardMaterial3D:
@@ -73,9 +127,7 @@ static func glow(color: Color) -> StandardMaterial3D:
 
 static func box(size: Vector3, color: Color, offset: Vector3) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	node.mesh = mesh
+	node.mesh = _box_mesh(size)
 	node.position = offset
 	node.material_override = flat(color)
 	return node
@@ -84,12 +136,7 @@ static func box(size: Vector3, color: Color, offset: Vector3) -> MeshInstance3D:
 static func cyl(radius: float, height: float, color: Color,
 		offset: Vector3) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 12
-	node.mesh = mesh
+	node.mesh = _cyl_mesh(radius, radius, height, 12)
 	node.position = offset
 	node.material_override = flat(color)
 	return node
@@ -99,12 +146,7 @@ static func cyl(radius: float, height: float, color: Color,
 static func taper(top_r: float, bottom_r: float, height: float, color: Color,
 		offset: Vector3, segments: int = 12) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = top_r
-	mesh.bottom_radius = bottom_r
-	mesh.height = height
-	mesh.radial_segments = segments
-	node.mesh = mesh
+	node.mesh = _cyl_mesh(top_r, bottom_r, height, segments)
 	node.position = offset
 	node.material_override = flat(color)
 	return node
@@ -116,9 +158,7 @@ static func taper(top_r: float, bottom_r: float, height: float, color: Color,
 static func strut(from: Vector3, to: Vector3, thickness: float,
 		color: Color) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(thickness, thickness, from.distance_to(to))
-	node.mesh = mesh
+	node.mesh = _box_mesh(Vector3(thickness, thickness, from.distance_to(to)))
 	node.transform = Transform3D(
 		Basis.looking_at((to - from).normalized(), Vector3.UP),
 		(from + to) / 2.0)
@@ -307,12 +347,7 @@ static func _turbine(tower_h: float, blade_len: float,
 	rotor.rotation_degrees.z = phase_deg
 	rotor.set_meta("rotor", true)  # the renderer spins these with wind
 	var spinner := MeshInstance3D.new()
-	var spinner_mesh := SphereMesh.new()
-	spinner_mesh.radius = 0.026
-	spinner_mesh.height = 0.052
-	spinner_mesh.radial_segments = 10
-	spinner_mesh.rings = 5
-	spinner.mesh = spinner_mesh
+	spinner.mesh = _sphere_mesh(0.026, 0.052, 10, 5, false)
 	spinner.scale = Vector3(1, 1, 1.4)
 	spinner.material_override = flat(WHITE)
 	rotor.add_child(spinner)
@@ -381,13 +416,7 @@ static func _make_nuclear() -> Node3D:
 	# containment: cylinder + hemispherical cap, the reactor's signature
 	node.add_child(cyl(0.13, 0.26, Color(0.86, 0.87, 0.88), Vector3(-0.19, 0.17, 0.13)))
 	var dome := MeshInstance3D.new()
-	var dome_mesh := SphereMesh.new()
-	dome_mesh.radius = 0.13
-	dome_mesh.height = 0.26
-	dome_mesh.is_hemisphere = true
-	dome_mesh.radial_segments = 16
-	dome_mesh.rings = 8
-	dome.mesh = dome_mesh
+	dome.mesh = _sphere_mesh(0.13, 0.26, 16, 8, true)
 	dome.position = Vector3(-0.19, 0.30, 0.13)
 	dome.material_override = flat(Color(0.86, 0.87, 0.88))
 	node.add_child(dome)

@@ -24,6 +24,12 @@ func run() -> void:
 		if arg.begins_with("--shot="):
 			shot = arg.trim_prefix("--shot=")
 
+	# run() is reached from main._ready, while the root Window is still
+	# setting up its own children — a synchronous add_child races that and
+	# sometimes fails ("parent busy setting up children"), leaving the whole
+	# gallery out of the tree and the shot a flat grey frame. One frame of
+	# patience makes the smoke deterministic.
+	await get_tree().process_frame
 	var root := Node3D.new()
 	get_tree().root.add_child(root)
 	_build_environment(root)
@@ -48,8 +54,8 @@ func run() -> void:
 	cam.size = 8.6
 	# the game's isometric angle: 45 deg yaw, ~35 deg pitch
 	cam.position = Vector3(6.0, 6.5, 6.0)
+	root.add_child(cam)  # look_at needs the node inside the tree
 	cam.look_at(Vector3(0, 0.3, 0), Vector3.UP)
-	root.add_child(cam)
 	cam.make_current()
 
 	# let the renderer settle (shadows + sky need a couple of frames)
