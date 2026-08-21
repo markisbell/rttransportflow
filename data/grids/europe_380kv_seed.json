@@ -1,0 +1,900 @@
+{
+ "version": 1,
+ "notes": "European 380 kV plan for the campaign start world: the aggregated German backbone at full fidelity plus lean spines reaching every CONTINENTAL_CORE metro, curated from public knowledge. metro_feeds names each metro's real feeding substations.",
+ "substations": {
+  "wilster": {
+   "lat": 53.92,
+   "lon": 9.37,
+   "country": "DE"
+  },
+  "brunsbuettel": {
+   "lat": 53.9,
+   "lon": 9.14,
+   "country": "DE"
+  },
+  "herrenwyk": {
+   "lat": 53.89,
+   "lon": 10.79,
+   "country": "DE"
+  },
+  "kruemmel": {
+   "lat": 53.41,
+   "lon": 10.41,
+   "country": "DE"
+  },
+  "dollern": {
+   "lat": 53.54,
+   "lon": 9.54,
+   "country": "DE"
+  },
+  "guestrow": {
+   "lat": 53.8,
+   "lon": 12.23,
+   "country": "DE"
+  },
+  "vierraden": {
+   "lat": 53.06,
+   "lon": 14.27,
+   "country": "DE"
+  },
+  "neuenhagen": {
+   "lat": 52.53,
+   "lon": 13.7,
+   "country": "DE"
+  },
+  "wustermark": {
+   "lat": 52.55,
+   "lon": 12.96,
+   "country": "DE"
+  },
+  "wolmirstedt": {
+   "lat": 52.25,
+   "lon": 11.63,
+   "country": "DE"
+  },
+  "jaenschwalde": {
+   "lat": 51.84,
+   "lon": 14.46,
+   "country": "DE"
+  },
+  "hagenwerder": {
+   "lat": 51.06,
+   "lon": 14.96,
+   "country": "DE"
+  },
+  "roehrsdorf": {
+   "lat": 50.79,
+   "lon": 12.8,
+   "country": "DE"
+  },
+  "vieselbach": {
+   "lat": 51.0,
+   "lon": 11.14,
+   "country": "DE"
+  },
+  "remptendorf": {
+   "lat": 50.53,
+   "lon": 11.68,
+   "country": "DE"
+  },
+  "redwitz": {
+   "lat": 50.17,
+   "lon": 11.2,
+   "country": "DE"
+  },
+  "etzenricht": {
+   "lat": 49.63,
+   "lon": 12.09,
+   "country": "DE"
+  },
+  "emden": {
+   "lat": 53.36,
+   "lon": 7.21,
+   "country": "DE"
+  },
+  "diele": {
+   "lat": 53.13,
+   "lon": 7.42,
+   "country": "DE"
+  },
+  "landesbergen": {
+   "lat": 52.56,
+   "lon": 9.11,
+   "country": "DE"
+  },
+  "wahle": {
+   "lat": 52.25,
+   "lon": 10.4,
+   "country": "DE"
+  },
+  "mecklar": {
+   "lat": 50.95,
+   "lon": 9.79,
+   "country": "DE"
+  },
+  "grafenrheinfeld": {
+   "lat": 50.0,
+   "lon": 10.2,
+   "country": "DE"
+  },
+  "raitersaich": {
+   "lat": 49.36,
+   "lon": 10.83,
+   "country": "DE"
+  },
+  "irsching": {
+   "lat": 48.77,
+   "lon": 11.58,
+   "country": "DE"
+  },
+  "isar": {
+   "lat": 48.61,
+   "lon": 12.29,
+   "country": "DE"
+  },
+  "oberbachern": {
+   "lat": 48.25,
+   "lon": 11.31,
+   "country": "DE"
+  },
+  "herbertingen": {
+   "lat": 48.06,
+   "lon": 9.43,
+   "country": "DE"
+  },
+  "osterath": {
+   "lat": 51.27,
+   "lon": 6.62,
+   "country": "DE"
+  },
+  "bergkamen": {
+   "lat": 51.64,
+   "lon": 7.64,
+   "country": "DE"
+  },
+  "rommerskirchen": {
+   "lat": 51.03,
+   "lon": 6.68,
+   "country": "DE"
+  },
+  "oberzier": {
+   "lat": 50.87,
+   "lon": 6.47,
+   "country": "DE"
+  },
+  "kriftel": {
+   "lat": 50.08,
+   "lon": 8.47,
+   "country": "DE"
+  },
+  "buerstadt": {
+   "lat": 49.64,
+   "lon": 8.45,
+   "country": "DE"
+  },
+  "philippsburg": {
+   "lat": 49.25,
+   "lon": 8.44,
+   "country": "DE"
+  },
+  "grossgartach": {
+   "lat": 49.14,
+   "lon": 9.13,
+   "country": "DE"
+  },
+  "pulverdingen": {
+   "lat": 48.93,
+   "lon": 9.1,
+   "country": "DE"
+  },
+  "eichstetten": {
+   "lat": 48.09,
+   "lon": 7.73,
+   "country": "DE"
+  },
+  "kuehmoos": {
+   "lat": 47.62,
+   "lon": 7.93,
+   "country": "DE"
+  },
+  "kassoe": {
+   "lat": 55.06,
+   "lon": 9.27,
+   "country": "DK",
+   "gateway": true
+  },
+  "bjaeverskov": {
+   "lat": 55.45,
+   "lon": 12.15,
+   "country": "DK"
+  },
+  "arrie": {
+   "lat": 55.51,
+   "lon": 13.08,
+   "country": "SE"
+  },
+  "tonstad": {
+   "lat": 58.66,
+   "lon": 6.72,
+   "country": "NO"
+  },
+  "meeden": {
+   "lat": 53.14,
+   "lon": 6.93,
+   "country": "NL",
+   "gateway": true
+  },
+  "doetinchem": {
+   "lat": 51.96,
+   "lon": 6.3,
+   "country": "NL",
+   "gateway": true
+  },
+  "lixhe": {
+   "lat": 50.75,
+   "lon": 5.67,
+   "country": "BE"
+  },
+  "vigy": {
+   "lat": 49.2,
+   "lon": 6.3,
+   "country": "FR",
+   "gateway": true
+  },
+  "muhlbach": {
+   "lat": 48.02,
+   "lon": 7.53,
+   "country": "FR",
+   "gateway": true
+  },
+  "laufenburg": {
+   "lat": 47.56,
+   "lon": 8.06,
+   "country": "CH"
+  },
+  "buers": {
+   "lat": 47.15,
+   "lon": 9.83,
+   "country": "AT",
+   "gateway": true
+  },
+  "stpeter": {
+   "lat": 48.25,
+   "lon": 13.08,
+   "country": "AT",
+   "gateway": true
+  },
+  "hradec": {
+   "lat": 50.25,
+   "lon": 13.5,
+   "country": "CZ",
+   "gateway": true
+  },
+  "prestice": {
+   "lat": 49.57,
+   "lon": 13.33,
+   "country": "CZ",
+   "gateway": true
+  },
+  "krajnik": {
+   "lat": 52.87,
+   "lon": 14.31,
+   "country": "PL",
+   "gateway": true
+  },
+  "mikulowa": {
+   "lat": 51.1,
+   "lon": 15.07,
+   "country": "PL",
+   "gateway": true
+  },
+  "krimpen": {
+   "lat": 51.92,
+   "lon": 4.6,
+   "country": "NL"
+  },
+  "maasbracht": {
+   "lat": 51.15,
+   "lon": 5.94,
+   "country": "NL"
+  },
+  "gramme": {
+   "lat": 50.55,
+   "lon": 5.2,
+   "country": "BE"
+  },
+  "mercator": {
+   "lat": 51.1,
+   "lon": 4.25,
+   "country": "BE"
+  },
+  "mery": {
+   "lat": 49.06,
+   "lon": 2.19,
+   "country": "FR"
+  },
+  "morbras": {
+   "lat": 48.78,
+   "lon": 2.63,
+   "country": "FR"
+  },
+  "stvulbas": {
+   "lat": 45.75,
+   "lon": 5.27,
+   "country": "FR"
+  },
+  "baggio": {
+   "lat": 45.46,
+   "lon": 9.08,
+   "country": "IT"
+  },
+  "durnrohr": {
+   "lat": 48.33,
+   "lon": 15.87,
+   "country": "AT"
+  },
+  "cechystred": {
+   "lat": 50.01,
+   "lon": 14.72,
+   "country": "CZ"
+  },
+  "milosna": {
+   "lat": 52.2,
+   "lon": 21.25,
+   "country": "PL"
+  },
+  "wielopole": {
+   "lat": 50.28,
+   "lon": 18.55,
+   "country": "PL"
+  }
+ },
+ "ac_lines": [
+  [
+   "wilster",
+   "brunsbuettel",
+   6
+  ],
+  [
+   "wilster",
+   "dollern",
+   6
+  ],
+  [
+   "herrenwyk",
+   "kruemmel",
+   6
+  ],
+  [
+   "kruemmel",
+   "dollern",
+   6
+  ],
+  [
+   "kruemmel",
+   "guestrow",
+   6
+  ],
+  [
+   "vierraden",
+   "krajnik",
+   6
+  ],
+  [
+   "vierraden",
+   "neuenhagen",
+   6
+  ],
+  [
+   "guestrow",
+   "wustermark",
+   6
+  ],
+  [
+   "wustermark",
+   "neuenhagen",
+   6
+  ],
+  [
+   "neuenhagen",
+   "jaenschwalde",
+   6
+  ],
+  [
+   "hagenwerder",
+   "mikulowa",
+   6
+  ],
+  [
+   "roehrsdorf",
+   "hradec",
+   6
+  ],
+  [
+   "roehrsdorf",
+   "remptendorf",
+   6
+  ],
+  [
+   "remptendorf",
+   "redwitz",
+   6
+  ],
+  [
+   "remptendorf",
+   "vieselbach",
+   6
+  ],
+  [
+   "wolmirstedt",
+   "wustermark",
+   6
+  ],
+  [
+   "wolmirstedt",
+   "wahle",
+   6
+  ],
+  [
+   "vieselbach",
+   "mecklar",
+   6
+  ],
+  [
+   "dollern",
+   "landesbergen",
+   6
+  ],
+  [
+   "emden",
+   "diele",
+   6
+  ],
+  [
+   "diele",
+   "meeden",
+   6
+  ],
+  [
+   "wahle",
+   "mecklar",
+   6
+  ],
+  [
+   "mecklar",
+   "grafenrheinfeld",
+   6
+  ],
+  [
+   "mecklar",
+   "kriftel",
+   6
+  ],
+  [
+   "bergkamen",
+   "osterath",
+   6
+  ],
+  [
+   "osterath",
+   "rommerskirchen",
+   6
+  ],
+  [
+   "rommerskirchen",
+   "oberzier",
+   6
+  ],
+  [
+   "kriftel",
+   "buerstadt",
+   6
+  ],
+  [
+   "buerstadt",
+   "philippsburg",
+   6
+  ],
+  [
+   "philippsburg",
+   "grossgartach",
+   6
+  ],
+  [
+   "grossgartach",
+   "pulverdingen",
+   6
+  ],
+  [
+   "grossgartach",
+   "grafenrheinfeld",
+   6
+  ],
+  [
+   "eichstetten",
+   "muhlbach",
+   6
+  ],
+  [
+   "eichstetten",
+   "kuehmoos",
+   6
+  ],
+  [
+   "kuehmoos",
+   "laufenburg",
+   6
+  ],
+  [
+   "pulverdingen",
+   "herbertingen",
+   6
+  ],
+  [
+   "grafenrheinfeld",
+   "raitersaich",
+   6
+  ],
+  [
+   "raitersaich",
+   "redwitz",
+   6
+  ],
+  [
+   "redwitz",
+   "etzenricht",
+   6
+  ],
+  [
+   "etzenricht",
+   "prestice",
+   6
+  ],
+  [
+   "etzenricht",
+   "irsching",
+   6
+  ],
+  [
+   "raitersaich",
+   "irsching",
+   6
+  ],
+  [
+   "irsching",
+   "oberbachern",
+   6
+  ],
+  [
+   "irsching",
+   "isar",
+   6
+  ],
+  [
+   "krimpen",
+   "maasbracht",
+   6
+  ],
+  [
+   "doetinchem",
+   "maasbracht",
+   6
+  ],
+  [
+   "maasbracht",
+   "gramme",
+   6
+  ],
+  [
+   "gramme",
+   "lixhe",
+   6
+  ],
+  [
+   "gramme",
+   "mercator",
+   6
+  ],
+  [
+   "mercator",
+   "krimpen",
+   6
+  ],
+  [
+   "mercator",
+   "mery",
+   6
+  ],
+  [
+   "vigy",
+   "morbras",
+   6
+  ],
+  [
+   "mery",
+   "morbras",
+   6
+  ],
+  [
+   "mery",
+   "stvulbas",
+   6
+  ],
+  [
+   "stvulbas",
+   "muhlbach",
+   6
+  ],
+  [
+   "laufenburg",
+   "baggio",
+   6
+  ],
+  [
+   "stpeter",
+   "durnrohr",
+   6
+  ],
+  [
+   "durnrohr",
+   "cechystred",
+   6
+  ],
+  [
+   "hradec",
+   "cechystred",
+   6
+  ],
+  [
+   "prestice",
+   "cechystred",
+   6
+  ],
+  [
+   "mikulowa",
+   "wielopole",
+   6
+  ],
+  [
+   "wielopole",
+   "milosna",
+   6
+  ],
+  [
+   "isar",
+   "stpeter",
+   6
+  ],
+  [
+   "krajnik",
+   "milosna",
+   6
+  ],
+  [
+   "meeden",
+   "krimpen",
+   6
+  ],
+  [
+   "vieselbach",
+   "wolmirstedt",
+   6
+  ],
+  [
+   "herbertingen",
+   "buers",
+   6
+  ],
+  [
+   "kassoe",
+   "wilster",
+   6
+  ],
+  [
+   "herrenwyk",
+   "wilster",
+   6
+  ],
+  [
+   "jaenschwalde",
+   "hagenwerder",
+   6
+  ],
+  [
+   "hagenwerder",
+   "roehrsdorf",
+   6
+  ],
+  [
+   "landesbergen",
+   "mecklar",
+   6
+  ],
+  [
+   "rommerskirchen",
+   "kriftel",
+   6
+  ],
+  [
+   "philippsburg",
+   "eichstetten",
+   6
+  ],
+  [
+   "herbertingen",
+   "oberbachern",
+   6
+  ],
+  [
+   "emden",
+   "landesbergen",
+   6
+  ],
+  [
+   "landesbergen",
+   "wahle",
+   6
+  ],
+  [
+   "guestrow",
+   "vierraden",
+   6
+  ],
+  [
+   "diele",
+   "bergkamen",
+   6
+  ],
+  [
+   "rommerskirchen",
+   "vigy",
+   6
+  ],
+  [
+   "osterath",
+   "doetinchem",
+   6
+  ]
+ ],
+ "dc_links": [
+  [
+   "suedlink_a",
+   "brunsbuettel",
+   "grossgartach",
+   2000
+  ],
+  [
+   "suedlink_b",
+   "wilster",
+   "grafenrheinfeld",
+   2000
+  ],
+  [
+   "suedostlink",
+   "wolmirstedt",
+   "isar",
+   2000
+  ],
+  [
+   "ultranet",
+   "osterath",
+   "philippsburg",
+   2000
+  ],
+  [
+   "a_nord",
+   "emden",
+   "osterath",
+   2000
+  ],
+  [
+   "nordlink",
+   "wilster",
+   "tonstad",
+   1400
+  ],
+  [
+   "baltic_cable",
+   "herrenwyk",
+   "arrie",
+   600
+  ],
+  [
+   "kontek",
+   "guestrow",
+   "bjaeverskov",
+   600
+  ],
+  [
+   "alegro",
+   "oberzier",
+   "lixhe",
+   1000
+  ]
+ ],
+ "plants": [
+  [
+   "emsland_gas",
+   "gas_ccgt",
+   52.47,
+   7.31
+  ],
+  [
+   "neurath_lignite",
+   "lignite",
+   51.04,
+   6.62
+  ],
+  [
+   "jaenschwalde_lignite",
+   "lignite",
+   51.83,
+   14.58
+  ],
+  [
+   "irsching_gas",
+   "gas_ccgt",
+   48.77,
+   11.55
+  ]
+ ],
+ "metro_feeds": {
+  "hamburg": [
+   "dollern",
+   "kruemmel"
+  ],
+  "berlin": [
+   "wustermark",
+   "neuenhagen"
+  ],
+  "ruhr": [
+   "bergkamen",
+   "osterath"
+  ],
+  "frankfurt": [
+   "kriftel",
+   "buerstadt"
+  ],
+  "stuttgart": [
+   "pulverdingen",
+   "grossgartach"
+  ],
+  "munich": [
+   "oberbachern",
+   "isar"
+  ],
+  "randstad": [
+   "krimpen",
+   "maasbracht"
+  ],
+  "brussels": [
+   "mercator",
+   "gramme"
+  ],
+  "paris": [
+   "mery",
+   "morbras"
+  ],
+  "lyon": [
+   "stvulbas"
+  ],
+  "zurich": [
+   "laufenburg"
+  ],
+  "milan": [
+   "baggio"
+  ],
+  "vienna": [
+   "durnrohr"
+  ],
+  "prague": [
+   "cechystred"
+  ],
+  "warsaw": [
+   "milosna"
+  ],
+  "silesia": [
+   "wielopole"
+  ]
+ }
+}

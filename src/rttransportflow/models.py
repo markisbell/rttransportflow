@@ -134,3 +134,8 @@ class ScenarioDoc(_Doc):
     name: str
     steps_per_day: int
     description: str = ""
+    # Degree of shunt (reactor) compensation of line charging, 0..1. Long
+    # EHV corridors inject enormous capacitive charging (the realistic
+    # continental grid measures ~87 GVAr) and real TSOs compensate it with
+    # reactors at the stations; 0 keeps every legacy bundle byte-identical.
+    shunt_comp: float = 0.0

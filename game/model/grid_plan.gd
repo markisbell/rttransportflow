@@ -1,10 +1,15 @@
-class_name GermanyGrid
+class_name GridPlan
 extends RefCounted
-## Authors the real (aggregated) German 380 kV grid from the curated seed
-## (data/grids/germany_380kv_seed.json): real named substations at their
-## real locations, the backbone corridors between them, the neighbour
-## interconnectors, and the DC projects as hvdc corridors with converter
-## stations at both ends.
+## Authors a realistic (aggregated) 380 kV grid from a curated seed: real
+## named substations at their real locations, the backbone corridors
+## between them, the neighbour interconnectors, and the DC projects as
+## hvdc corridors with converter stations at both ends.
+##
+## Two seeds ship: germany_380kv_seed.json (the standalone probe) and
+## europe_380kv_seed.json (the Germany core plus lean spines to every
+## CONTINENTAL_CORE metro) — author_start() builds the campaign's
+## inherited world from the latter: grid, metro feeds, then the adequacy
+## plant ladder anchored at each metro's real feeding substations.
 ##
 ## Routing honours the tile model's one-corridor-per-tile rule, which makes
 ## true line CROSSINGS impossible — so AC lines are laid first (the mesh),
@@ -13,13 +18,20 @@ extends RefCounted
 ## own bounding box (+ margin): an unbounded failing BFS floods all 772k
 ## tiles, the P6 freeze lesson.
 
-const SEED_PATH := "data/grids/germany_380kv_seed.json"
+const GERMANY_SEED := "data/grids/germany_380kv_seed.json"
+const EUROPE_SEED := "data/grids/europe_380kv_seed.json"
 const BOX_MARGIN_KM := 150.0  # route search box beyond the endpoints
+## Corridors must not BRUSH a metro outside the plan: touching a foreign
+## footprint connects its load with no fleet behind it (the P5 47.4 Hz
+## lesson). Halo tiles are set for one author run and consulted by the
+## router; core metros stay touchable — that is how they tap the grid.
+static var _halo := {}
 
 
-static func author(world: Node, projection: Dictionary) -> Dictionary:
+static func author(world: Node, projection: Dictionary,
+		seed_path: String = GERMANY_SEED) -> Dictionary:
 	var seed_doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(
-		AppPaths.root() + "/" + SEED_PATH))
+		AppPaths.root() + "/" + seed_path))
 	if not (seed_doc is Dictionary):
 		return {"ok": false, "error": "seed missing/unparsable"}
 	var lon0 := float(projection.get("lon0", -20.0))
@@ -36,7 +48,11 @@ static func author(world: Node, projection: Dictionary) -> Dictionary:
 		var tile := _nearest_land(world, raw)
 		if tile == Vector2i(-1, -1):
 			return {"ok": false, "error": "no land near " + name}
-		world.place_substation(tile)
+		# an AC gateway is a corridor STUB: the line draws to the border but
+		# a dead-end forms no bus — a leaf substation there bought nothing
+		# electrically and cost a node-budget slot each
+		if not bool(s.get("gateway", false)):
+			world.place_substation(tile)
 		tiles[name] = tile
 
 	# a few real stations anchor the AC island for the topology pass
@@ -49,7 +65,8 @@ static func author(world: Node, projection: Dictionary) -> Dictionary:
 	var failed: Array[String] = []
 	var laid_ac := 0
 	for line: Array in seed_doc["ac_lines"]:
-		if _lay(world, tiles[line[0]], tiles[line[1]], "line_400"):
+		if _lay(world, tiles[line[0]], tiles[line[1]], "line_400",
+				int(line[2]) if line.size() > 2 else 0):
 			laid_ac += 1
 		else:
 			failed.append("%s-%s" % [line[0], line[1]])
@@ -68,12 +85,16 @@ static func author(world: Node, projection: Dictionary) -> Dictionary:
 ## purpose: several lines terminating on one station tile merge there,
 ## which IS the switching station.
 static func _lay(world: Node, from_tile: Vector2i, to_tile: Vector2i,
-		kind: String) -> bool:
+		kind: String, circuits: int = 0) -> bool:
 	var path := _route_astar(world, from_tile, to_tile, kind)
 	if path.is_empty():
 		return false
 	var previous := path[0]
 	world.place_corridor(previous, kind)
+	if circuits > 0:
+		for tile: Vector2i in path:
+			world.corridor_circuits[tile] = maxi(
+				int(world.corridor_circuits.get(tile, 0)), circuits)
 	for i in range(1, path.size()):
 		var tile := path[i]
 		var step := tile - previous
@@ -213,6 +234,8 @@ static func _passable(world: Node, n: Vector2i, to_tile: Vector2i,
 		bx0: int, bx1: int, by0: int, by1: int) -> bool:
 	if n.x < bx0 or n.x > bx1 or n.y < by0 or n.y > by1:
 		return false
+	if _halo.has(n):
+		return false
 	if not world.can_place_corridor(n, kind):
 		return false
 	if not world.corridors.has(n):
@@ -237,7 +260,8 @@ static func _nearest_land(world: Node, anchor: Vector2i) -> Vector2i:
 				var tile := anchor + Vector2i(dx, dy)
 				if world.in_bounds(tile) and world.is_land(tile) \
 						and not world.corridors.has(tile) \
-						and not world.substations.has(tile):
+						and not world.substations.has(tile) \
+						and world.load_center_at(tile) == "":
 					return tile
 	return Vector2i(-1, -1)
 
@@ -253,4 +277,155 @@ static func _free_flank(world: Node, site: Vector2i) -> Vector2i:
 		var n := site + offset
 		if world.can_place_corridor(n, "hvdc") and not world.corridors.has(n):
 			return n
+	return Vector2i(-1, -1)
+
+
+# ─── the campaign start world (inherited 2025) ────────────────────────
+
+## Ladder rungs copied from the demo author's measured tuning: ~45 %
+## nuclear base, coal to ~70 %, gas for the evening top, OCGT closer.
+static func _ladder_kinds(remaining: float, placed: float,
+		need: float) -> Array[String]:
+	if remaining > 1200.0 and placed < need * 0.45:
+		return ["nuclear", "coal", "gas_ccgt"]
+	if remaining > 700.0 and placed < need * 0.7:
+		return ["coal", "gas_ccgt"]
+	if remaining > 300.0:
+		return ["gas_ccgt", "gas_ocgt"]
+	return ["gas_ocgt"]
+
+
+## Build the campaign's inherited world on the European plan: the seed
+## grid, every CONTINENTAL_CORE metro fed from its real substations, then
+## the adequacy plant ladder (LIVE_PEAK_MARGIN over each metro's peak)
+## anchored at those substations. Deterministic throughout.
+static func author_start(world: Node) -> bool:
+	# metros outside the plan must never be brushed by a route (their load
+	# would ride along with no fleet behind it)
+	_halo = {}
+	var core := {}
+	for lc_id: String in Campaign.CONTINENTAL_CORE:
+		core[lc_id] = true
+	for lc_id: String in world.load_centers:
+		if core.has(lc_id):
+			continue
+		for tile: Vector2i in world.load_centers[lc_id]["tiles"]:
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					_halo[tile + Vector2i(dx, dy)] = true
+
+	var stats := author(world, BuildSession.map_projection(), EUROPE_SEED)
+	if not bool(stats.get("ok", false)):
+		push_warning("GridPlan.author_start: seed grid incomplete: "
+			+ JSON.stringify(stats.get("failed", [])))
+	var seed_doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(
+		AppPaths.root() + "/" + EUROPE_SEED))
+	var sub_tiles := {}
+	for name: String in seed_doc["substations"]:
+		var sd: Dictionary = seed_doc["substations"][name]
+		var raw := Vector2i(
+			int((float(sd["lon"]) - float(BuildSession.map_projection()["lon0"]))
+				/ float(BuildSession.map_projection()["deg_lon_per_tile"])),
+			int((float(BuildSession.map_projection()["lat0"]) - float(sd["lat"]))
+				/ float(BuildSession.map_projection()["deg_lat_per_tile"])))
+		# the substation was placed at/near raw during author(); find it
+		sub_tiles[name] = _nearest_substation(world, raw)
+
+	var feeds: Dictionary = seed_doc.get("metro_feeds", {})
+	var ok := true
+	for lc_id: String in Campaign.CONTINENTAL_CORE:
+		if not world.load_centers.has(lc_id) or not feeds.has(lc_id):
+			continue
+		var lc: Dictionary = world.load_centers[lc_id]
+		var feed_names: Array = feeds[lc_id]
+		var taps: Array = DemoBuild.taps_around(world, lc["tiles"], _halo)
+		if taps.is_empty():
+			push_warning("GridPlan: no tap around " + lc_id)
+			ok = false
+			continue
+		# one corridor from every feeding substation into the metro
+		for i in feed_names.size():
+			var sub_tile: Vector2i = sub_tiles.get(str(feed_names[i]),
+				Vector2i(-1, -1))
+			if sub_tile == Vector2i(-1, -1):
+				continue
+			var tap: Vector2i = taps[i % taps.size()]
+			world.place_corridor(tap, "line_400")
+			if not _lay(world, sub_tile, tap, "line_400", 12):
+				push_warning("GridPlan: feed %s -> %s unroutable"
+					% [feed_names[i], lc_id])
+				ok = false
+		# the adequacy ladder, anchored at the metro's feeding substations
+		var need: float = lc["peak_mw"] * GridTopology.LIVE_PEAK_MARGIN
+		var placed := 0.0
+		var count := 0
+		var banned := _halo.duplicate()
+		# The ladder anchors at the METRO, not at a distant substation: a
+		# metro's fleet must sit around it (the old world's proven regime,
+		# and the real one — big plants ring real metros), or its entire
+		# supply squeezes through the one or two feed corridors and trips
+		# them instantly (Paris: ~20 GW through two lines, measured 286 %).
+		# The feeds then carry only inter-metro exchange. Ring placement
+		# also packs the parks so their taps collapse into few buses.
+		var anchor: Vector2i = lc["tiles"][0]
+		while placed < need:
+			var site := Vector2i(-1, -1)
+			var kind := ""
+			for candidate: String in _ladder_kinds(need - placed, placed, need):
+				site = DemoBuild.find_site(world, candidate, anchor,
+					world.tiles_for_km(150.0), banned)
+				if site == Vector2i(-1, -1):
+					site = DemoBuild.find_site(world, candidate, anchor,
+						world.tiles_for_km(400.0), banned)
+				if site != Vector2i(-1, -1):
+					kind = candidate
+					break
+			if site == Vector2i(-1, -1):
+				push_warning("GridPlan: ladder exhausted for " + lc_id)
+				ok = false
+				break
+			var pid: String = world.place_plant(kind, site)
+			var plant_tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
+			var spur: Array[Vector2i] = []
+			if plant_tap != Vector2i(-1, -1):
+				spur = _spur(world, plant_tap, taps[count % taps.size()])
+			if spur.is_empty():
+				world.remove_plant(pid)
+				banned[site] = true
+				continue
+			for tile: Vector2i in spur:
+				world.place_corridor(tile, "line_400")
+			placed += float(world.PLANT_SIZES[kind])
+			count += 1
+	_halo = {}
+	return ok
+
+
+## Short plant spur into the web: bounded BFS that stops on the FIRST
+## existing corridor tile (spurs merge into trunks, never lay parallels).
+static func _spur(world: Node, from_tile: Vector2i,
+		toward: Vector2i) -> Array[Vector2i]:
+	var margin: int = world.tiles_for_km(60.0)
+	var bx0 := mini(from_tile.x, toward.x) - margin
+	var bx1 := maxi(from_tile.x, toward.x) + margin
+	var by0 := mini(from_tile.y, toward.y) - margin
+	var by1 := maxi(from_tile.y, toward.y) + margin
+	var passable := func(n: Vector2i) -> bool:
+		return n.x >= bx0 and n.x <= bx1 and n.y >= by0 and n.y <= by1 \
+			and not _halo.has(n) \
+			and str(world.corridors.get(n, "line_400")) == "line_400" \
+			and world.can_place_corridor(n, "line_400")
+	return DemoBuild.route(world, from_tile, toward, true, {}, passable,
+		["line_400"])
+
+
+static func _nearest_substation(world: Node, anchor: Vector2i) -> Vector2i:
+	for r in range(0, 10):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var tile := anchor + Vector2i(dx, dy)
+				if world.substations.has(tile):
+					return tile
 	return Vector2i(-1, -1)

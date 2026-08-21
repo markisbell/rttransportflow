@@ -86,13 +86,24 @@ func _take_screenshot() -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
-	if OS.get_environment("SHOT_GRID") == "germany":
-		# the real (aggregated) German 380 kV grid instead of the demo build
-		print("GERMANY authoring...")
-		var stats: Dictionary = GermanyGrid.author(World,
-			BuildSession.map_projection())
-		print("GERMANY ", JSON.stringify(stats))
+	if OS.get_environment("SHOT_GRID") != "":
+		# a realistic seed grid instead of the demo build: SHOT_GRID=germany
+		# (standalone), =europe (the plan alone), =start (full campaign world)
+		if OS.get_environment("SHOT_GRID") == "start":
+			print("GRIDPLAN start world: ", GridPlan.author_start(World))
+		else:
+			var seed_path := GridPlan.EUROPE_SEED \
+				if OS.get_environment("SHOT_GRID") == "europe" else GridPlan.GERMANY_SEED
+			print("GRIDPLAN authoring ", seed_path)
+			var stats: Dictionary = GridPlan.author(World,
+				BuildSession.map_projection(), seed_path)
+			print("GRIDPLAN ", JSON.stringify(stats))
 		var topo: Dictionary = GridTopology.build(World)
+		if OS.get_environment("SHOT_DUMP") != "" and topo.has("native"):
+			var f := FileAccess.open(OS.get_environment("SHOT_DUMP"), FileAccess.WRITE)
+			f.store_string(JSON.stringify(topo["native"]))
+			f.close()
+			print("DUMPED native bundle")
 		if bool(topo.get("ok", false)):
 			var native: Dictionary = topo["native"]
 			print("TOPOLOGY buses=%d branches=%d warnings=%d" % [

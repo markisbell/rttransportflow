@@ -861,6 +861,7 @@
   "scenario": {
     "name": "built_world",
     "steps_per_day": 96,
-    "description": "player-built grid (P5)"
+    "description": "player-built grid (P5)",
+    "shunt_comp": 0.9
   }
 }

@@ -30,7 +30,8 @@ static func fixture_build(world: Node) -> void:
 ## (P7SmokeBase.lay_hvdc used to keep a private second copy).
 static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 		stop_at_existing: bool = false, avoid: Dictionary = {},
-		passable: Callable = Callable()) -> Array[Vector2i]:
+		passable: Callable = Callable(),
+		stop_kinds: Array = []) -> Array[Vector2i]:
 	var queue: Array[Vector2i] = [from_tile]
 	var head := 0  # index head, not pop_front: Array.pop_front is O(n) and
 	# a continental-scale search (tens of thousands of tiles) goes quadratic
@@ -38,8 +39,14 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 	while head < queue.size():
 		var current: Vector2i = queue[head]
 		head += 1
+		# stop_kinds narrows what counts as "existing": an AC plant spur
+		# stopping at an HVDC corridor tile merges with NOTHING — it ends
+		# beside a line of the wrong kind and orphans its plant (24 islands
+		# at t=0 taught this once DC corridors crossed the country)
 		if current == to_tile \
-				or (stop_at_existing and world.corridors.has(current)):
+				or (stop_at_existing and world.corridors.has(current)
+					and (stop_kinds.is_empty()
+						or str(world.corridors[current]) in stop_kinds)):
 			var path: Array[Vector2i] = []
 			while current != came[current]:
 				path.append(current)

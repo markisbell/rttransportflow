@@ -56,6 +56,11 @@ var dc_overlay: Dictionary = {}
 ## staircase unchanged), but the renderer skips its mast and draws the
 ## conductors cutting the corner — that is what a diagonal line IS here.
 var diag_fillers: Dictionary = {}
+## AUTHORED circuit counts: Vector2i -> int. The topology sizer takes the
+## max of its own flow estimate and the largest authored value along a
+## branch — the "authored corridor upgrades" path ledger 45 named for
+## meshed trunks the local estimator cannot size.
+var corridor_circuits: Dictionary = {}
 ## explicit substations: Vector2i -> true
 var substations: Dictionary = {}
 ## plants: pid -> {kind, tile: Vector2i, p_max_mw}
@@ -372,6 +377,7 @@ func place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
 
 func remove_corridor(tile: Vector2i) -> void:
 	diag_fillers.erase(tile)
+	corridor_circuits.erase(tile)
 	var removed := dc_overlay.erase(tile)
 	if corridors.erase(tile) or removed:
 		world_changed.emit()
@@ -390,6 +396,7 @@ func clear_build() -> void:
 	corridors.clear()
 	dc_overlay.clear()
 	diag_fillers.clear()
+	corridor_circuits.clear()
 	substations.clear()
 	plants.clear()
 	_plant_tiles.clear()
@@ -408,6 +415,9 @@ func serialize() -> Dictionary:
 	var filler_list := []
 	for tile: Vector2i in diag_fillers:
 		filler_list.append([tile.x, tile.y])
+	var circuit_list := []
+	for tile: Vector2i in corridor_circuits:
+		circuit_list.append([tile.x, tile.y, corridor_circuits[tile]])
 	var substation_list: Array = []
 	for tile: Vector2i in substations:
 		substation_list.append([tile.x, tile.y])
@@ -423,6 +433,7 @@ func serialize() -> Dictionary:
 		plant_list.append(row)
 	return {"version": ENVELOPE_VERSION, "corridors": corridor_list,
 		"dc_overlay": overlay_list, "diag_fillers": filler_list,
+		"corridor_circuits": circuit_list,
 		"substations": substation_list, "plants": plant_list,
 		"next_pid": _next_pid}
 
@@ -437,6 +448,8 @@ func restore(envelope: Dictionary) -> bool:
 		dc_overlay[Vector2i(int(entry[0]), int(entry[1]))] = true
 	for entry: Array in envelope.get("diag_fillers", []):
 		diag_fillers[Vector2i(int(entry[0]), int(entry[1]))] = true
+	for entry: Array in envelope.get("corridor_circuits", []):
+		corridor_circuits[Vector2i(int(entry[0]), int(entry[1]))] = int(entry[2])
 	for entry: Array in envelope.get("substations", []):
 		substations[Vector2i(int(entry[0]), int(entry[1]))] = true
 	for p: Dictionary in envelope.get("plants", []):

@@ -172,12 +172,17 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 				if not seen_edges.has(key_adj):
 					seen_edges[key_adj] = true
 					branches.append({"from": from_bus, "to": to_bus_adj,
-						"steps": 1, "kind": corridors[tile]})
+						"steps": 1, "kind": corridors[tile],
+						"authored": maxi(
+							int(world.corridor_circuits.get(tile, 0)),
+							int(world.corridor_circuits.get(next, 0)))})
 				continue
 			# walk the simple path until the next bus tile
 			var prev := tile
 			var current := next
 			var steps := 1
+			var authored: int = maxi(int(world.corridor_circuits.get(tile, 0)),
+				int(world.corridor_circuits.get(next, 0)))
 			var dead_end := false
 			while not bus_tiles.has(current):
 				var forward: Array[Vector2i] = []
@@ -190,6 +195,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 					break
 				prev = current
 				current = forward[0]
+				authored = maxi(authored, int(world.corridor_circuits.get(current, 0)))
 				steps += 1
 			if dead_end:
 				continue  # dead-end stub: no branch (warned via dropped sites later)
@@ -203,7 +209,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 				continue
 			seen_edges[edge_key] = true
 			branches.append({"from": from_bus, "to": to_bus, "steps": steps,
-				"kind": corridors[next]})
+				"kind": corridors[next], "authored": authored})
 
 	# --- 4. attach plants and load centers to buses ---------------------
 	var plant_bus := {}  # pid -> bus index
@@ -335,8 +341,11 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	var lines := {"lines": []}
 	var line_seq := 0
 	for branch: Dictionary in kept_branches:
-		var circuits: int = clampi(
+		# authored upgrades win where the local flow estimate cannot see
+		# meshed transfers (ledger 45); the estimator still sizes bridges
+		var circuits: int = clampi(maxi(
 			int(ceil(needs[line_seq] / (CIRCUIT_MVA * CIRCUIT_UTILISATION))),
+			int(branch.get("authored", 0))),
 			DEFAULT_PARALLEL, MAX_PARALLEL)
 		lines["lines"].append({
 			"id": "L%d" % line_seq,
@@ -381,7 +390,11 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 			"p_mw": demand[lc_id]})
 
 	var scenario := {"name": "built_world", "steps_per_day": STEPS,
-		"description": "player-built grid (P5)"}
+		"description": "player-built grid (P5)",
+		# long EHV corridors need their charging compensated (shunt
+		# reactors at the stations) or the PF drowns in Mvar — the
+		# realistic continental grid measured 87 GVAr uncompensated
+		"shunt_comp": 0.9}
 
 	# --- 7. wire devices (P7): storage, H2 chain, HVDC links + hubs -----
 	var wire: Dictionary = WireDeviceEmit.emit(world, hvdc_corridors, farm_hub,

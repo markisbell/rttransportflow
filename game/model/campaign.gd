@@ -37,12 +37,17 @@ const CONTINENTAL_CORE: Array[String] = [
 
 ## Build the inherited-2025 world (deterministic; author_start verifies it
 ## against the shipped golden and start_2025.json restores it at boot).
+## Since the realistic-grid re-baseline (ledger 46) the world is the
+## EUROPEAN PLAN: real named substations and corridors from the curated
+## seed, every core metro fed from its real stations, the adequacy fleet
+## laddered at those stations — the meshed real topology is also what
+## retired the L116/L108 evening-peak duty trips (the ledger-45 pocket).
 ## No pre-placed wind or batteries: they shift mesh flows and pushed a
 ## nuclear export spur past the 120 % duty threshold within the first
 ## block (found by four event-log hunts) — renewables arrive through their
 ## unlock years instead.
 static func build_inherited_world(world: Node) -> bool:
-	return DemoBuild.auto_build(world, CONTINENTAL_CORE)
+	return GridPlan.author_start(world)
 const BLOCK_DAYS := 1.0 / 96.0
 
 var active := false

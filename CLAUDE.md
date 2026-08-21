@@ -406,6 +406,35 @@ docs/GAME_DESIGN.md.
     the player now inherits a world with a real day-2 incident — arguably
     a teaching moment, explicitly an owner decision.
 
+46. **The campaign world is the EUROPEAN PLAN + shunt compensation**
+    (owner-directed re-baseline, 2026-08-21): `GridPlan.author_start`
+    replaces the demo-chain author — the inherited world is now the curated
+    realistic seed (`data/grids/europe_380kv_seed.json`: the German 380 kV
+    backbone at full fidelity, lean spines to every CONTINENTAL_CORE metro,
+    real interconnectors, the DC projects), every metro fed from its real
+    substations with the adequacy fleet ringed around it (plants at distant
+    park substations pushed each metro's whole supply through 1-2 feed
+    corridors — measured 286 %). Three structural pieces landed with it:
+    - **authored circuit counts** (`WorldModel.corridor_circuits`, seed
+      `circuits`, feeds at 12): the ledger-45 "authored corridor upgrades"
+      path — the sizer takes max(flow estimate, authored); estimator
+      behavior unchanged where nothing is authored.
+    - **AC gateways are corridor stubs** (no substation, no bus): a
+      cross-border leaf bus bought nothing electrically and cost a
+      node-budget slot each; the line still draws to the border.
+    - **shunt-reactor compensation** (`scenario.shunt_comp`, builder-side
+      pandapower shunts): the realistic grid's long corridors inject
+      **87 GVAr** of line charging and the PF diverged outright — every
+      t=0 "overload" was reactive charging current, not MW (zone-balanced
+      startup transfers measure 1e-12). 90 % compensation converges at
+      1.020-1.025 pu, max loading 24 %. Legacy bundles (flag absent)
+      byte-identical; the topology golden re-baselined for the new
+      scenario field. The ledger-45 L116/L108 day-1.34 duty trip is
+      retired by construction (meshed real topology + authored circuits).
+    Node budget: 135 buses / 252 branches (warn-range, inside 150).
+    OSM/OpenInfraMap stays excluded (ODbL, ledger 38); plant-site realism
+    is queued on the WRI Global Power Plant Database (CC-BY).
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
@@ -1182,6 +1211,39 @@ in world_view_3d.gd, which carries uncommitted in-progress work). The
 survey's periphery leads (engine.py's silent except-pass + absent backend
 logging, ADR-004's phantom CI perf budget, the Godot toolchain
 double-pin) are recorded in the overview artifact for later.
+
+### Realistic campaign world re-baseline (owner-directed, 2026-08-21)
+
+**Built:** ledger 46 in full — GridPlan (the renamed, generalized seed
+author) builds the inherited world from the European plan; authored
+circuit counts; AC gateway stubs; backend shunt-reactor compensation
+(`scenario.shunt_comp`, pandapower shunts, legacy bundles untouched);
+`DemoBuild.route` gains kind-aware stops (AC spurs stopping at HVDC tiles
+orphaned 24 islands at t=0) and an index-head queue (pop_front went
+quadratic at continental scale).
+
+**Tests:** backend 152 green (europe_mini pins untouched); GdUnit 39
+(topology golden re-baselined for the scenario field); author_start,
+campaign_take_the_reins (★★★, ZERO trips/blackouts/UFLS through day
+2.03 — the ledger-45 incident retired), save_load_replay bit-identical,
+dispatch_day green with prices unchanged to the cent (night 53.83 /
+evening 63.12 €/MWh).
+
+**Discoveries:** (1) the t=0 "overloads" were never MW — zone-balanced
+startup transfers measure 1e-12; they were 87 GVAr of uncompensated line
+charging on realistic corridor lengths, and the PF diverged outright
+(vm NaN). Real grids hang shunt reactors at every EHV station; now the
+game's do too. (2) A metro's fleet must ring the metro: parks at distant
+substations pushed the whole supply through 1-2 feed corridors (286 %
+measured). (3) Scattered per-plant taps cost ~108 lone buses; packed
+parks collapse to few. (4) The node-budget "153" appearing thrice was
+apples-to-oranges estimation — mirror the sizer's exact rule before
+tuning against it.
+
+**Deviations (deliberate):** economy/calm_week/soak deferred to the next
+sweep (dispatch_day's identical prices bound the economics); WRI GPPD
+plant re-siting queued (CC-BY; OpenInfraMap/OSM stays excluded per
+ledger 38).
 
 ## 7. Open questions for the project owner
 

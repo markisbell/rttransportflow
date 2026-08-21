@@ -56,6 +56,12 @@ def build_network(data: InputData) -> BuiltNetwork:
 
     line_idx: list[int] = []
     line_ids: list[str] = []
+    # Shunt-reactor compensation (scenario.shunt_comp): each line's charging
+    # is absorbed half at each end, scaled by the compensation degree —
+    # the standard EHV practice the bundle's flag stands for. Aggregated
+    # per bus into one shunt element after the line loop.
+    comp = float(getattr(data.scenario, "shunt_comp", 0.0) or 0.0)
+    shunt_q: dict[int, float] = {}
     for ln in data.lines.lines:
         if ln.std_type is not None:
             idx = pp.create_line(
@@ -67,6 +73,16 @@ def build_network(data: InputData) -> BuiltNetwork:
                 parallel=ln.parallel,
                 name=ln.id,
             )
+            if comp > 0.0:
+                std = pp.load_std_type(net, ln.std_type, "line")
+                qc = (2.0 * 3.141592653589793 * 50.0
+                      * float(std["c_nf_per_km"]) * 1e-9
+                      * ln.length_km * ln.parallel
+                      * (net.bus.at[bus_index[ln.from_bus], "vn_kv"] * 1e3) ** 2
+                      / 1e6)
+                for end in (ln.from_bus, ln.to_bus):
+                    b = bus_index[end]
+                    shunt_q[b] = shunt_q.get(b, 0.0) + qc * comp / 2.0
         else:
             idx = pp.create_line_from_parameters(
                 net,
@@ -82,6 +98,9 @@ def build_network(data: InputData) -> BuiltNetwork:
             )
         line_idx.append(idx)
         line_ids.append(ln.id)
+
+    for b, q in sorted(shunt_q.items()):
+        pp.create_shunt(net, b, q_mvar=q, name="comp")
 
     zone_bus = {z.id: z.bus for z in data.grid.zones}
     load_idx: list[int] = []
