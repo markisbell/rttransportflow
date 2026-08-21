@@ -72,11 +72,14 @@ const FOCUS_BUILD_BUDGET := 60
 const DETAIL_MAX_SIZE := MAX_ZOOM + 1.0
 ## one coarse quad per COARSE_STEP tiles
 const COARSE_STEP := 8
-## A metro footprint is ~12 x 12 tiles at 5 km and every tile carries a
-## cluster of four building models — by far the heaviest thing per chunk.
-## Past this ortho size a single building is barely a pixel, so the clusters
-## are dropped and rebuilt on the way back in.
-const CITY_DETAIL_MAX_SIZE := 70.0
+## Past this ortho size a single building or pylon is barely a pixel, so
+## component MODELS (city clusters, plant models, corridor pylons) are
+## dropped chunk-wise and rebuilt on the way back in. What represents the
+## grid above the band is the strategic ribbon layer (StrategicGrid): a
+## continental corridor web holds thousands of corridor tiles at ~90 nodes
+## each — building those as models at overview zoom is minutes of work for
+## sub-pixel geometry (found the hard way by the Germany 380 kV author).
+const MODEL_DETAIL_MAX_SIZE := 70.0
 
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
 ## drives the ghost preview and what a click builds.
@@ -115,7 +118,13 @@ var _dragging := false
 var _map_ready := false
 var _stream_dirty := false
 var _components_dirty := false
-var _cities_shown := true
+var _models_shown := true
+var _strategic: MeshInstance3D
+var _strategic_dirty := false
+var _sky_material: ProceduralSkyMaterial
+var _city_lights: MultiMeshInstance3D
+var _city_lights_material: StandardMaterial3D
+var _tod_cache := -1.0  # time-of-day fraction the lighting was last set for
 
 
 func _ready() -> void:
@@ -129,6 +138,13 @@ func _ready() -> void:
 	_cursor.mesh = cursor_mesh
 	_cursor.material_override = PlantModels.flat(Color(1, 1, 1, 0.30), true)
 	add_child(_cursor)
+	_strategic = MeshInstance3D.new()
+	var strategic_material := StandardMaterial3D.new()
+	strategic_material.vertex_color_use_as_albedo = true
+	strategic_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_strategic.material_override = strategic_material
+	_strategic.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_strategic)
 	World.world_changed.connect(redraw)
 	tile_clicked.connect(_apply_tool)
 	redraw()
@@ -157,6 +173,7 @@ func _build_environment() -> void:
 	sky_material.ground_horizon_color = Color(0.62, 0.68, 0.70)
 	var sky := Sky.new()
 	sky.sky_material = sky_material
+	_sky_material = sky_material
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.72
@@ -205,6 +222,11 @@ func _apply_camera() -> void:
 		var band := fog_band(_zoom)
 		_env.fog_depth_begin = band.x
 		_env.fog_depth_end = band.y
+	if _strategic != null:
+		# the ribbon layer is the STRATEGIC representation: near the ground
+		# the pylon models carry the grid and a tile-wide ribbon would pave
+		# the countryside pink
+		_strategic.visible = _zoom > 55.0
 	_stream_dirty = true
 
 
@@ -257,7 +279,94 @@ func focus_tile(tile: Vector2i, zoom: float = -1.0) -> void:
 	_drain_pending(FOCUS_BUILD_BUDGET)
 
 
+# ─── day / night ──────────────────────────────────────────────────────
+# The sun follows the SIM clock (GameClock.t_sim): sunrise ~06:00, noon
+# peak, warm dusk, blue-grey night — and after dark the load centres glow
+# (a MultiMesh of emissive window-quads over every city tile; the existing
+# glow pass blooms them, the satellite-at-night look). Render-only: no
+# physics reads the sun.
+
+const DAY_SUN := Color(1.0, 0.965, 0.89)
+const DUSK_SUN := Color(1.0, 0.62, 0.38)
+const NIGHT_SUN := Color(0.55, 0.62, 0.82)  # moonlight stand-in
+const DAY_SKY_TOP := Color(0.33, 0.52, 0.78)
+const DAY_SKY_HORIZON := Color(0.74, 0.82, 0.88)
+const NIGHT_SKY_TOP := Color(0.015, 0.025, 0.07)
+const NIGHT_SKY_HORIZON := Color(0.05, 0.07, 0.13)
+const DAY_FOG := Color(0.74, 0.82, 0.90)
+const NIGHT_FOG := Color(0.05, 0.06, 0.10)
+const CITY_LIGHT := Color(1.0, 0.80, 0.45)
+
+
+func _apply_daylight(tod: float) -> void:
+	# solar elevation proxy: -1 (midnight) .. +1 (noon)
+	var sun_e := sin((tod - 0.25) * TAU)
+	var day_f := smoothstep(-0.10, 0.30, sun_e)
+	var dusk_f := 1.0 - clampf(absf(sun_e) / 0.30, 0.0, 1.0)  # peak near horizon
+	_sun.rotation_degrees = Vector3(
+		-lerpf(10.0, 52.0, clampf(sun_e, 0.0, 1.0)),
+		-34.0 + (tod - 0.5) * 70.0, 0.0)
+	_sun.light_energy = 1.45 * day_f + 0.06
+	_sun.light_color = NIGHT_SUN.lerp(DAY_SUN, day_f).lerp(DUSK_SUN, dusk_f * 0.7)
+	_sun.shadow_enabled = day_f > 0.05  # moonlight shadows sparkle on iGPUs
+	if _env != null:
+		_env.ambient_light_energy = 0.72 * day_f + 0.14
+		_env.fog_light_color = NIGHT_FOG.lerp(DAY_FOG, day_f)
+	if _sky_material != null:
+		_sky_material.sky_top_color = NIGHT_SKY_TOP.lerp(DAY_SKY_TOP, day_f)
+		_sky_material.sky_horizon_color = NIGHT_SKY_HORIZON.lerp(
+			DAY_SKY_HORIZON, day_f)
+	if _city_lights != null:
+		var night_f := 1.0 - day_f
+		_city_lights.visible = night_f > 0.03
+		_city_lights_material.emission_energy_multiplier = 2.4 * night_f
+	if _strategic != null:
+		# unshaded ribbons ignore the sun — dim them with it, or the grid
+		# blazes neon at midnight
+		var level := 0.25 + 0.75 * day_f
+		(_strategic.material_override as StandardMaterial3D).albedo_color = \
+			Color(level, level, level)
+
+
+## One emissive quad per load-centre tile — built once per map.
+func _build_city_lights() -> void:
+	if _city_lights != null:
+		_city_lights.queue_free()
+	var tiles: Array[Vector2i] = []
+	for lc_id: String in World.load_centers:
+		for tile: Vector2i in World.load_centers[lc_id]["tiles"]:
+			tiles.append(tile)
+	if tiles.is_empty():
+		return
+	var multi := MultiMesh.new()
+	multi.transform_format = MultiMesh.TRANSFORM_3D
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(0.96, 0.96)
+	multi.mesh = quad
+	multi.instance_count = tiles.size()
+	for i in tiles.size():
+		var tile := tiles[i]
+		multi.set_instance_transform(i, Transform3D(Basis.IDENTITY,
+			Vector3(tile.x + 0.5, ground_y(tile) + 0.055, tile.y + 0.5)))
+	_city_lights = MultiMeshInstance3D.new()
+	_city_lights.multimesh = multi
+	_city_lights_material = StandardMaterial3D.new()
+	_city_lights_material.albedo_color = CITY_LIGHT
+	_city_lights_material.emission_enabled = true
+	_city_lights_material.emission = CITY_LIGHT
+	_city_lights_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_city_lights.material_override = _city_lights_material
+	_city_lights.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_city_lights.visible = false
+	add_child(_city_lights)
+
+
 func _process(delta: float) -> void:
+	var tod := fmod(GameClock.t_sim, GameClock.SECONDS_PER_DAY) \
+		/ GameClock.SECONDS_PER_DAY
+	if absf(tod - _tod_cache) > 0.0003:  # ~26 sim-seconds; cheap either way
+		_tod_cache = tod
+		_apply_daylight(tod)
 	if not is_equal_approx(_yaw, _yaw_target):
 		_yaw = lerp_angle(deg_to_rad(_yaw), deg_to_rad(_yaw_target),
 			clampf(delta * 8.0, 0.0, 1.0))
@@ -273,16 +382,19 @@ func _process(delta: float) -> void:
 		_update_stream()
 	# crossing the city-detail band adds or drops thousands of building
 	# instances; do it once on the crossing, not per frame
-	var want_cities := _cities_wanted()
-	if want_cities != _cities_shown:
-		_cities_shown = want_cities
-		if want_cities:
+	var want_models := _models_wanted()
+	if want_models != _models_shown:
+		_models_shown = want_models
+		if want_models:
 			_components_dirty = true
 		else:
-			_drop_cities()
+			_drop_models()
 	if _components_dirty:
 		_components_dirty = false
 		_sync_components()
+	if _strategic_dirty and _strategic != null:
+		_strategic_dirty = false
+		_strategic.mesh = StrategicGrid.build_mesh(World)
 	_drain_pending(BUILD_PER_FRAME)
 
 
@@ -405,7 +517,7 @@ func _update_stream() -> void:
 ## cover is sub-pixel anyway, so the radius shrinks with the view rather
 ## than being a fixed ring.
 func _deco_visible(key: Vector2i) -> bool:
-	if _zoom > CITY_DETAIL_MAX_SIZE:
+	if _zoom > MODEL_DETAIL_MAX_SIZE:
 		return false
 	var centre := Vector2((key.x + 0.5) * CHUNK, (key.y + 0.5) * CHUNK)
 	return centre.distance_to(Vector2(_focus.x, _focus.z)) <= DECO_RADIUS + CHUNK
@@ -477,6 +589,8 @@ func _free_chunk(key: Vector2i) -> void:
 ## components). Tile lookups keep it O(chunk area) no matter how much the
 ## player has built.
 func _populate_chunk(key: Vector2i) -> void:
+	if not _models_wanted():
+		return  # above the model band the strategic layer is the grid
 	var chunk: Dictionary = _chunks[key]
 	var root := chunk["root"] as Node3D
 	var plants := chunk["plants"] as Dictionary
@@ -498,7 +612,7 @@ func _populate_chunk(key: Vector2i) -> void:
 			if World.corridors.has(tile):
 				_build_corridor(key, tile)
 			var lc_id := World.load_center_at(tile)
-			if lc_id != "" and not cities.has(tile) and _cities_wanted():
+			if lc_id != "" and not cities.has(tile):
 				var lc: Dictionary = World.load_centers.get(lc_id, {})
 				var peak: float = lc.get("peak_mw", 0.0)
 				# the variant is picked from the TILE, not a running counter:
@@ -540,18 +654,22 @@ func _build_corridor(key: Vector2i, tile: Vector2i) -> void:
 ## Reconcile loaded chunks with the model after an edit. Only chunks that
 ## are resident do any work — the rest pick their components up when they
 ## stream in.
-func _cities_wanted() -> bool:
-	return _zoom <= CITY_DETAIL_MAX_SIZE
+func _models_wanted() -> bool:
+	return _zoom <= MODEL_DETAIL_MAX_SIZE
 
 
-## Drop every resident city cluster (called when the zoom leaves the band
-## where individual buildings are legible).
-func _drop_cities() -> void:
+## Drop every resident component model (called when the zoom leaves the
+## band where individual buildings and pylons are legible — the strategic
+## ribbon layer carries the grid above it).
+func _drop_models() -> void:
 	for key: Vector2i in _chunks:
-		var cities := (_chunks[key] as Dictionary)["cities"] as Dictionary
-		for tile: Vector2i in cities.keys():
-			(cities[tile] as Node3D).queue_free()
-		cities.clear()
+		var chunk: Dictionary = _chunks[key]
+		for group: String in ["cities", "corridors", "plants"]:
+			var nodes := chunk[group] as Dictionary
+			for k: Variant in nodes.keys():
+				(nodes[k] as Node3D).queue_free()
+			nodes.clear()
+		(chunk["corridor_keys"] as Dictionary).clear()
 
 
 func _sync_components() -> void:
@@ -579,12 +697,14 @@ func redraw() -> void:
 		if World.width == 0:
 			return
 		_build_backdrop()
+		_build_city_lights()
 		_map_ready = true
 		_focus = Vector3(World.width / 2.0, 0.0, World.height / 2.0)
 		_apply_camera()
 	# never stream or reconcile inline: see _process
 	_stream_dirty = true
 	_components_dirty = true
+	_strategic_dirty = true
 
 
 func ground_y(tile: Vector2i) -> float:

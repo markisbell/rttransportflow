@@ -21,6 +21,8 @@ Ladoga 708,221 · Norway coast 350,212 — the relief showcase spots).
 | `zoom_44.png` | working zoom: corridors readable, forests thinning to visibility flag range |
 | `zoom_120.png` | strategic zoom (MAX_ZOOM): whole frame visible — **any full-frame haze is the fog-band regression** `test_world_view.gd` pins; coastline shape recognizable, sea depth-graded |
 | `model_gallery.png` | every buildable component on the labelled grid |
+| `germany_grid.png` | `SHOT_GRID=germany`: the aggregated real 380 kV grid — red AC mesh, violet DC (SuedLink/SuedOstLink/Ultranet/A-Nord + NordLink offshore), white substations; strategic ribbons carry the network above zoom 55 |
+| `night_berlin.png` | `SHOT_TIME=23`: night — dark continent, warm city-light glow, pylons silhouetted; `SHOT_TIME` sets the hour (probe default is midday) |
 
 Relief checks (ETOPO sidecar, `tools/map_authoring/relief.py`): smooth
 shorelines (no tile staircase), snow above the Alpine treeline, lakes blue

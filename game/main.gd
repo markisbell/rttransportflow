@@ -86,13 +86,33 @@ func _take_screenshot() -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
-	DemoBuild.auto_build(World)
-	# a few of the P7 buildables so the palette's newer kinds appear on the map
-	var anchor: Vector2i = (World.load_centers["hamburg"]["tiles"] as Array)[0]
-	for kind: String in ["battery", "electrolyzer", "hvdc_converter"]:
-		var site := DemoBuild.find_site(World, kind, anchor, 8)
-		if site != Vector2i(-1, -1):
-			World.place_plant(kind, site)
+	if OS.get_environment("SHOT_GRID") == "germany":
+		# the real (aggregated) German 380 kV grid instead of the demo build
+		print("GERMANY authoring...")
+		var stats: Dictionary = GermanyGrid.author(World,
+			BuildSession.map_projection())
+		print("GERMANY ", JSON.stringify(stats))
+		var topo: Dictionary = GridTopology.build(World)
+		if bool(topo.get("ok", false)):
+			var native: Dictionary = topo["native"]
+			print("TOPOLOGY buses=%d branches=%d warnings=%d" % [
+				(native["grid"]["buses"] as Array).size(),
+				(native["lines"]["lines"] as Array).size(),
+				(topo.get("warnings", []) as Array).size()])
+		else:
+			print("TOPOLOGY refused: ", topo.get("error", "?"))
+	else:
+		DemoBuild.auto_build(World)
+		# a few of the P7 buildables so the palette's newer kinds appear
+		var anchor: Vector2i = (World.load_centers["hamburg"]["tiles"] as Array)[0]
+		for kind: String in ["battery", "electrolyzer", "hvdc_converter"]:
+			var site := DemoBuild.find_site(World, kind, anchor, 8)
+			if site != Vector2i(-1, -1):
+				World.place_plant(kind, site)
+	if OS.get_environment("SHOT_TIME") != "":  # hour of day, e.g. "0" = midnight
+		GameClock.t_sim = float(OS.get_environment("SHOT_TIME")) * 3600.0
+	else:
+		GameClock.t_sim = 12.0 * 3600.0  # canon shots are midday
 	view.redraw()
 	var focus: Vector2i = (World.load_centers["berlin"]["tiles"] as Array)[0]
 	if OS.get_environment("SHOT_TILE") != "":  # "x,y" — aim the probe anywhere

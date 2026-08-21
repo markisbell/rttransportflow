@@ -49,8 +49,15 @@ func _ready() -> void:
 	var cluster := preload("res://views/frequency_cluster.gd").new()
 	add_child(cluster)
 	# AFTER add_child: the cluster sets its own position in _ready(), which
-	# runs on add_child and would overwrite an earlier assignment
-	cluster.position = Vector2(798, 356)  # clear of the nav panel above
+	# runs on add_child and would overwrite an earlier assignment.
+	# Docked to the RIGHT edge below the nav panel via ANCHORS (user
+	# direction): a fixed x floated the panel mid-screen on wide displays.
+	cluster.anchor_left = 1.0
+	cluster.anchor_right = 1.0
+	cluster.offset_left = -482.0
+	cluster.offset_right = -12.0
+	cluster.offset_top = 356.0
+	cluster.offset_bottom = 678.0
 
 	# menu-driven building (user direction): no build hotkeys anywhere
 	_build_menu = BuildMenu.new()

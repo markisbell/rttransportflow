@@ -47,6 +47,9 @@ var _load_center_tiles: Dictionary = {}  # Vector2i -> load-center id
 
 ## corridors: Vector2i -> String line kind ("line_220" | "line_400")
 var corridors: Dictionary = {}
+## hvdc passing OVER an AC corridor tile (crossing spans): Vector2i -> true.
+## The tile keeps its AC line in `corridors`; the DC web includes the tile.
+var dc_overlay: Dictionary = {}
 ## explicit substations: Vector2i -> true
 var substations: Dictionary = {}
 ## plants: pid -> {kind, tile: Vector2i, p_max_mw}
@@ -320,6 +323,17 @@ func place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
 		return false
 	if corridors.get(tile, "") == kind:
 		return true
+	if corridors.has(tile):
+		# an hvdc line may CROSS an AC corridor: the tile keeps its AC line,
+		# the DC line passes over (dc_overlay) and the two stay electrically
+		# separate — a real crossing span. Any other collision is refused:
+		# silently overwriting the kind used to cut the standing line's web.
+		if kind == "hvdc" and str(corridors[tile]) != "hvdc":
+			dc_overlay[tile] = true
+			corridor_placed.emit(tile, kind)
+			world_changed.emit()
+			return true
+		return false
 	corridors[tile] = kind
 	corridor_placed.emit(tile, kind)
 	world_changed.emit()
@@ -327,7 +341,8 @@ func place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
 
 
 func remove_corridor(tile: Vector2i) -> void:
-	if corridors.erase(tile):
+	var removed := dc_overlay.erase(tile)
+	if corridors.erase(tile) or removed:
 		world_changed.emit()
 
 
@@ -342,6 +357,7 @@ func place_substation(tile: Vector2i) -> bool:
 
 func clear_build() -> void:
 	corridors.clear()
+	dc_overlay.clear()
 	substations.clear()
 	plants.clear()
 	_plant_tiles.clear()
@@ -354,6 +370,9 @@ func serialize() -> Dictionary:
 	var corridor_list: Array = []
 	for tile: Vector2i in corridors:
 		corridor_list.append([tile.x, tile.y, corridors[tile]])
+	var overlay_list := []
+	for tile: Vector2i in dc_overlay:
+		overlay_list.append([tile.x, tile.y])
 	var substation_list: Array = []
 	for tile: Vector2i in substations:
 		substation_list.append([tile.x, tile.y])
@@ -368,6 +387,7 @@ func serialize() -> Dictionary:
 				row[extra] = p[extra]
 		plant_list.append(row)
 	return {"version": ENVELOPE_VERSION, "corridors": corridor_list,
+		"dc_overlay": overlay_list,
 		"substations": substation_list, "plants": plant_list,
 		"next_pid": _next_pid}
 
@@ -378,6 +398,8 @@ func restore(envelope: Dictionary) -> bool:
 	clear_build()
 	for entry: Array in envelope.get("corridors", []):
 		corridors[Vector2i(int(entry[0]), int(entry[1]))] = str(entry[2])
+	for entry: Array in envelope.get("dc_overlay", []):
+		dc_overlay[Vector2i(int(entry[0]), int(entry[1]))] = true
 	for entry: Array in envelope.get("substations", []):
 		substations[Vector2i(int(entry[0]), int(entry[1]))] = true
 	for p: Dictionary in envelope.get("plants", []):

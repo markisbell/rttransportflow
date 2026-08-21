@@ -62,6 +62,10 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	# buses or branches — they pair converter stations (P7, §1.16).
 	var corridors := {}
 	var hvdc_corridors := {}
+	# crossing spans: a dc_overlay tile carries BOTH its AC line (below)
+	# and the hvdc line passing over — it joins both electrical worlds
+	for tile: Vector2i in world.dc_overlay:
+		hvdc_corridors[tile] = "hvdc"
 	for tile: Vector2i in world.corridors:
 		if str(world.corridors[tile]) == "hvdc":
 			hvdc_corridors[tile] = "hvdc"

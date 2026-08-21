@@ -32,9 +32,12 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 		stop_at_existing: bool = false, avoid: Dictionary = {},
 		passable: Callable = Callable()) -> Array[Vector2i]:
 	var queue: Array[Vector2i] = [from_tile]
+	var head := 0  # index head, not pop_front: Array.pop_front is O(n) and
+	# a continental-scale search (tens of thousands of tiles) goes quadratic
 	var came := {from_tile: from_tile}
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
+	while head < queue.size():
+		var current: Vector2i = queue[head]
+		head += 1
 		if current == to_tile \
 				or (stop_at_existing and world.corridors.has(current)):
 			var path: Array[Vector2i] = []
