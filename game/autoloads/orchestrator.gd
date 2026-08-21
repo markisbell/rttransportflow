@@ -40,6 +40,8 @@ const STEP_TIMEOUT_S := 15.0
 
 var running := false
 var in_flight := false
+var _recovering_since := 0
+var _heartbeat_at := 0
 var last_reset_status := ""
 var last_t := -1
 var last_result := {}
@@ -158,6 +160,13 @@ func inject(events: Array) -> void:
 
 
 func _on_tick() -> void:
+	# heartbeat: every 10 s the gate state goes to the log, so a frozen
+	# clock names its own cause instead of needing three diagnosis rounds
+	if Time.get_ticks_msec() - _heartbeat_at > 10_000:
+		_heartbeat_at = Time.get_ticks_msec()
+		print("ORCH t=%d speed=%.0f run=%s busy=%s reset=%s/%s recov=%s healthy=%s stats=%s" % [
+			last_t, GameClock.speed, running, in_flight, needs_reset,
+			resetting, _recovering, _healthy(), JSON.stringify(stats)])
 	if not running or GameClock.speed <= 0.0:
 		return
 	if resetting or needs_reset or not _healthy():
@@ -316,8 +325,14 @@ var _recovering := false
 
 func _recover() -> void:
 	if _recovering:
-		return  # the 10 Hz tick loop may re-enter while the handshake awaits
+		# a wedged recovery must not wedge FOREVER: if the awaits inside a
+		# previous _recover never resumed, break the guard after 60 s so
+		# the tick loop can try again (freeze #2 post-mortem)
+		if Time.get_ticks_msec() - _recovering_since > 60_000:
+			_recovering = false
+		return
 	_recovering = true
+	_recovering_since = Time.get_ticks_msec()
 	if await _bridge().handshake(ID):
 		await _reset_backend("recover")
 	else:
