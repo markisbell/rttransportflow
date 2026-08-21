@@ -21,7 +21,29 @@ signal tile_clicked(tile: Vector2i)
 signal tile_hovered(tile: Vector2i)
 
 const MIN_ZOOM := 5.0
-const MAX_ZOOM := 1200.0  # the whole continent fits at ~1000 on the 5 km grid
+## You can never zoom out to the whole continent. At 5 km tiles this is a
+## ~600 km tall window — a REGION, France-or-Germany sized — and the fog
+## closes in before its edge, so the world reads as continuing past the
+## horizon rather than stopping at a rendered boundary.
+##
+## This is a performance contract as much as a look: the resident chunk set
+## is proportional to the visible area, so an unbounded zoom is an unbounded
+## streaming load. At 1200 the camera framed all 771 840 tiles, every jump
+## queued a continent of chunks, and the renderer ran out of RIDs and died.
+## Navigation across Europe is the minimap and jump list's job, not the
+## camera's.
+const MAX_ZOOM := 120.0
+
+## Camera geometry, NAMED because twice now a fog band silently encoded it
+## as bare numbers and broke when the other number moved (see fog_band).
+## The camera stands STANDOFF world units from the focus point along the
+## view direction — so the focus plane sits at depth ≈ STANDOFF, and any
+## depth-based effect must be expressed relative to it, never absolutely.
+const STANDOFF := 700.0
+## Vertical component of the (unnormalized) view direction; the horizontal
+## component has magnitude 1, so tan(pitch) = PITCH_RATIO and the ground
+## depth visible in a frame of ortho size z spans STANDOFF ± 0.5·z/PITCH_RATIO.
+const PITCH_RATIO := 0.92
 
 ## Streaming constants. CHUNK is a compromise: smaller chunks stream more
 ## smoothly but multiply node count and per-chunk overhead.
@@ -29,17 +51,25 @@ const CHUNK := 32
 ## visible half-extent multiplier — the loaded ring must reach PAST the
 ## frustum so its boundary is never on screen (that, plus the coarse
 ## backdrop, is why no popping edge is visible)
-const VIEW_MARGIN := 1.35
+const VIEW_MARGIN := 1.15
 ## chunks are dropped only past this multiple of the load radius, so panning
 ## back and forth across a boundary does not thrash
 const EVICT_MARGIN := 1.9
 const MAX_LOADED_CHUNKS := 120
 const BUILD_PER_FRAME := 3
+## Trees and rocks are the per-frame cost, not terrain: a forest chunk
+## carries ~2 000 instances, and the whole ring carries six figures of them.
+## They are only legible near the camera, so beyond this radius a chunk
+## keeps its ground and hides its cover (a visibility flag, so coming back
+## costs nothing).
+const DECO_RADIUS := 45.0
 ## chunks built synchronously when the camera JUMPS (nav widget, boot)
 const FOCUS_BUILD_BUDGET := 60
-## beyond this ortho size the detail layer is pointless (and unaffordable):
-## the coarse backdrop carries the overview alone
-const DETAIL_MAX_SIZE := 150.0
+## Above this ortho size the detail layer would be dropped for the coarse
+## backdrop alone. With MAX_ZOOM bounded it is never reached — kept as a
+## backstop so a future zoom change cannot silently reintroduce the
+## build-and-drop-everything cliff at the threshold.
+const DETAIL_MAX_SIZE := MAX_ZOOM + 1.0
 ## one coarse quad per COARSE_STEP tiles
 const COARSE_STEP := 8
 ## A metro footprint is ~12 x 12 tiles at 5 km and every tile carries a
@@ -160,16 +190,36 @@ func _build_camera() -> void:
 func _apply_camera() -> void:
 	# locked isometric: fixed pitch, yaw in 90° steps, orthographic zoom
 	var yaw := deg_to_rad(_yaw)
-	var direction := Vector3(sin(yaw), 0.92, cos(yaw)).normalized()
+	var direction := Vector3(sin(yaw), PITCH_RATIO, cos(yaw)).normalized()
 	camera.size = _zoom
-	camera.position = _focus + direction * 700.0
+	camera.position = _focus + direction * STANDOFF
 	camera.look_at(_focus, Vector3.UP)
 	if _env != null:
-		# the haze band always starts just past the focus plane and ends
-		# beyond the streamed ring, so distance reads as air at every zoom
-		_env.fog_depth_begin = 700.0 + _zoom * 0.35
-		_env.fog_depth_end = 700.0 + _zoom * 2.6
+		var band := fog_band(_zoom)
+		_env.fog_depth_begin = band.x
+		_env.fog_depth_end = band.y
 	_stream_dirty = true
+
+
+## The depth-fog band for an ortho size, DERIVED from the camera geometry —
+## returns Vector2(begin, end). This function exists because hand-tuned fog
+## constants have now caused two incidents in this file: exponential fog
+## bleached the whole continent (see _build_environment), and a rewritten
+## depth band that dropped the STANDOFF base fogged 100 % of every frame —
+## the ground plane lives at depth ≈ STANDOFF, so a band anchored near zero
+## sits entirely in front of the world and everything renders full-haze.
+##
+## Geometry: the ground depth visible in the frame spans STANDOFF ± half
+## where half = 0.5·zoom/PITCH_RATIO. The two fractions are frame-relative,
+## so they mean the same thing at every zoom: haze begins 45 % of the way
+## up the visible span (a depth cue at the top of the frame — under an
+## orthographic camera fog can never be the culling mechanism, the side and
+## bottom edges sit at near-focus depth) and reaches full opacity past the
+## frame edge but BEFORE the streamed ring's edge, so the detail-to-coarse
+## handover is always masked. test_world_view.gd pins these invariants.
+static func fog_band(zoom: float) -> Vector2:
+	var half := 0.5 * zoom / PITCH_RATIO
+	return Vector2(STANDOFF + 0.45 * half, STANDOFF + 1.30 * half)
 
 
 func focus_tile(tile: Vector2i, zoom: float = -1.0) -> void:
@@ -310,6 +360,11 @@ func _update_stream() -> void:
 		keep[key] = true
 		if not _chunks.has(key):
 			_pending.append(key)
+	# cover follows the camera: cheap flag, no rebuild
+	for key: Vector2i in _chunks:
+		var deco := (_chunks[key] as Dictionary).get("deco") as Node3D
+		if deco != null:
+			deco.visible = _deco_visible(key)
 	# evict what fell well outside the ring (hysteresis: EVICT_MARGIN)
 	var radius := _zoom * VIEW_MARGIN + CHUNK
 	for key: Vector2i in _chunks.keys():
@@ -320,6 +375,16 @@ func _update_stream() -> void:
 				or centre.distance_to(Vector2(_focus.x, _focus.z)) \
 					> radius * EVICT_MARGIN:
 			_free_chunk(key)
+
+
+## Is this chunk close enough to be worth its trees? Zoomed far out the
+## cover is sub-pixel anyway, so the radius shrinks with the view rather
+## than being a fixed ring.
+func _deco_visible(key: Vector2i) -> bool:
+	if _zoom > CITY_DETAIL_MAX_SIZE:
+		return false
+	var centre := Vector2((key.x + 0.5) * CHUNK, (key.y + 0.5) * CHUNK)
+	return centre.distance_to(Vector2(_focus.x, _focus.z)) <= DECO_RADIUS + CHUNK
 
 
 func _drain_pending(budget: int) -> void:
@@ -346,20 +411,35 @@ func _build_chunk(key: Vector2i) -> void:
 	terrain.material_override = _terrain_mat()
 	root.add_child(terrain)
 
+	# cover lives under its own node so the whole lot can be hidden by
+	# distance without touching the ground mesh (see DECO_RADIUS)
+	var deco := Node3D.new()
+	root.add_child(deco)
 	var placements := DecoScatter.placements_region(World, x0, y0, x1, y1)
 	for prop: String in placements:
 		for node: MultiMeshInstance3D in DecoScatter.build_multimeshes(
 				prop, placements[prop]):
-			root.add_child(node)
+			deco.add_child(node)
+	deco.visible = _deco_visible(key)
 
-	_chunks[key] = {"root": root, "plants": {}, "corridors": {},
+	_chunks[key] = {"root": root, "deco": deco, "plants": {}, "corridors": {},
 		"corridor_keys": {}, "cities": {}}
 	_populate_chunk(key)
 
 
+## Free NOW, not at end of frame. `queue_free()` defers, while
+## `_drain_pending` builds synchronously in the same frame — so every jump
+## allocated a screenful of meshes while the evicted ones were still alive.
+## Repeat that a few times from the jump list and Godot's RID allocator hits
+## its element limit, `_mesh_from` starts returning null and the renderer
+## dies ("Element limit reached", then "Parameter mem is null"). Freeing in
+## place keeps peak allocation equal to the resident set instead of the
+## resident set times the jump rate.
 func _free_chunk(key: Vector2i) -> void:
 	var chunk: Dictionary = _chunks[key]
-	(chunk["root"] as Node3D).queue_free()
+	var root := chunk["root"] as Node3D
+	_chunk_root.remove_child(root)
+	root.free()
 	_chunks.erase(key)
 
 
