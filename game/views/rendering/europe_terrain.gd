@@ -395,6 +395,40 @@ static func _build_relief_region(world: Node, x0: int, y0: int,
 			if is_water:
 				_shore_walls(world, vertices, normals, colors, indices,
 					x, y, x0, y0, cw, corner_h, SUBMERGE)
+	# perimeter SKIRT: the chunk's edges drop a curtain, so where the
+	# neighbour is not resident (mid-stream, zoom transitions) the border
+	# reads as a terrace against the sunken coarse instead of a floating
+	# torn edge. Between two resident chunks the curtain hides inside the
+	# neighbour's ground and costs nothing visually.
+	for edge in 4:
+		for i in range(x1 - x0 if edge < 2 else y1 - y0):
+			var a := Vector3.ZERO
+			var b := Vector3.ZERO
+			match edge:
+				0:  # north (y0)
+					a = Vector3(x0 + i, 0, y0)
+					b = Vector3(x0 + i + 1, 0, y0)
+				1:  # south (y1)
+					a = Vector3(x0 + i + 1, 0, y1)
+					b = Vector3(x0 + i, 0, y1)
+				2:  # west (x0)
+					a = Vector3(x0, 0, y0 + i + 1)
+					b = Vector3(x0, 0, y0 + i)
+				3:  # east (x1)
+					a = Vector3(x1, 0, y0 + i)
+					b = Vector3(x1, 0, y0 + i + 1)
+			a.y = corner_h[(int(a.z) - y0 + 1) * cw + (int(a.x) - x0 + 1)]
+			b.y = corner_h[(int(b.z) - y0 + 1) * cw + (int(b.x) - x0 + 1)]
+			var depth := minf(a.y, b.y) - 0.6
+			var base_i := vertices.size()
+			var col := SKIRT_COLOR * 0.85
+			for v: Vector3 in [a, b, Vector3(b.x, depth, b.z),
+					Vector3(a.x, depth, a.z)]:
+				vertices.push_back(v)
+				normals.push_back(Vector3.UP)
+				colors.push_back(col)
+			for j: int in [0, 1, 2, 0, 2, 3]:
+				indices.push_back(base_i + j)
 	return {"vertices": vertices, "normals": normals, "colors": colors,
 		"indices": indices}
 

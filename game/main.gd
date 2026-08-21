@@ -133,6 +133,26 @@ func _take_screenshot() -> void:
 		if OS.get_environment("SHOT_ZOOM") != "" else 17.0)
 	print("PROBE focus=", focus, " view_focus=", view._focus, " zoom=", view._zoom)
 	await get_tree().create_timer(1.5).timeout
+	if OS.get_environment("SHOT_ZOOM2") != "":  # birdview->zoom-in repro
+		view.focus_tile(focus, float(OS.get_environment("SHOT_ZOOM2")))
+		await get_tree().create_timer(
+			float(OS.get_environment("SHOT_SETTLE")) \
+			if OS.get_environment("SHOT_SETTLE") != "" else 0.3).timeout
+		print("PROBE2 chunks=", view._chunks.size(), " pending=",
+			view._pending.size(), " strategic_vis=", view._strategic.visible,
+			" cam_size=", view.camera.size, " cam_pos=", view.camera.position,
+			" zoom=", view._zoom)
+		var focus_key := Vector2i(int(view._focus.x) / 32, int(view._focus.z) / 32)
+		if view._chunks.has(focus_key):
+			var chunk: Dictionary = view._chunks[focus_key]
+			var root2 := chunk["root"] as Node3D
+			var terrain := root2.get_child(0) as MeshInstance3D
+			print("PROBE3 key=", focus_key, " in_tree=", root2.is_inside_tree(),
+				" vis=", terrain.visible, " surfaces=",
+				terrain.mesh.get_surface_count() if terrain.mesh != null else -1,
+				" aabb=", terrain.get_aabb(), " gpos=", terrain.global_position)
+		else:
+			print("PROBE3 focus chunk NOT RESIDENT: ", focus_key)
 	get_viewport().get_texture().get_image().save_png(_screenshot_path)
 	print("SCREENSHOT saved to ", _screenshot_path)
 	get_tree().quit(0)

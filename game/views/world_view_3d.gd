@@ -114,6 +114,7 @@ var _env: Environment
 ## corridor_keys: {}, cities: {}}
 var _chunks := {}
 var _pending: Array[Vector2i] = []
+var _evict_queue: Array[Vector2i] = []
 var _dragging := false
 var _map_ready := false
 var _stream_dirty := false
@@ -439,15 +440,26 @@ func _process(delta: float) -> void:
 ## chunks-per-frame count stuttered whenever chunks were expensive — the
 ## budget makes streaming cost a bounded slice of every frame instead.
 const BUILD_BUDGET_MS := 6.0
+## ...raised while the queue is deep: healing a zoom transition fast
+## matters more than a perfectly even frame right then
+const BUILD_BUDGET_DEEP_MS := 14.0
+const EVICTS_PER_FRAME := 12
 
 
 func _drain_pending_budgeted() -> void:
+	var freed := 0
+	while not _evict_queue.is_empty() and freed < EVICTS_PER_FRAME:
+		var key: Vector2i = _evict_queue.pop_front()
+		if _chunks.has(key):
+			_free_chunk(key)
+		freed += 1
 	if _pending.is_empty():
 		return
+	var budget := BUILD_BUDGET_DEEP_MS if _pending.size() > 12 else BUILD_BUDGET_MS
 	var t0 := Time.get_ticks_usec()
 	var built := 0
 	while not _pending.is_empty():
-		if built > 0 and (Time.get_ticks_usec() - t0) / 1000.0 > BUILD_BUDGET_MS:
+		if built > 0 and (Time.get_ticks_usec() - t0) / 1000.0 > budget:
 			break
 		_build_chunk(_pending.pop_front())
 		built += 1
@@ -573,16 +585,21 @@ func _update_stream() -> void:
 		var deco := (_chunks[key] as Dictionary).get("deco") as Node3D
 		if deco != null:
 			deco.visible = _deco_visible(key)
-	# evict what fell well outside the ring (hysteresis: EVICT_MARGIN)
+	# evict what fell well outside the ring (hysteresis: EVICT_MARGIN) —
+	# QUEUED, not inline: a birdview->close-zoom transition marks ~70
+	# chunks at once and freeing them in one frame was a multi-hundred-ms
+	# hitch right when the player is zooming (the "torn map" report)
 	var radius := _zoom * VIEW_MARGIN + CHUNK
 	for key: Vector2i in _chunks.keys():
 		if keep.has(key):
+			_evict_queue.erase(key)
 			continue
 		var centre := Vector2((key.x + 0.5) * CHUNK, (key.y + 0.5) * CHUNK)
 		if _zoom > DETAIL_MAX_SIZE \
 				or centre.distance_to(Vector2(_focus.x, _focus.z)) \
 					> radius * EVICT_MARGIN:
-			_free_chunk(key)
+			if not _evict_queue.has(key):
+				_evict_queue.append(key)
 
 
 ## Is this chunk close enough to be worth its trees? Zoomed far out the
