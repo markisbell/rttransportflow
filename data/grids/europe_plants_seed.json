@@ -1,0 +1,4374 @@
+{
+ "version": 1,
+ "source": "Global Power Plant Database v1.3, World Resources Institute (CC-BY 4.0) \u2014 curated per module docstring",
+ "plants": [
+  {
+   "name": "Vuglegirska power station",
+   "country": "UKR",
+   "lat": 48.4652,
+   "lon": 38.2027,
+   "capacity_mw": 3600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Zaporizhia power station",
+   "country": "UKR",
+   "lat": 47.5089,
+   "lon": 34.6253,
+   "capacity_mw": 2825.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Af\u015fin Elbistan Termik Santrali",
+   "country": "TUR",
+   "lat": 38.3537,
+   "lon": 36.981,
+   "capacity_mw": 2795.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Janschwalde power station",
+   "country": "DEU",
+   "lat": 51.8344,
+   "lon": 14.459,
+   "capacity_mw": 2790.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kozienice",
+   "country": "POL",
+   "lat": 51.6658,
+   "lon": 21.4647,
+   "capacity_mw": 2673.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Brindisi Sud power station",
+   "country": "ITA",
+   "lat": 40.5632,
+   "lon": 18.0318,
+   "capacity_mw": 2640.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Moldavskaya GRES",
+   "country": "MDA",
+   "lat": 46.6292,
+   "lon": 29.9407,
+   "capacity_mw": 2520.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Zmiivska power station",
+   "country": "UKR",
+   "lat": 49.5853,
+   "lon": 36.5236,
+   "capacity_mw": 2425.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Burshtyn power station",
+   "country": "UKR",
+   "lat": 49.2104,
+   "lon": 24.6665,
+   "capacity_mw": 2334.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Novocherkasskaya GRES",
+   "country": "RUS",
+   "lat": 47.4,
+   "lon": 40.2333,
+   "capacity_mw": 2214.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Zonguldak Eren (ZETES)",
+   "country": "TUR",
+   "lat": 41.5035,
+   "lon": 31.8875,
+   "capacity_mw": 2090.0,
+   "kind": "coal"
+  },
+  {
+   "name": "West Burton",
+   "country": "GBR",
+   "lat": 53.3604,
+   "lon": -0.8102,
+   "capacity_mw": 2012.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Cottam",
+   "country": "GBR",
+   "lat": 53.304,
+   "lon": -0.7815,
+   "capacity_mw": 2008.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ratcliffe",
+   "country": "GBR",
+   "lat": 52.8653,
+   "lon": -1.255,
+   "capacity_mw": 2000.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Drax",
+   "country": "GBR",
+   "lat": 53.7356,
+   "lon": -0.9911,
+   "capacity_mw": 1980.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Torrevaldaliga Nord power station",
+   "country": "ITA",
+   "lat": 42.1269,
+   "lon": 11.7583,
+   "capacity_mw": 1980.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Eggborough",
+   "country": "GBR",
+   "lat": 53.7116,
+   "lon": -1.1269,
+   "capacity_mw": 1960.0,
+   "kind": "coal"
+  },
+  {
+   "name": "GKM (Mannheim) power station",
+   "country": "DEU",
+   "lat": 49.4452,
+   "lon": 8.4891,
+   "capacity_mw": 1958.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kashirskaya GRES",
+   "country": "RUS",
+   "lat": 54.8581,
+   "lon": 38.2597,
+   "capacity_mw": 1910.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ladyzhyn power station",
+   "country": "UKR",
+   "lat": 48.706,
+   "lon": 29.2202,
+   "capacity_mw": 1800.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Trypilska",
+   "country": "UKR",
+   "lat": 50.1344,
+   "lon": 30.7468,
+   "capacity_mw": 1800.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Rybnik",
+   "country": "POL",
+   "lat": 50.1331,
+   "lon": 18.5232,
+   "capacity_mw": 1775.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Starobeshivska",
+   "country": "UKR",
+   "lat": 47.7997,
+   "lon": 38.0061,
+   "capacity_mw": 1775.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kryvorizka power station",
+   "country": "UKR",
+   "lat": 47.5432,
+   "lon": 33.6583,
+   "capacity_mw": 1764.0,
+   "kind": "coal"
+  },
+  {
+   "name": "TENT A",
+   "country": "SRB",
+   "lat": 44.6711,
+   "lon": 20.1593,
+   "capacity_mw": 1730.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Turceni power station",
+   "country": "ROU",
+   "lat": 44.6694,
+   "lon": 23.408,
+   "capacity_mw": 1650.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Po\u0142aniec",
+   "country": "POL",
+   "lat": 50.4365,
+   "lon": 21.3377,
+   "capacity_mw": 1623.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Eemshaven",
+   "country": "NLD",
+   "lat": 53.4355,
+   "lon": 6.8793,
+   "capacity_mw": 1600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Hamburg-Moorburg",
+   "country": "DEU",
+   "lat": 53.489,
+   "lon": 9.949,
+   "capacity_mw": 1600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Aberthaw B",
+   "country": "GBR",
+   "lat": 51.3873,
+   "lon": -3.4049,
+   "capacity_mw": 1586.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Rheinhafen-Dampfkraftwerk",
+   "country": "DEU",
+   "lat": 49.0134,
+   "lon": 8.3065,
+   "capacity_mw": 1547.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kurakhov power station",
+   "country": "UKR",
+   "lat": 47.9944,
+   "lon": 37.2402,
+   "capacity_mw": 1517.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Opole",
+   "country": "POL",
+   "lat": 50.7514,
+   "lon": 17.8845,
+   "capacity_mw": 1492.0,
+   "kind": "coal"
+  },
+  {
+   "name": "KW Voerde",
+   "country": "DEU",
+   "lat": 51.5765,
+   "lon": 6.6894,
+   "capacity_mw": 1390.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Dolna Odra",
+   "country": "POL",
+   "lat": 53.2067,
+   "lon": 14.4651,
+   "capacity_mw": 1362.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Jaworzno III",
+   "country": "POL",
+   "lat": 50.2064,
+   "lon": 19.2046,
+   "capacity_mw": 1345.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Cenal power station",
+   "country": "TUR",
+   "lat": 40.4167,
+   "lon": 27.3183,
+   "capacity_mw": 1320.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Rovinari power station",
+   "country": "ROU",
+   "lat": 44.9068,
+   "lon": 23.1383,
+   "capacity_mw": 1320.0,
+   "kind": "coal"
+  },
+  {
+   "name": "CHP-22",
+   "country": "RUS",
+   "lat": 55.6341,
+   "lon": 37.8173,
+   "capacity_mw": 1310.0,
+   "kind": "coal"
+  },
+  {
+   "name": "La Spezia power station",
+   "country": "ITA",
+   "lat": 44.1118,
+   "lon": 9.8743,
+   "capacity_mw": 1300.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Zuevskaya power station",
+   "country": "UKR",
+   "lat": 48.0332,
+   "lon": 38.2887,
+   "capacity_mw": 1290.0,
+   "kind": "coal"
+  },
+  {
+   "name": "TENT B",
+   "country": "SRB",
+   "lat": 44.6551,
+   "lon": 20.0053,
+   "capacity_mw": 1270.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Luhanska",
+   "country": "UKR",
+   "lat": 48.7478,
+   "lon": 39.2624,
+   "capacity_mw": 1210.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0130sken Sug\u00f6z\u00fc power station",
+   "country": "TUR",
+   "lat": 36.8346,
+   "lon": 35.8801,
+   "capacity_mw": 1210.0,
+   "kind": "coal"
+  },
+  {
+   "name": "KW Walsum",
+   "country": "DEU",
+   "lat": 51.5267,
+   "lon": 6.7187,
+   "capacity_mw": 1200.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0130skenderun Atlas Termik Santrali",
+   "country": "TUR",
+   "lat": 36.6904,
+   "lon": 36.2084,
+   "capacity_mw": 1200.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0130\u00c7DA\u015e Bekirli-2 power station",
+   "country": "TUR",
+   "lat": 40.3991,
+   "lon": 27.05,
+   "capacity_mw": 1200.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0130\u00c7DA\u015e Biga Termik Santrali",
+   "country": "TUR",
+   "lat": 40.0224,
+   "lon": 26.9777,
+   "capacity_mw": 1200.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Prydniprovska power station",
+   "country": "UKR",
+   "lat": 48.4052,
+   "lon": 35.1135,
+   "capacity_mw": 1195.0,
+   "kind": "coal"
+  },
+  {
+   "name": "CORDEMAIS 4",
+   "country": "FRA",
+   "lat": 47.2756,
+   "lon": -1.8779,
+   "capacity_mw": 1160.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0141aziska",
+   "country": "POL",
+   "lat": 50.1331,
+   "lon": 18.8465,
+   "capacity_mw": 1155.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Staudinger power station",
+   "country": "DEU",
+   "lat": 50.0886,
+   "lon": 8.9534,
+   "capacity_mw": 1132.0,
+   "kind": "coal"
+  },
+  {
+   "name": "LITORAL DE ALMERIA GR 2",
+   "country": "ESP",
+   "lat": 36.9783,
+   "lon": -1.9054,
+   "capacity_mw": 1119.5900000000001,
+   "kind": "coal"
+  },
+  {
+   "name": "Maasvlakte 3",
+   "country": "NLD",
+   "lat": 51.9587,
+   "lon": 4.0272,
+   "capacity_mw": 1100.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kozienice",
+   "country": "POL",
+   "lat": 51.5829,
+   "lon": 21.5478,
+   "capacity_mw": 1075.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kozienice II",
+   "country": "POL",
+   "lat": 51.6668,
+   "lon": 21.4614,
+   "capacity_mw": 1075.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Mintia-Deva power station",
+   "country": "ROU",
+   "lat": 45.9134,
+   "lon": 22.8254,
+   "capacity_mw": 1075.0,
+   "kind": "coal"
+  },
+  {
+   "name": "TERUEL GR 3",
+   "country": "ESP",
+   "lat": 40.9966,
+   "lon": -0.3798,
+   "capacity_mw": 1055.77,
+   "kind": "coal"
+  },
+  {
+   "name": "Westfalen",
+   "country": "DEU",
+   "lat": 51.6805,
+   "lon": 7.9696,
+   "capacity_mw": 1049.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Maasvlakte (MV1 and MV2)",
+   "country": "NLD",
+   "lat": 51.9626,
+   "lon": 4.0217,
+   "capacity_mw": 1040.0,
+   "kind": "coal"
+  },
+  {
+   "name": "COMPOSTILLA II GR 5",
+   "country": "ESP",
+   "lat": 42.6125,
+   "lon": -6.5647,
+   "capacity_mw": 1005.1399999999999,
+   "kind": "coal"
+  },
+  {
+   "name": "EMILE HUCHET",
+   "country": "FRA",
+   "lat": 49.151,
+   "lon": 6.697,
+   "capacity_mw": 995.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Soma power station",
+   "country": "TUR",
+   "lat": 39.1953,
+   "lon": 27.6357,
+   "capacity_mw": 990.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Andrea Palladio power station (FUSINA)",
+   "country": "ITA",
+   "lat": 45.4314,
+   "lon": 12.2468,
+   "capacity_mw": 976.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Moneypoint power station",
+   "country": "IRL",
+   "lat": 52.6074,
+   "lon": -9.4237,
+   "capacity_mw": 915.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Vojany (EVO) Thermal Power Plant Slovakia",
+   "country": "SVK",
+   "lat": 48.5536,
+   "lon": 21.9782,
+   "capacity_mw": 880.0,
+   "kind": "coal"
+  },
+  {
+   "name": "ABONO 2",
+   "country": "ESP",
+   "lat": 43.5528,
+   "lon": -5.7231,
+   "capacity_mw": 877.6600000000001,
+   "kind": "coal"
+  },
+  {
+   "name": "Heyden power station",
+   "country": "DEU",
+   "lat": 52.3828,
+   "lon": 8.996,
+   "capacity_mw": 875.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Chvaletice power station",
+   "country": "CZE",
+   "lat": 50.0275,
+   "lon": 15.4505,
+   "capacity_mw": 820.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Avedoerevaerket (Aved\u00c3\u00b8re)",
+   "country": "DNK",
+   "lat": 55.6035,
+   "lon": 12.4812,
+   "capacity_mw": 815.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Mironovskaya",
+   "country": "UKR",
+   "lat": 48.3407,
+   "lon": 38.4049,
+   "capacity_mw": 815.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Detmarovice power station",
+   "country": "CZE",
+   "lat": 49.9072,
+   "lon": 18.4646,
+   "capacity_mw": 800.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ibbenb\u00fcren-B power station",
+   "country": "DEU",
+   "lat": 52.2888,
+   "lon": 7.7479,
+   "capacity_mw": 794.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Asnaes power station",
+   "country": "DNK",
+   "lat": 55.6615,
+   "lon": 11.0809,
+   "capacity_mw": 787.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Heilbronn power station",
+   "country": "DEU",
+   "lat": 49.1773,
+   "lon": 9.2063,
+   "capacity_mw": 778.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Altbach power station",
+   "country": "DEU",
+   "lat": 48.7176,
+   "lon": 9.3749,
+   "capacity_mw": 769.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Wilhelmshaven power station",
+   "country": "DEU",
+   "lat": 53.5658,
+   "lon": 8.1462,
+   "capacity_mw": 757.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Trianel Kohlekraftwerk L\u00fcnen",
+   "country": "DEU",
+   "lat": 51.6124,
+   "lon": 7.4653,
+   "capacity_mw": 746.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Studstrupvaerket",
+   "country": "DNK",
+   "lat": 56.2521,
+   "lon": 10.3423,
+   "capacity_mw": 730.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Herne power station",
+   "country": "DEU",
+   "lat": 51.5508,
+   "lon": 7.1875,
+   "capacity_mw": 729.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kraftwerk Bexbach",
+   "country": "DEU",
+   "lat": 49.3635,
+   "lon": 7.2371,
+   "capacity_mw": 721.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Bergkamen power station",
+   "country": "DEU",
+   "lat": 51.637,
+   "lon": 7.6191,
+   "capacity_mw": 717.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Nordjylland power station",
+   "country": "DNK",
+   "lat": 57.0736,
+   "lon": 10.0416,
+   "capacity_mw": 716.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u0141agisza",
+   "country": "POL",
+   "lat": 50.3499,
+   "lon": 19.1412,
+   "capacity_mw": 700.0,
+   "kind": "coal"
+  },
+  {
+   "name": "KWM",
+   "country": "DEU",
+   "lat": 52.315,
+   "lon": 10.0914,
+   "capacity_mw": 690.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Scholven power station",
+   "country": "DEU",
+   "lat": 51.6024,
+   "lon": 7.0099,
+   "capacity_mw": 690.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Hemweg power station",
+   "country": "NLD",
+   "lat": 52.4049,
+   "lon": 4.8465,
+   "capacity_mw": 685.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Pego power station",
+   "country": "PRT",
+   "lat": 39.468,
+   "lon": -8.1097,
+   "capacity_mw": 682.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ostro\u0142\u0119ka B",
+   "country": "POL",
+   "lat": 53.1039,
+   "lon": 21.6118,
+   "capacity_mw": 681.0,
+   "kind": "coal"
+  },
+  {
+   "name": "AES Galabovo",
+   "country": "BGR",
+   "lat": 42.1573,
+   "lon": 25.9084,
+   "capacity_mw": 670.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Weiher",
+   "country": "DEU",
+   "lat": 49.3341,
+   "lon": 7.0314,
+   "capacity_mw": 655.6,
+   "kind": "coal"
+  },
+  {
+   "name": "Brindisi Nord power station",
+   "country": "ITA",
+   "lat": 40.6432,
+   "lon": 17.9802,
+   "capacity_mw": 640.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Fiume Santo power station",
+   "country": "ITA",
+   "lat": 40.8461,
+   "lon": 8.3068,
+   "capacity_mw": 640.0,
+   "kind": "coal"
+  },
+  {
+   "name": "KW West",
+   "country": "DEU",
+   "lat": 51.5796,
+   "lon": 6.6789,
+   "capacity_mw": 640.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ledvice power station",
+   "country": "CZE",
+   "lat": 50.5763,
+   "lon": 13.7803,
+   "capacity_mw": 640.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Bobov Dol power station",
+   "country": "BGR",
+   "lat": 42.2855,
+   "lon": 23.0342,
+   "capacity_mw": 630.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Isalnita power station",
+   "country": "ROU",
+   "lat": 44.3886,
+   "lon": 23.718,
+   "capacity_mw": 630.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kemerk\u00f6y power station",
+   "country": "TUR",
+   "lat": 37.0354,
+   "lon": 27.9011,
+   "capacity_mw": 630.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Yata\u011fan power station",
+   "country": "TUR",
+   "lat": 37.3317,
+   "lon": 28.1017,
+   "capacity_mw": 630.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Enstedvaerket",
+   "country": "DNK",
+   "lat": 55.0206,
+   "lon": 9.4419,
+   "capacity_mw": 626.0,
+   "kind": "coal"
+  },
+  {
+   "name": "EC Siekierki",
+   "country": "POL",
+   "lat": 52.1901,
+   "lon": 21.0873,
+   "capacity_mw": 620.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Ptolemais",
+   "country": "GRC",
+   "lat": 40.4809,
+   "lon": 21.7274,
+   "capacity_mw": 620.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Togliatti",
+   "country": "RUS",
+   "lat": 53.5472,
+   "lon": 49.4539,
+   "capacity_mw": 620.0,
+   "kind": "coal"
+  },
+  {
+   "name": "\u00c7ay\u0131rhan power station",
+   "country": "TUR",
+   "lat": 40.097,
+   "lon": 31.6954,
+   "capacity_mw": 620.0,
+   "kind": "coal"
+  },
+  {
+   "name": "LA ROBLA GRUPO 2",
+   "country": "ESP",
+   "lat": 42.7924,
+   "lon": -5.634,
+   "capacity_mw": 619.06,
+   "kind": "coal"
+  },
+  {
+   "name": "Amyntaio power station",
+   "country": "GRC",
+   "lat": 40.6192,
+   "lon": 21.6832,
+   "capacity_mw": 600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Seyit\u00f6mer power station",
+   "country": "TUR",
+   "lat": 39.5736,
+   "lon": 29.8822,
+   "capacity_mw": 600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Slavyansk power station",
+   "country": "UKR",
+   "lat": 48.872,
+   "lon": 37.7657,
+   "capacity_mw": 600.0,
+   "kind": "coal"
+  },
+  {
+   "name": "PROVENCE 5",
+   "country": "FRA",
+   "lat": 43.4672,
+   "lon": 5.4875,
+   "capacity_mw": 595.0,
+   "kind": "coal"
+  },
+  {
+   "name": "GELDERLAND",
+   "country": "NLD",
+   "lat": 51.8561,
+   "lon": 5.8294,
+   "capacity_mw": 590.0,
+   "kind": "coal"
+  },
+  {
+   "name": "HAVRE 4",
+   "country": "FRA",
+   "lat": 49.4757,
+   "lon": 0.1491,
+   "capacity_mw": 580.0,
+   "kind": "coal"
+  },
+  {
+   "name": "LOS BARRIOS",
+   "country": "ESP",
+   "lat": 36.1828,
+   "lon": -5.42,
+   "capacity_mw": 570.05,
+   "kind": "coal"
+  },
+  {
+   "name": "Meri-Pori",
+   "country": "FIN",
+   "lat": 61.6317,
+   "lon": 21.4068,
+   "capacity_mw": 565.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Berlin-Reuter-West power station",
+   "country": "DEU",
+   "lat": 52.5351,
+   "lon": 13.2426,
+   "capacity_mw": 564.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Frimmersdorf power station",
+   "country": "DEU",
+   "lat": 51.0574,
+   "lon": 6.5771,
+   "capacity_mw": 562.0,
+   "kind": "coal"
+  },
+  {
+   "name": "MEIRAMA GRUPO 1",
+   "country": "ESP",
+   "lat": 43.1685,
+   "lon": -8.4111,
+   "capacity_mw": 557.2,
+   "kind": "coal"
+  },
+  {
+   "name": "NARCEA GRUPO 3",
+   "country": "ESP",
+   "lat": 43.2924,
+   "lon": -6.3937,
+   "capacity_mw": 553.6400000000001,
+   "kind": "coal"
+  },
+  {
+   "name": "Siersza",
+   "country": "POL",
+   "lat": 50.2083,
+   "lon": 19.4617,
+   "capacity_mw": 546.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Kangal power station",
+   "country": "TUR",
+   "lat": 39.0774,
+   "lon": 37.2958,
+   "capacity_mw": 537.0,
+   "kind": "coal"
+  },
+  {
+   "name": "ALCUDIA 1  GRUPO N 1",
+   "country": "ESP",
+   "lat": 39.8106,
+   "lon": 3.0913,
+   "capacity_mw": 533.8,
+   "kind": "coal"
+  },
+  {
+   "name": "Kilroot",
+   "country": "GBR",
+   "lat": 54.7255,
+   "lon": -5.7653,
+   "capacity_mw": 520.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Novaky (ENO) Thermal CHP Power Plant Slovakia",
+   "country": "SVK",
+   "lat": 48.6988,
+   "lon": 18.5335,
+   "capacity_mw": 518.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Rostock power station",
+   "country": "DEU",
+   "lat": 54.1428,
+   "lon": 12.1329,
+   "capacity_mw": 514.0,
+   "kind": "coal"
+  },
+  {
+   "name": "Dobrotvir power station",
+   "country": "UKR",
+   "lat": 50.2133,
+   "lon": 24.375,
+   "capacity_mw": 500.0,
+   "kind": "coal"
+  },
+  {
+   "name": "CHP-23",
+   "country": "RUS",
+   "lat": 55.9162,
+   "lon": 37.6879,
+   "capacity_mw": 5690.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Krostromskaya",
+   "country": "RUS",
+   "lat": 57.4596,
+   "lon": 41.1741,
+   "capacity_mw": 3600.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "MONTALTO (Alessandro Volta)",
+   "country": "ITA",
+   "lat": 42.3572,
+   "lon": 11.5373,
+   "capacity_mw": 3446.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Kirishskaya GRES",
+   "country": "RUS",
+   "lat": 59.4892,
+   "lon": 32.0503,
+   "capacity_mw": 2595.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Konakovskaya",
+   "country": "RUS",
+   "lat": 56.741,
+   "lon": 36.7707,
+   "capacity_mw": 2520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Eems",
+   "country": "NLD",
+   "lat": 53.4441,
+   "lon": 6.856,
+   "capacity_mw": 2465.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Lukoml Thermal Power Plant Belarus",
+   "country": "BLR",
+   "lat": 54.6803,
+   "lon": 29.1341,
+   "capacity_mw": 2460.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Stavropolskaya GRES",
+   "country": "RUS",
+   "lat": 45.3122,
+   "lon": 41.5111,
+   "capacity_mw": 2415.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Pembroke",
+   "country": "GBR",
+   "lat": 51.685,
+   "lon": -4.99,
+   "capacity_mw": 2180.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Gersteinwerk",
+   "country": "DEU",
+   "lat": 51.6725,
+   "lon": 7.7099,
+   "capacity_mw": 2004.5,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Emsland",
+   "country": "DEU",
+   "lat": 52.4819,
+   "lon": 7.3067,
+   "capacity_mw": 1837.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHP-21",
+   "country": "RUS",
+   "lat": 55.8947,
+   "lon": 37.5107,
+   "capacity_mw": 1800.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Elektrenai (Lithuania) Thermal Power Plant Lithuania",
+   "country": "LTU",
+   "lat": 54.7701,
+   "lon": 24.6474,
+   "capacity_mw": 1800.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Staythorpe C",
+   "country": "GBR",
+   "lat": 53.073,
+   "lon": -0.8585,
+   "capacity_mw": 1772.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "BESOS  GRUPO 5",
+   "country": "ESP",
+   "lat": 41.4196,
+   "lon": 2.2294,
+   "capacity_mw": 1670.81,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Enka Gebze Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.7638,
+   "lon": 30.393,
+   "capacity_mw": 1595.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ARCOS DE LA FRONTERA GRUPO 1",
+   "country": "ESP",
+   "lat": 36.6721,
+   "lon": -5.8164,
+   "capacity_mw": 1585.3899999999999,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Nevinnomysskya",
+   "country": "RUS",
+   "lat": 44.6595,
+   "lon": 41.9294,
+   "capacity_mw": 1530.2,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Enka \u0130zmir Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 38.7467,
+   "lon": 26.9563,
+   "capacity_mw": 1520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TAVAZZANO",
+   "country": "ITA",
+   "lat": 45.3325,
+   "lon": 9.4364,
+   "capacity_mw": 1520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Erbil",
+   "country": "IRQ",
+   "lat": 36.0084,
+   "lon": 43.9169,
+   "capacity_mw": 1500.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Shaturskaya GRES",
+   "country": "RUS",
+   "lat": 55.5833,
+   "lon": 39.5611,
+   "capacity_mw": 1493.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TORREVALDALIGA South",
+   "country": "ITA",
+   "lat": 42.1241,
+   "lon": 11.7624,
+   "capacity_mw": 1488.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Didcot B",
+   "country": "GBR",
+   "lat": 51.6246,
+   "lon": -1.2683,
+   "capacity_mw": 1470.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "LA CASELLA C.LE",
+   "country": "ITA",
+   "lat": 45.0904,
+   "lon": 9.4805,
+   "capacity_mw": 1465.85,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "OSTIGLIA",
+   "country": "ITA",
+   "lat": 45.0603,
+   "lon": 11.1374,
+   "capacity_mw": 1457.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Bursa Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.2952,
+   "lon": 29.0736,
+   "capacity_mw": 1432.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Grain CHP",
+   "country": "GBR",
+   "lat": 51.4444,
+   "lon": 0.7114,
+   "capacity_mw": 1404.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Gemeinschaftskraftwerk Irsching",
+   "country": "DEU",
+   "lat": 48.767,
+   "lon": 11.58,
+   "capacity_mw": 1391.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Connahs Quay",
+   "country": "GBR",
+   "lat": 53.2317,
+   "lon": -3.0815,
+   "capacity_mw": 1380.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "VADO Ligure",
+   "country": "ITA",
+   "lat": 44.2755,
+   "lon": 8.4305,
+   "capacity_mw": 1353.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ambarl\u0131 B Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.9834,
+   "lon": 28.6921,
+   "capacity_mw": 1351.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "West Burton CCGT",
+   "country": "GBR",
+   "lat": 53.3631,
+   "lon": -0.7976,
+   "capacity_mw": 1332.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Magnum",
+   "country": "NLD",
+   "lat": 53.4502,
+   "lon": 6.8548,
+   "capacity_mw": 1311.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "South Humber Bank",
+   "country": "GBR",
+   "lat": 53.6008,
+   "lon": -0.1446,
+   "capacity_mw": 1310.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Simmering",
+   "country": "AUT",
+   "lat": 48.1815,
+   "lon": 16.4334,
+   "capacity_mw": 1272.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ENIPOWER BRINDISI",
+   "country": "ITA",
+   "lat": 40.6293,
+   "lon": 18.0033,
+   "capacity_mw": 1260.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CARTAGENA GRUPO 1",
+   "country": "ESP",
+   "lat": 37.5732,
+   "lon": -0.9392,
+   "capacity_mw": 1248.82,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "VPI Immingham",
+   "country": "GBR",
+   "lat": 53.6366,
+   "lon": -0.2395,
+   "capacity_mw": 1240.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TERMINI IMERESE C.LE",
+   "country": "ITA",
+   "lat": 37.9684,
+   "lon": 13.7512,
+   "capacity_mw": 1235.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CCC SAGUNTO  GRUPO 2",
+   "country": "ESP",
+   "lat": 39.6426,
+   "lon": -0.2344,
+   "capacity_mw": 1232.19,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Knapsack Natural Gas I",
+   "country": "DEU",
+   "lat": 50.8617,
+   "lon": 6.8424,
+   "capacity_mw": 1230.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Yuzhnaya Tets",
+   "country": "RUS",
+   "lat": 59.8276,
+   "lon": 30.4512,
+   "capacity_mw": 1207.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Hadjret Ennous",
+   "country": "DZA",
+   "lat": 36.5767,
+   "lon": 2.0797,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Kiev CHP-5",
+   "country": "UKR",
+   "lat": 50.532,
+   "lon": 30.6625,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Koudiet Eddraouch",
+   "country": "DZA",
+   "lat": 36.885,
+   "lon": 8.0778,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Saltend",
+   "country": "GBR",
+   "lat": 53.735,
+   "lon": -0.2432,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Terga",
+   "country": "DZA",
+   "lat": 35.4608,
+   "lon": -1.2295,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Peterhead",
+   "country": "GBR",
+   "lat": 57.4772,
+   "lon": -1.7889,
+   "capacity_mw": 1180.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ribatejo",
+   "country": "PRT",
+   "lat": 39.0118,
+   "lon": -8.9521,
+   "capacity_mw": 1176.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHP Volga Car",
+   "country": "RUS",
+   "lat": 53.575,
+   "lon": 49.2453,
+   "capacity_mw": 1172.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PALOS DE LA FRONTERA GRUPO 1",
+   "country": "ESP",
+   "lat": 37.1843,
+   "lon": -6.8857,
+   "capacity_mw": 1167.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Hamitabat Termik Santrali",
+   "country": "TUR",
+   "lat": 41.4827,
+   "lon": 27.3366,
+   "capacity_mw": 1156.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SERMIDE",
+   "country": "ITA",
+   "lat": 45.0265,
+   "lon": 11.2522,
+   "capacity_mw": 1151.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Aksa Antalya Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 37.1203,
+   "lon": 30.6016,
+   "capacity_mw": 1150.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHP-20",
+   "country": "RUS",
+   "lat": 55.7001,
+   "lon": 37.586,
+   "capacity_mw": 1150.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Bereza SDPP Thermal Power Plant Belarus",
+   "country": "BLR",
+   "lat": 52.4538,
+   "lon": 25.1926,
+   "capacity_mw": 1130.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHIVASSO",
+   "country": "ITA",
+   "lat": 45.1856,
+   "lon": 7.9016,
+   "capacity_mw": 1123.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Krasnodar TPP",
+   "country": "RUS",
+   "lat": 45.0178,
+   "lon": 39.0608,
+   "capacity_mw": 1120.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Hrazadan",
+   "country": "ARM",
+   "lat": 40.564,
+   "lon": 44.7479,
+   "capacity_mw": 1110.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Minsk-4 CHP CCGT Power Plant",
+   "country": "BLR",
+   "lat": 53.872,
+   "lon": 27.4022,
+   "capacity_mw": 1035.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Duhok",
+   "country": "IRQ",
+   "lat": 36.9445,
+   "lon": 42.7817,
+   "capacity_mw": 1000.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "FLEVO",
+   "country": "NLD",
+   "lat": 52.5772,
+   "lon": 5.53,
+   "capacity_mw": 999.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Tapada do Outeiro",
+   "country": "PRT",
+   "lat": 41.07,
+   "lon": -8.4587,
+   "capacity_mw": 990.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Tabriz",
+   "country": "IRN",
+   "lat": 38.0093,
+   "lon": 46.0981,
+   "capacity_mw": 987.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Msila 1",
+   "country": "DZA",
+   "lat": 35.7071,
+   "lon": 4.4804,
+   "capacity_mw": 980.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ENIPOWER RAVENNA",
+   "country": "ITA",
+   "lat": 45.512,
+   "lon": 9.509,
+   "capacity_mw": 972.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Cassano d\u2019Adda",
+   "country": "ITA",
+   "lat": 45.5115,
+   "lon": 9.5098,
+   "capacity_mw": 969.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ardebil Sabalan",
+   "country": "IRN",
+   "lat": 38.5315,
+   "lon": 48.1818,
+   "capacity_mw": 954.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Orumia",
+   "country": "IRN",
+   "lat": 37.3457,
+   "lon": 45.2651,
+   "capacity_mw": 951.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Band\u0131rma Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.3786,
+   "lon": 27.9116,
+   "capacity_mw": 931.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "MARTIGUES PONTEAU",
+   "country": "FRA",
+   "lat": 43.3585,
+   "lon": 5.0216,
+   "capacity_mw": 930.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Paresar",
+   "country": "IRN",
+   "lat": 37.6378,
+   "lon": 49.0849,
+   "capacity_mw": 930.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Langage",
+   "country": "GBR",
+   "lat": 50.3882,
+   "lon": -4.0118,
+   "capacity_mw": 905.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Erzin Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 36.9271,
+   "lon": 36.0534,
+   "capacity_mw": 904.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Carrington",
+   "country": "GBR",
+   "lat": 53.4366,
+   "lon": -2.4077,
+   "capacity_mw": 900.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Kaliningradskaya",
+   "country": "RUS",
+   "lat": 54.6619,
+   "lon": 20.5908,
+   "capacity_mw": 900.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Severo-Zapadnaya",
+   "country": "RUS",
+   "lat": 60.016,
+   "lon": 30.0978,
+   "capacity_mw": 900.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "OMV Samsun Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 41.24,
+   "lon": 36.4767,
+   "capacity_mw": 887.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Maxima",
+   "country": "NLD",
+   "lat": 52.5772,
+   "lon": 5.53,
+   "capacity_mw": 880.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Spalding",
+   "country": "GBR",
+   "lat": 52.773,
+   "lon": -0.1441,
+   "capacity_mw": 880.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Sloe",
+   "country": "NLD",
+   "lat": 51.4482,
+   "lon": 3.6928,
+   "capacity_mw": 870.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PUERTO DE BARCELONA  GRUPO 2",
+   "country": "ESP",
+   "lat": 41.3366,
+   "lon": 2.1594,
+   "capacity_mw": 866.3,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Tiszai Er\u0151m\u0171",
+   "country": "HUN",
+   "lat": 47.9178,
+   "lon": 21.0784,
+   "capacity_mw": 864.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Riga Tec 2",
+   "country": "LVA",
+   "lat": 56.918,
+   "lon": 24.2766,
+   "capacity_mw": 863.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TPP CCCC Petrom Brazi",
+   "country": "ROU",
+   "lat": 44.8802,
+   "lon": 25.9988,
+   "capacity_mw": 860.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CTCC AS PONTES  GRUPO 5",
+   "country": "ESP",
+   "lat": 43.4451,
+   "lon": -7.8621,
+   "capacity_mw": 855.67,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CTCC SOTO DE RIBERA  GRUPO 5",
+   "country": "ESP",
+   "lat": 43.3161,
+   "lon": -5.8777,
+   "capacity_mw": 854.1700000000001,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ulyanovsk TPP-1",
+   "country": "RUS",
+   "lat": 54.3472,
+   "lon": 48.625,
+   "capacity_mw": 852.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Severn Power",
+   "country": "GBR",
+   "lat": 51.5475,
+   "lon": -2.975,
+   "capacity_mw": 850.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Yaroslavl TPP-1",
+   "country": "RUS",
+   "lat": 57.5506,
+   "lon": 39.7711,
+   "capacity_mw": 850.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Cengiz Enerji Samsun",
+   "country": "TUR",
+   "lat": 41.2393,
+   "lon": 36.4799,
+   "capacity_mw": 849.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Marchwood",
+   "country": "GBR",
+   "lat": 50.8998,
+   "lon": -1.4384,
+   "capacity_mw": 842.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Dunamenti Er\u0151m\u0171",
+   "country": "HUN",
+   "lat": 47.3283,
+   "lon": 18.9169,
+   "capacity_mw": 840.7,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "GISSI",
+   "country": "ITA",
+   "lat": 42.0502,
+   "lon": 14.5639,
+   "capacity_mw": 840.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Gardabani (Tbilisi) Thermal Power Plant Georgia",
+   "country": "GEO",
+   "lat": 41.4728,
+   "lon": 45.0635,
+   "capacity_mw": 840.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Marsat",
+   "country": "DZA",
+   "lat": 35.8,
+   "lon": -0.1924,
+   "capacity_mw": 840.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Po\u010derady",
+   "country": "CZE",
+   "lat": 50.4267,
+   "lon": 13.6747,
+   "capacity_mw": 840.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CTCC CASTELLON  GRUPO 4",
+   "country": "ESP",
+   "lat": 39.9592,
+   "lon": -0.001,
+   "capacity_mw": 839.35,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Trianel Natural Gaskraftwerk",
+   "country": "DEU",
+   "lat": 51.6739,
+   "lon": 7.9291,
+   "capacity_mw": 838.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Pego C.C.",
+   "country": "PRT",
+   "lat": 39.4689,
+   "lon": -8.1113,
+   "capacity_mw": 837.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CENTRALE DI SCANDALE",
+   "country": "ITA",
+   "lat": 39.1022,
+   "lon": 17.0325,
+   "capacity_mw": 826.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "EMILE HUCHET",
+   "country": "FRA",
+   "lat": 49.1526,
+   "lon": 6.7018,
+   "capacity_mw": 826.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Lares",
+   "country": "PRT",
+   "lat": 40.1245,
+   "lon": -8.775,
+   "capacity_mw": 826.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Franken 1",
+   "country": "DEU",
+   "lat": 49.4208,
+   "lon": 11.0077,
+   "capacity_mw": 823.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CCC BAHIA DE ALGECIRAS",
+   "country": "ESP",
+   "lat": 36.1829,
+   "lon": -5.3905,
+   "capacity_mw": 820.536,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CTCC PLANA DEL VENT 2",
+   "country": "ESP",
+   "lat": 40.9596,
+   "lon": 0.8692,
+   "capacity_mw": 819.03,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Sutton Bridge",
+   "country": "GBR",
+   "lat": 52.7579,
+   "lon": 0.1923,
+   "capacity_mw": 819.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ambarl\u0131 A Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.9793,
+   "lon": 28.6994,
+   "capacity_mw": 816.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CTCC ESCOMBRERAS",
+   "country": "ESP",
+   "lat": 37.5732,
+   "lon": -0.9392,
+   "capacity_mw": 815.64,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SKS IPP SNC Lavalin",
+   "country": "DZA",
+   "lat": 36.8789,
+   "lon": 6.9366,
+   "capacity_mw": 815.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Seabank 1",
+   "country": "GBR",
+   "lat": 51.5392,
+   "lon": -2.67,
+   "capacity_mw": 812.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Megalopolis V",
+   "country": "GRC",
+   "lat": 37.418,
+   "lon": 22.1083,
+   "capacity_mw": 811.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Rocksavage",
+   "country": "GBR",
+   "lat": 53.3147,
+   "lon": -2.7232,
+   "capacity_mw": 810.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ALTOMONTE",
+   "country": "ITA",
+   "lat": 39.7118,
+   "lon": 16.215,
+   "capacity_mw": 808.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PIACENZA",
+   "country": "ITA",
+   "lat": 45.0543,
+   "lon": 9.7086,
+   "capacity_mw": 806.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Damhead Creek",
+   "country": "GBR",
+   "lat": 51.4249,
+   "lon": 0.6014,
+   "capacity_mw": 805.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ESCATRON",
+   "country": "ESP",
+   "lat": 41.2977,
+   "lon": -0.3376,
+   "capacity_mw": 804.36,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "E.ON C.TE LIVORNO FERRARIS",
+   "country": "ITA",
+   "lat": 45.2372,
+   "lon": 8.1932,
+   "capacity_mw": 804.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TARRAGONA",
+   "country": "ESP",
+   "lat": 41.1081,
+   "lon": 1.1912,
+   "capacity_mw": 802.84,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CENTRALE DI TURANO LODIGIANO - BERTONICO (LO)",
+   "country": "ITA",
+   "lat": 45.2268,
+   "lon": 9.6377,
+   "capacity_mw": 800.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Coryton",
+   "country": "GBR",
+   "lat": 51.5119,
+   "lon": 0.5079,
+   "capacity_mw": 800.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SORGENIA PUGLIA CENTRALE DI MODUGNO",
+   "country": "ITA",
+   "lat": 41.1025,
+   "lon": 16.756,
+   "capacity_mw": 800.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Baymina Ankara Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 39.7773,
+   "lon": 32.4022,
+   "capacity_mw": 798.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CASTEJON  GRUPO 2",
+   "country": "ESP",
+   "lat": 42.1718,
+   "lon": -1.6773,
+   "capacity_mw": 797.41,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "DK6",
+   "country": "FRA",
+   "lat": 51.0482,
+   "lon": 2.3255,
+   "capacity_mw": 796.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SAN ROQUE GRUPO 2",
+   "country": "ESP",
+   "lat": 36.1955,
+   "lon": -5.4131,
+   "capacity_mw": 791.6800000000001,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CICLO COMBINADO DE CASTELNOU",
+   "country": "ESP",
+   "lat": 41.2167,
+   "lon": -0.2928,
+   "capacity_mw": 790.68,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CCGT APRILIA",
+   "country": "ITA",
+   "lat": 41.5616,
+   "lon": 12.6337,
+   "capacity_mw": 787.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "AMOREBIETA",
+   "country": "ESP",
+   "lat": 43.2347,
+   "lon": -2.7497,
+   "capacity_mw": 786.42,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TORVISCOSA",
+   "country": "ITA",
+   "lat": 45.817,
+   "lon": 13.2891,
+   "capacity_mw": 785.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ARRUBAL GRUPO 1",
+   "country": "ESP",
+   "lat": 42.4194,
+   "lon": -2.2511,
+   "capacity_mw": 784.7,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CASTELLON",
+   "country": "ESP",
+   "lat": 39.9592,
+   "lon": -0.001,
+   "capacity_mw": 782.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CAMPO DE GIBRALTAR GRUPO 20",
+   "country": "ESP",
+   "lat": 36.1834,
+   "lon": -5.3933,
+   "capacity_mw": 780.6600000000001,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHP-16",
+   "country": "RUS",
+   "lat": 55.7833,
+   "lon": 37.5022,
+   "capacity_mw": 780.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Janub",
+   "country": "AZE",
+   "lat": 39.8943,
+   "lon": 48.9173,
+   "capacity_mw": 780.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "MONCALIERI",
+   "country": "ITA",
+   "lat": 44.993,
+   "lon": 7.6755,
+   "capacity_mw": 780.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Minsk-5 CHP CCGT Power Plant",
+   "country": "BLR",
+   "lat": 53.612,
+   "lon": 27.954,
+   "capacity_mw": 780.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Turcas Denizli Do\u011falgaz S.",
+   "country": "TUR",
+   "lat": 37.8504,
+   "lon": 29.4152,
+   "capacity_mw": 775.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Kazan CHP 3",
+   "country": "RUS",
+   "lat": 55.8674,
+   "lon": 48.9521,
+   "capacity_mw": 772.64,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Enka Adapazar\u0131 Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.866,
+   "lon": 30.3873,
+   "capacity_mw": 770.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ENERGIA MOLISE",
+   "country": "ITA",
+   "lat": 41.9369,
+   "lon": 15.0004,
+   "capacity_mw": 769.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "RIZZICONI",
+   "country": "ITA",
+   "lat": 38.4453,
+   "lon": 15.99,
+   "capacity_mw": 760.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SIMERI CRICHI",
+   "country": "ITA",
+   "lat": 38.8759,
+   "lon": 16.6569,
+   "capacity_mw": 760.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SPARANISE",
+   "country": "ITA",
+   "lat": 41.1783,
+   "lon": 14.1129,
+   "capacity_mw": 760.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ACECA  GRUPO 4",
+   "country": "ESP",
+   "lat": 39.9427,
+   "lon": -3.8548,
+   "capacity_mw": 758.74,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "LEVANTE",
+   "country": "ITA",
+   "lat": 45.4458,
+   "lon": 12.2552,
+   "capacity_mw": 752.5,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TPP Iernut",
+   "country": "ROU",
+   "lat": 46.4677,
+   "lon": 24.1833,
+   "capacity_mw": 751.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PORTO CORSINI",
+   "country": "ITA",
+   "lat": 44.4836,
+   "lon": 12.2652,
+   "capacity_mw": 750.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PRIOLO C.LE",
+   "country": "ITA",
+   "lat": 37.14,
+   "lon": 15.2159,
+   "capacity_mw": 750.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "BAHIA DE ALGECIRAS I",
+   "country": "ESP",
+   "lat": 36.1829,
+   "lon": -5.3905,
+   "capacity_mw": 731.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Lavrio",
+   "country": "GRC",
+   "lat": 37.7463,
+   "lon": 24.0666,
+   "capacity_mw": 723.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Little Barford",
+   "country": "GBR",
+   "lat": 52.2046,
+   "lon": -0.2693,
+   "capacity_mw": 720.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Rye House",
+   "country": "GBR",
+   "lat": 51.7626,
+   "lon": 0.0094,
+   "capacity_mw": 715.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Medway",
+   "country": "GBR",
+   "lat": 51.4396,
+   "lon": 0.6894,
+   "capacity_mw": 700.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Rades A1",
+   "country": "TUN",
+   "lat": 36.7967,
+   "lon": 10.283,
+   "capacity_mw": 700.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Sabalan",
+   "country": "IRN",
+   "lat": 37.2928,
+   "lon": 48.3658,
+   "capacity_mw": 696.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Diemen 33",
+   "country": "NLD",
+   "lat": 52.3389,
+   "lon": 5.0213,
+   "capacity_mw": 684.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ras Djinet",
+   "country": "DZA",
+   "lat": 36.8509,
+   "lon": 3.6983,
+   "capacity_mw": 672.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Saratov HPP-2",
+   "country": "RUS",
+   "lat": 51.6239,
+   "lon": 46.0097,
+   "capacity_mw": 669.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Soltaniyeh",
+   "country": "IRN",
+   "lat": 36.5636,
+   "lon": 48.8042,
+   "capacity_mw": 648.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Pravoberezhnaya CHPP-5",
+   "country": "RUS",
+   "lat": 59.8746,
+   "lon": 30.5035,
+   "capacity_mw": 643.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TPP-2",
+   "country": "RUS",
+   "lat": 47.2161,
+   "lon": 39.5794,
+   "capacity_mw": 642.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "V\u00e4rme",
+   "country": "SWE",
+   "lat": 59.3532,
+   "lon": 18.0985,
+   "capacity_mw": 639.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Sanandaj",
+   "country": "IRN",
+   "lat": 35.3954,
+   "lon": 47.0306,
+   "capacity_mw": 636.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Charlottenburg",
+   "country": "DEU",
+   "lat": 52.5219,
+   "lon": 13.3111,
+   "capacity_mw": 633.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "SARLUX",
+   "country": "ITA",
+   "lat": 39.1037,
+   "lon": 9.0063,
+   "capacity_mw": 630.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Smolenskaya GRES",
+   "country": "RUS",
+   "lat": 55.6056,
+   "lon": 32.4139,
+   "capacity_mw": 630.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ballylumford C",
+   "country": "GBR",
+   "lat": 54.8428,
+   "lon": -5.7853,
+   "capacity_mw": 616.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Bandirma 2 Do\u011falgaz Santrali",
+   "country": "TUR",
+   "lat": 40.3083,
+   "lon": 27.7687,
+   "capacity_mw": 607.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Huckingen",
+   "country": "DEU",
+   "lat": 51.3679,
+   "lon": 6.7167,
+   "capacity_mw": 606.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "CHP-8",
+   "country": "RUS",
+   "lat": 55.7242,
+   "lon": 37.6966,
+   "capacity_mw": 605.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Baiji",
+   "country": "IRQ",
+   "lat": 35.0296,
+   "lon": 43.5592,
+   "capacity_mw": 600.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Killingholme",
+   "country": "GBR",
+   "lat": 53.6535,
+   "lon": -0.2556,
+   "capacity_mw": 600.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Vladmir Branch",
+   "country": "RUS",
+   "lat": 56.1448,
+   "lon": 40.4546,
+   "capacity_mw": 596.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "TPP-3 (R.E. Klasson)",
+   "country": "RUS",
+   "lat": 55.8833,
+   "lon": 38.7833,
+   "capacity_mw": 589.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Jijel",
+   "country": "DZA",
+   "lat": 36.8139,
+   "lon": 5.876,
+   "capacity_mw": 588.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Dormagen",
+   "country": "DEU",
+   "lat": 51.0791,
+   "lon": 6.8287,
+   "capacity_mw": 586.3,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Dzerzhinsk TPP",
+   "country": "RUS",
+   "lat": 56.2336,
+   "lon": 43.5208,
+   "capacity_mw": 580.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "BOUCHAIN 7",
+   "country": "FRA",
+   "lat": 50.2987,
+   "lon": 3.3156,
+   "capacity_mw": 575.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Arbaa",
+   "country": "DZA",
+   "lat": 36.5988,
+   "lon": 3.1375,
+   "capacity_mw": 560.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "\u0130\u00e7 Anadolu Do\u011falgaz Kombine \u00c7evrim Santrali",
+   "country": "TUR",
+   "lat": 39.7575,
+   "lon": 33.448,
+   "capacity_mw": 560.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Yerevan",
+   "country": "ARM",
+   "lat": 40.1138,
+   "lon": 44.5038,
+   "capacity_mw": 550.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Gomel-2 CHP Power Plant Belarus",
+   "country": "BLR",
+   "lat": 52.4492,
+   "lon": 30.8167,
+   "capacity_mw": 544.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Zayzoun (Zayzun) CCGT Power Plant Syria",
+   "country": "SYR",
+   "lat": 35.737,
+   "lon": 36.362,
+   "capacity_mw": 544.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Minsk-3 CHP CCGT Power Plant",
+   "country": "BLR",
+   "lat": 53.8799,
+   "lon": 27.6476,
+   "capacity_mw": 542.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Volzhskaya HPP 1",
+   "country": "RUS",
+   "lat": 48.8242,
+   "lon": 44.8178,
+   "capacity_mw": 541.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ballylumford B",
+   "country": "GBR",
+   "lat": 54.845,
+   "lon": -5.787,
+   "capacity_mw": 540.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Karkov CHP-5",
+   "country": "UKR",
+   "lat": 49.9719,
+   "lon": 36.107,
+   "capacity_mw": 540.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Delesto",
+   "country": "NLD",
+   "lat": 53.3185,
+   "lon": 6.9544,
+   "capacity_mw": 530.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ivanovskaya CHPP-3",
+   "country": "RUS",
+   "lat": 56.9907,
+   "lon": 41.0113,
+   "capacity_mw": 530.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Aghada",
+   "country": "IRL",
+   "lat": 51.8347,
+   "lon": -8.2362,
+   "capacity_mw": 528.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Sumqayit",
+   "country": "AZE",
+   "lat": 40.6036,
+   "lon": 49.6332,
+   "capacity_mw": 525.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Pervomaiskaya TPP-14",
+   "country": "RUS",
+   "lat": 59.8731,
+   "lon": 30.2467,
+   "capacity_mw": 524.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "ISAB ENERGY",
+   "country": "ITA",
+   "lat": 37.1399,
+   "lon": 15.2158,
+   "capacity_mw": 521.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Ain Djasser",
+   "country": "DZA",
+   "lat": 35.8665,
+   "lon": 6.0262,
+   "capacity_mw": 520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Baglan Bay CCGT",
+   "country": "GBR",
+   "lat": 51.6145,
+   "lon": -3.8352,
+   "capacity_mw": 520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Naturkraft CCPP",
+   "country": "NOR",
+   "lat": 59.2751,
+   "lon": 5.5129,
+   "capacity_mw": 520.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Deeside",
+   "country": "GBR",
+   "lat": 53.2332,
+   "lon": -3.0547,
+   "capacity_mw": 515.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Lipetsk CHPP-2",
+   "country": "RUS",
+   "lat": 52.5896,
+   "lon": 39.4944,
+   "capacity_mw": 515.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Novopolotsk Thermal Power Plant Belarus",
+   "country": "BLR",
+   "lat": 55.5265,
+   "lon": 28.549,
+   "capacity_mw": 505.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "Severnaya CHPP-21",
+   "country": "RUS",
+   "lat": 60.0758,
+   "lon": 30.4744,
+   "capacity_mw": 500.0,
+   "kind": "gas_ccgt"
+  },
+  {
+   "name": "PORTO TOLLE",
+   "country": "ITA",
+   "lat": 44.9569,
+   "lon": 12.4883,
+   "capacity_mw": 2640.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Azerbaijan TPP",
+   "country": "AZE",
+   "lat": 40.78,
+   "lon": 46.9901,
+   "capacity_mw": 2400.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "PORCHEVILLE",
+   "country": "FRA",
+   "lat": 48.9692,
+   "lon": 1.7588,
+   "capacity_mw": 2290.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Al-Shemal",
+   "country": "IRQ",
+   "lat": 36.0547,
+   "lon": 43.2961,
+   "capacity_mw": 2100.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "TURBIGO",
+   "country": "ITA",
+   "lat": 45.5201,
+   "lon": 8.7422,
+   "capacity_mw": 1569.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "CORDEMAIS",
+   "country": "FRA",
+   "lat": 47.2754,
+   "lon": -1.8767,
+   "capacity_mw": 1370.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Eesti Elektrijaam",
+   "country": "EST",
+   "lat": 59.2748,
+   "lon": 27.9046,
+   "capacity_mw": 1369.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "PIOMBINO TERMICA",
+   "country": "ITA",
+   "lat": 42.9565,
+   "lon": 10.6034,
+   "capacity_mw": 1280.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "ROSSANO TE",
+   "country": "ITA",
+   "lat": 39.6218,
+   "lon": 16.6084,
+   "capacity_mw": 1200.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Aleppo Thermal Power Plant Syria",
+   "country": "SYR",
+   "lat": 36.1763,
+   "lon": 37.437,
+   "capacity_mw": 1065.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "CT SANTURCE 2",
+   "country": "ESP",
+   "lat": 43.34,
+   "lon": -3.0539,
+   "capacity_mw": 897.02,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "SAN FILIPPO DEL MELA",
+   "country": "ITA",
+   "lat": 38.2049,
+   "lon": 15.2818,
+   "capacity_mw": 866.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Stenungsund",
+   "country": "SWE",
+   "lat": 58.0863,
+   "lon": 11.8435,
+   "capacity_mw": 840.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Wilmersdorf",
+   "country": "DEU",
+   "lat": 52.4816,
+   "lon": 13.3076,
+   "capacity_mw": 828.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Tabriz",
+   "country": "IRN",
+   "lat": 38.08,
+   "lon": 46.2919,
+   "capacity_mw": 736.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Baiji",
+   "country": "IRQ",
+   "lat": 35.0375,
+   "lon": 43.5582,
+   "capacity_mw": 720.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Banias Thermal Power Plant Syria",
+   "country": "SYR",
+   "lat": 35.1715,
+   "lon": 35.927,
+   "capacity_mw": 680.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Kyndbyvaerket",
+   "country": "DNK",
+   "lat": 55.8134,
+   "lon": 11.8792,
+   "capacity_mw": 664.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Al-Zara Thermal Power Plant Syria",
+   "country": "SYR",
+   "lat": 34.959,
+   "lon": 36.661,
+   "capacity_mw": 660.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Sahand",
+   "country": "IRN",
+   "lat": 37.424,
+   "lon": 46.013,
+   "capacity_mw": 650.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "E\u00dcAS Ambarl\u0131 FO Sant. Istanbul",
+   "country": "TUR",
+   "lat": 40.9787,
+   "lon": 28.6993,
+   "capacity_mw": 630.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Mehardeh Thermal Power Plant Syria",
+   "country": "SYR",
+   "lat": 35.263,
+   "lon": 36.585,
+   "capacity_mw": 630.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "EC PKN Orlen",
+   "country": "POL",
+   "lat": 52.5843,
+   "lon": 19.6879,
+   "capacity_mw": 600.0,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "SON REUS 3  TURBINA DE GAS N 3",
+   "country": "ESP",
+   "lat": 39.65,
+   "lon": 2.6807,
+   "capacity_mw": 563.75,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "CT ESCOMBRERAS 5",
+   "country": "ESP",
+   "lat": 37.5645,
+   "lon": -0.9513,
+   "capacity_mw": 537.28,
+   "kind": "gas_ocgt"
+  },
+  {
+   "name": "Dinorwig",
+   "country": "GBR",
+   "lat": 53.1181,
+   "lon": -4.1032,
+   "capacity_mw": 1800.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Dinorwig",
+   "country": "GBR",
+   "lat": 53.1186,
+   "lon": -4.1139,
+   "capacity_mw": 1728.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "GRAND MAISON",
+   "country": "FRA",
+   "lat": 45.146,
+   "lon": 6.051,
+   "capacity_mw": 1690.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Vianden Pumped Storage Power Plant Luxembourg",
+   "country": "LUX",
+   "lat": 49.9518,
+   "lon": 6.1784,
+   "capacity_mw": 1296.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "ALDEADAVILA II 2",
+   "country": "ESP",
+   "lat": 41.2117,
+   "lon": -6.6856,
+   "capacity_mw": 1226.43,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Zagorskaya PSPP",
+   "country": "RUS",
+   "lat": 56.4822,
+   "lon": 38.1856,
+   "capacity_mw": 1200.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "COO",
+   "country": "BEL",
+   "lat": 50.3849,
+   "lon": 5.8618,
+   "capacity_mw": 1164.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "PSW Vianden",
+   "country": "DEU",
+   "lat": 49.9523,
+   "lon": 6.1783,
+   "capacity_mw": 1096.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "ENTRACQUE_CHRO",
+   "country": "ITA",
+   "lat": 44.2256,
+   "lon": 7.3842,
+   "capacity_mw": 1064.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Goldisthal",
+   "country": "DEU",
+   "lat": 50.5098,
+   "lon": 11.0209,
+   "capacity_mw": 1052.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Markersbach",
+   "country": "DEU",
+   "lat": 50.5194,
+   "lon": 12.8798,
+   "capacity_mw": 1045.2,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "PRESENZANO",
+   "country": "ITA",
+   "lat": 41.3816,
+   "lon": 14.0903,
+   "capacity_mw": 1005.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Limmern",
+   "country": "CHE",
+   "lat": 46.8489,
+   "lon": 9.0118,
+   "capacity_mw": 1000.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "RONCOVALGRANDE",
+   "country": "ITA",
+   "lat": 46.0702,
+   "lon": 8.7339,
+   "capacity_mw": 1000.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "EDOLO",
+   "country": "ITA",
+   "lat": 46.171,
+   "lon": 10.348,
+   "capacity_mw": 950.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "MONTEZIC",
+   "country": "FRA",
+   "lat": 44.734,
+   "lon": 2.641,
+   "capacity_mw": 910.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Wehr",
+   "country": "DEU",
+   "lat": 47.6453,
+   "lon": 7.9182,
+   "capacity_mw": 910.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kruonis Pumped Storage Hydroelectric Power Plant Lithuania",
+   "country": "LTU",
+   "lat": 54.799,
+   "lon": 24.2475,
+   "capacity_mw": 900.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "La Muela II Grupo 4",
+   "country": "ESP",
+   "lat": 39.2438,
+   "lon": -0.9317,
+   "capacity_mw": 877.95,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "VILLARINO 4",
+   "country": "ESP",
+   "lat": 41.2669,
+   "lon": -6.3078,
+   "capacity_mw": 850.8799999999999,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "REVIN",
+   "country": "FRA",
+   "lat": 49.906,
+   "lon": 4.625,
+   "capacity_mw": 808.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Frades II",
+   "country": "PRT",
+   "lat": 41.6934,
+   "lon": -8.0279,
+   "capacity_mw": 780.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "SUPER BISSORTE",
+   "country": "FRA",
+   "lat": 45.202,
+   "lon": 6.576,
+   "capacity_mw": 742.3,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Cierny Vah Pumped Storage Hydroelectric Power Plant Slovakia",
+   "country": "SVK",
+   "lat": 49.0088,
+   "lon": 19.9122,
+   "capacity_mw": 735.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Malta main stage",
+   "country": "AUT",
+   "lat": 47.0659,
+   "lon": 13.3539,
+   "capacity_mw": 730.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Dniester",
+   "country": "UKR",
+   "lat": 48.5136,
+   "lon": 27.4733,
+   "capacity_mw": 702.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Dniester (pumped storage)",
+   "country": "UKR",
+   "lat": 48.5136,
+   "lon": 27.4733,
+   "capacity_mw": 648.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "LA MUELA CORTES 1",
+   "country": "ESP",
+   "lat": 39.2628,
+   "lon": -0.9192,
+   "capacity_mw": 634.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "RHE BAJINA BASTA",
+   "country": "SRB",
+   "lat": 43.9645,
+   "lon": 19.4102,
+   "capacity_mw": 614.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kopswerk II",
+   "country": "AUT",
+   "lat": 46.975,
+   "lon": 10.043,
+   "capacity_mw": 525.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "ANAPO C.LE",
+   "country": "ITA",
+   "lat": 37.1183,
+   "lon": 15.1394,
+   "capacity_mw": 500.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "KW Silz",
+   "country": "AUT",
+   "lat": 47.2696,
+   "lon": 10.9678,
+   "capacity_mw": 500.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kaprun Limberg II",
+   "country": "AUT",
+   "lat": 47.1985,
+   "lon": 12.7223,
+   "capacity_mw": 480.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Waldeck 2",
+   "country": "DEU",
+   "lat": 51.1671,
+   "lon": 9.0468,
+   "capacity_mw": 480.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Cruachan",
+   "country": "GBR",
+   "lat": 56.394,
+   "lon": -5.115,
+   "capacity_mw": 440.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Cruachan",
+   "country": "GBR",
+   "lat": 56.4112,
+   "lon": -5.1135,
+   "capacity_mw": 440.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kiev",
+   "country": "UKR",
+   "lat": 50.5883,
+   "lon": 30.5118,
+   "capacity_mw": 440.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Capljina Pumped Storage Power Plant Bosnia and Herzegovina",
+   "country": "BIH",
+   "lat": 43.0133,
+   "lon": 17.8041,
+   "capacity_mw": 420.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "HE BAJINA BASTA",
+   "country": "SRB",
+   "lat": 43.9645,
+   "lon": 19.4102,
+   "capacity_mw": 420.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Hohenwarte",
+   "country": "DEU",
+   "lat": 50.6038,
+   "lon": 11.4752,
+   "capacity_mw": 377.6,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "TAJO DE LA ENCANTADA 1",
+   "country": "ESP",
+   "lat": 36.9083,
+   "lon": -4.7631,
+   "capacity_mw": 376.88,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "AGUAYO 3",
+   "country": "ESP",
+   "lat": 43.0952,
+   "lon": -4.0004,
+   "capacity_mw": 360.59999999999997,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Ffestiniog",
+   "country": "GBR",
+   "lat": 52.9807,
+   "lon": -3.9686,
+   "capacity_mw": 360.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Tashlyk",
+   "country": "UKR",
+   "lat": 47.7968,
+   "lon": 31.1811,
+   "capacity_mw": 313.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Foyers",
+   "country": "GBR",
+   "lat": 57.2618,
+   "lon": -4.4835,
+   "capacity_mw": 300.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Turlough Hill",
+   "country": "IRL",
+   "lat": 53.0242,
+   "lon": -6.4164,
+   "capacity_mw": 292.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kopswerk I",
+   "country": "DEU",
+   "lat": 46.9684,
+   "lon": 10.0599,
+   "capacity_mw": 247.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kaprun main stage",
+   "country": "AUT",
+   "lat": 47.2591,
+   "lon": 12.7389,
+   "capacity_mw": 240.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kiev (pumped storage)",
+   "country": "UKR",
+   "lat": 50.6113,
+   "lon": 30.4902,
+   "capacity_mw": 235.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Waldeck1/Bringhausen",
+   "country": "DEU",
+   "lat": 51.1671,
+   "lon": 9.0468,
+   "capacity_mw": 143.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "ENTRACQUE ROVINA",
+   "country": "ITA",
+   "lat": 44.2256,
+   "lon": 7.3817,
+   "capacity_mw": 125.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Malta Secondary school",
+   "country": "AUT",
+   "lat": 47.0659,
+   "lon": 13.3539,
+   "capacity_mw": 120.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Kaprun Oberstufe",
+   "country": "AUT",
+   "lat": 47.1968,
+   "lon": 12.7192,
+   "capacity_mw": 113.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Linthal (Limmern)",
+   "country": "CHE",
+   "lat": 46.8489,
+   "lon": 9.0118,
+   "capacity_mw": 34.4,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Albbruck-Wehrkraftwerk",
+   "country": "CHE",
+   "lat": 47.5908,
+   "lon": 8.1295,
+   "capacity_mw": 28.4,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Beznau-Wehrkraftwerk",
+   "country": "CHE",
+   "lat": 47.5525,
+   "lon": 8.2286,
+   "capacity_mw": 6.2,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Foyers Falls",
+   "country": "GBR",
+   "lat": 57.2461,
+   "lon": -4.4901,
+   "capacity_mw": 5.0,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Linthkraft  Netstal",
+   "country": "CHE",
+   "lat": 47.062,
+   "lon": 9.0553,
+   "capacity_mw": 1.42,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Revin",
+   "country": "FRA",
+   "lat": 49.9343,
+   "lon": 4.6924,
+   "capacity_mw": 1.2,
+   "kind": "hydro_ps"
+  },
+  {
+   "name": "Be\u0142chat\u00f3w",
+   "country": "POL",
+   "lat": 51.2679,
+   "lon": 19.3265,
+   "capacity_mw": 5472.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Niederaussem power station",
+   "country": "DEU",
+   "lat": 50.993,
+   "lon": 6.6685,
+   "capacity_mw": 3430.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Boxberg power station",
+   "country": "DEU",
+   "lat": 51.4163,
+   "lon": 14.5619,
+   "capacity_mw": 2585.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "BoA 2",
+   "country": "DEU",
+   "lat": 51.0365,
+   "lon": 6.6133,
+   "capacity_mw": 2100.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Neurath power station",
+   "country": "DEU",
+   "lat": 51.0395,
+   "lon": 6.615,
+   "capacity_mw": 2068.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Weisweiler power station",
+   "country": "DEU",
+   "lat": 50.8392,
+   "lon": 6.3211,
+   "capacity_mw": 1800.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Maritsa Itzok-2 power station",
+   "country": "BGR",
+   "lat": 42.2541,
+   "lon": 26.134,
+   "capacity_mw": 1602.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Agios Dimitrios power station",
+   "country": "GRC",
+   "lat": 40.3941,
+   "lon": 21.9256,
+   "capacity_mw": 1595.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Schwarze Pumpe power station",
+   "country": "DEU",
+   "lat": 51.5348,
+   "lon": 14.3531,
+   "capacity_mw": 1500.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Tur\u00f3w",
+   "country": "POL",
+   "lat": 50.9482,
+   "lon": 14.9128,
+   "capacity_mw": 1498.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Sines power station",
+   "country": "PRT",
+   "lat": 37.9322,
+   "lon": -8.8038,
+   "capacity_mw": 1296.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Kardia power station",
+   "country": "GRC",
+   "lat": 40.4102,
+   "lon": 21.7856,
+   "capacity_mw": 1250.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "P\u0105tn\u00f3w I",
+   "country": "POL",
+   "lat": 52.3013,
+   "lon": 18.2344,
+   "capacity_mw": 1244.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Sostanj (TE\u0160)",
+   "country": "SVN",
+   "lat": 46.3723,
+   "lon": 15.0534,
+   "capacity_mw": 1099.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Pocerady power station",
+   "country": "CZE",
+   "lat": 50.4278,
+   "lon": 13.6777,
+   "capacity_mw": 1000.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Melnik power station",
+   "country": "CZE",
+   "lat": 50.4131,
+   "lon": 14.4158,
+   "capacity_mw": 960.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Maritsa Itzok-3 power station",
+   "country": "BGR",
+   "lat": 42.145,
+   "lon": 26.0025,
+   "capacity_mw": 908.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Schkopau power station",
+   "country": "DEU",
+   "lat": 51.3985,
+   "lon": 11.9504,
+   "capacity_mw": 900.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Matra power station",
+   "country": "HUN",
+   "lat": 47.7886,
+   "lon": 20.066,
+   "capacity_mw": 884.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Braunkohlekraftwerk Lippendorf",
+   "country": "DEU",
+   "lat": 51.1821,
+   "lon": 12.3733,
+   "capacity_mw": 875.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Lippendorf power station",
+   "country": "DEU",
+   "lat": 51.1821,
+   "lon": 12.3733,
+   "capacity_mw": 875.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Kosovo A Coal Power Plant Kosovo",
+   "country": "KOS",
+   "lat": 42.6767,
+   "lon": 21.0867,
+   "capacity_mw": 800.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Tusimice power station",
+   "country": "CZE",
+   "lat": 50.381,
+   "lon": 13.3399,
+   "capacity_mw": 800.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Prunerov",
+   "country": "CZE",
+   "lat": 50.4178,
+   "lon": 13.2592,
+   "capacity_mw": 750.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Tuzla CHP Power Plant Bosnia and Herzegovina",
+   "country": "BIH",
+   "lat": 44.5215,
+   "lon": 18.6056,
+   "capacity_mw": 730.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "TE KOSTOLAC B",
+   "country": "SRB",
+   "lat": 44.7307,
+   "lon": 21.2104,
+   "capacity_mw": 697.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Kosovo B Coal Power Plant Kosovo",
+   "country": "KOS",
+   "lat": 42.6937,
+   "lon": 21.057,
+   "capacity_mw": 678.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Bitola Coal Power Plant Macedonia",
+   "country": "MKD",
+   "lat": 41.058,
+   "lon": 21.4832,
+   "capacity_mw": 675.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "TE KOSOVO B",
+   "country": "SRB",
+   "lat": 42.6945,
+   "lon": 21.059,
+   "capacity_mw": 618.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "TE KOSOVO A",
+   "country": "SRB",
+   "lat": 42.6773,
+   "lon": 21.0886,
+   "capacity_mw": 617.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Megalopoli power station",
+   "country": "GRC",
+   "lat": 37.4174,
+   "lon": 22.1079,
+   "capacity_mw": 600.0,
+   "kind": "lignite"
+  },
+  {
+   "name": "Zaporozhye",
+   "country": "UKR",
+   "lat": 47.5119,
+   "lon": 34.5863,
+   "capacity_mw": 6000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "GRAVELINES",
+   "country": "FRA",
+   "lat": 51.0141,
+   "lon": 2.1332,
+   "capacity_mw": 5460.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "PALUEL",
+   "country": "FRA",
+   "lat": 49.8582,
+   "lon": 0.6354,
+   "capacity_mw": 5320.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CATTENOM",
+   "country": "FRA",
+   "lat": 49.416,
+   "lon": 6.2169,
+   "capacity_mw": 5200.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Balakovo NPP",
+   "country": "RUS",
+   "lat": 52.0928,
+   "lon": 47.9539,
+   "capacity_mw": 4000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kalinn NPP",
+   "country": "RUS",
+   "lat": 57.905,
+   "lon": 35.0614,
+   "capacity_mw": 4000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kursk",
+   "country": "RUS",
+   "lat": 51.675,
+   "lon": 35.6056,
+   "capacity_mw": 4000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Leningrad NPP",
+   "country": "RUS",
+   "lat": 59.8528,
+   "lon": 29.0486,
+   "capacity_mw": 4000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Rostov NPP",
+   "country": "RUS",
+   "lat": 47.5993,
+   "lon": 42.3717,
+   "capacity_mw": 4000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Ringhals",
+   "country": "SWE",
+   "lat": 57.2574,
+   "lon": 12.1087,
+   "capacity_mw": 3932.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CRUAS",
+   "country": "FRA",
+   "lat": 44.6325,
+   "lon": 4.7546,
+   "capacity_mw": 3660.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "TRICASTIN 1",
+   "country": "FRA",
+   "lat": 44.3311,
+   "lon": 4.7311,
+   "capacity_mw": 3660.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "BLAYAIS",
+   "country": "FRA",
+   "lat": 45.256,
+   "lon": -0.6932,
+   "capacity_mw": 3640.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CHINON",
+   "country": "FRA",
+   "lat": 47.2254,
+   "lon": 0.1656,
+   "capacity_mw": 3620.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "BUGEY",
+   "country": "FRA",
+   "lat": 45.7973,
+   "lon": 5.2706,
+   "capacity_mw": 3580.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "DAMPIERRE",
+   "country": "FRA",
+   "lat": 47.7321,
+   "lon": 2.5185,
+   "capacity_mw": 3560.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Forsmark",
+   "country": "SWE",
+   "lat": 60.4028,
+   "lon": 18.1744,
+   "capacity_mw": 3227.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CHOOZ",
+   "country": "FRA",
+   "lat": 50.09,
+   "lon": 4.7894,
+   "capacity_mw": 3000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Smolensk",
+   "country": "RUS",
+   "lat": 54.1647,
+   "lon": 33.2367,
+   "capacity_mw": 3000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "South Ukraine",
+   "country": "UKR",
+   "lat": 47.812,
+   "lon": 31.22,
+   "capacity_mw": 3000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CIVAUX",
+   "country": "FRA",
+   "lat": 46.4563,
+   "lon": 0.6548,
+   "capacity_mw": 2990.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "DOEL 4",
+   "country": "BEL",
+   "lat": 51.3254,
+   "lon": 4.2597,
+   "capacity_mw": 2910.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Rivne (Rouno)",
+   "country": "UKR",
+   "lat": 51.3245,
+   "lon": 25.8974,
+   "capacity_mw": 2835.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "ST ALBAN",
+   "country": "FRA",
+   "lat": 45.4043,
+   "lon": 4.7554,
+   "capacity_mw": 2670.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "FLAMANVILLE",
+   "country": "FRA",
+   "lat": 49.5366,
+   "lon": -1.8823,
+   "capacity_mw": 2660.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "PENLY",
+   "country": "FRA",
+   "lat": 49.9764,
+   "lon": 1.2107,
+   "capacity_mw": 2660.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "BELLEVILLE",
+   "country": "FRA",
+   "lat": 47.5103,
+   "lon": 2.875,
+   "capacity_mw": 2620.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "GOLFECH",
+   "country": "FRA",
+   "lat": 44.106,
+   "lon": 0.8443,
+   "capacity_mw": 2620.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "NOGENT",
+   "country": "FRA",
+   "lat": 48.5171,
+   "lon": 3.5181,
+   "capacity_mw": 2620.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Oskarshamn",
+   "country": "SWE",
+   "lat": 57.413,
+   "lon": 16.6683,
+   "capacity_mw": 2603.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kernkraft Gundremmingen",
+   "country": "DEU",
+   "lat": 48.515,
+   "lon": 10.4016,
+   "capacity_mw": 2572.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Temel\u00edn",
+   "country": "CZE",
+   "lat": 49.1796,
+   "lon": 14.3795,
+   "capacity_mw": 2133.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "TIHANGE 3",
+   "country": "BEL",
+   "lat": 50.5342,
+   "lon": 5.2751,
+   "capacity_mw": 2053.8,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Dukonavy",
+   "country": "CZE",
+   "lat": 49.0852,
+   "lon": 16.1479,
+   "capacity_mw": 2040.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CN ALMARAZ 1",
+   "country": "ESP",
+   "lat": 39.807,
+   "lon": -5.6986,
+   "capacity_mw": 2016.9,
+   "kind": "nuclear"
+  },
+  {
+   "name": "KOZLODUY",
+   "country": "BGR",
+   "lat": 43.7438,
+   "lon": 23.7723,
+   "capacity_mw": 2000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Khmelnytska",
+   "country": "UKR",
+   "lat": 50.3024,
+   "lon": 26.6473,
+   "capacity_mw": 2000.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "ASCO GR",
+   "country": "ESP",
+   "lat": 41.2008,
+   "lon": 0.5679,
+   "capacity_mw": 1990.5,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Paksi Atomer\u0151m\u0171",
+   "country": "HUN",
+   "lat": 46.5739,
+   "lon": 18.8536,
+   "capacity_mw": 1886.8,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Novovoronezh",
+   "country": "RUS",
+   "lat": 51.2822,
+   "lon": 39.21,
+   "capacity_mw": 1880.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "ST LAURENT",
+   "country": "FRA",
+   "lat": 47.7197,
+   "lon": 1.5783,
+   "capacity_mw": 1830.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "FESSENHEIM",
+   "country": "FRA",
+   "lat": 47.9032,
+   "lon": 7.5631,
+   "capacity_mw": 1760.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kola NPP",
+   "country": "RUS",
+   "lat": 67.4667,
+   "lon": 32.4667,
+   "capacity_mw": 1760.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Olkiluoto 1",
+   "country": "FIN",
+   "lat": 61.2371,
+   "lon": 21.4433,
+   "capacity_mw": 1760.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "ISAR-2",
+   "country": "DEU",
+   "lat": 48.6049,
+   "lon": 12.2936,
+   "capacity_mw": 1485.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "BROKDORF",
+   "country": "DEU",
+   "lat": 53.8506,
+   "lon": 9.345,
+   "capacity_mw": 1480.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "PHILIPPSBURG-2",
+   "country": "DEU",
+   "lat": 49.2529,
+   "lon": 8.4364,
+   "capacity_mw": 1468.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "EMSLAND",
+   "country": "DEU",
+   "lat": 52.4716,
+   "lon": 7.3204,
+   "capacity_mw": 1406.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "NECKARWESTHEIM-2",
+   "country": "DEU",
+   "lat": 49.0408,
+   "lon": 9.1759,
+   "capacity_mw": 1400.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Grohnde",
+   "country": "DEU",
+   "lat": 52.0356,
+   "lon": 9.4135,
+   "capacity_mw": 1360.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "NPP Cernavoda",
+   "country": "ROU",
+   "lat": 44.3215,
+   "lon": 28.0568,
+   "capacity_mw": 1298.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kernkraftwerk Leibstadt",
+   "country": "CHE",
+   "lat": 47.6012,
+   "lon": 8.1845,
+   "capacity_mw": 1245.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Heysham 2",
+   "country": "GBR",
+   "lat": 54.0285,
+   "lon": -2.916,
+   "capacity_mw": 1230.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Sizewell B",
+   "country": "GBR",
+   "lat": 52.2145,
+   "lon": 1.6206,
+   "capacity_mw": 1198.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Torness",
+   "country": "GBR",
+   "lat": 55.9679,
+   "lon": -2.4086,
+   "capacity_mw": 1185.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Hartlepool",
+   "country": "GBR",
+   "lat": 54.6341,
+   "lon": -1.1801,
+   "capacity_mw": 1180.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Heysham 1",
+   "country": "GBR",
+   "lat": 54.0285,
+   "lon": -2.916,
+   "capacity_mw": 1155.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "CN COFRENTES",
+   "country": "ESP",
+   "lat": 39.2134,
+   "lon": -1.0509,
+   "capacity_mw": 1063.94,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Dungeness B",
+   "country": "GBR",
+   "lat": 50.9133,
+   "lon": 0.964,
+   "capacity_mw": 1050.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "VANDELLOS GR 2",
+   "country": "ESP",
+   "lat": 40.9511,
+   "lon": 0.8662,
+   "capacity_mw": 1045.31,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kernkraftwerk G\u00f6sgen",
+   "country": "CHE",
+   "lat": 47.3656,
+   "lon": 7.968,
+   "capacity_mw": 1035.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "TRILLO",
+   "country": "ESP",
+   "lat": 40.7016,
+   "lon": -2.6227,
+   "capacity_mw": 1003.41,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Loviisa Y1",
+   "country": "FIN",
+   "lat": 60.3708,
+   "lon": 26.3468,
+   "capacity_mw": 992.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Hunterston B",
+   "country": "GBR",
+   "lat": 55.7204,
+   "lon": -4.8964,
+   "capacity_mw": 965.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "TIHANGE 1N",
+   "country": "BEL",
+   "lat": 50.5342,
+   "lon": 5.2751,
+   "capacity_mw": 962.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Hinkley Point B",
+   "country": "GBR",
+   "lat": 51.2085,
+   "lon": -3.1334,
+   "capacity_mw": 955.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Bohunice Nuclear Power Plant Slovakia",
+   "country": "SVK",
+   "lat": 48.496,
+   "lon": 17.6816,
+   "capacity_mw": 880.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Mochovce Nuclear Power Plant Slovakia",
+   "country": "SVK",
+   "lat": 48.2621,
+   "lon": 18.459,
+   "capacity_mw": 880.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Kernkraftwerk Beznau",
+   "country": "CHE",
+   "lat": 47.552,
+   "lon": 8.2281,
+   "capacity_mw": 760.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Krsko (NEK)",
+   "country": "SVN",
+   "lat": 45.9389,
+   "lon": 15.516,
+   "capacity_mw": 696.0,
+   "kind": "nuclear"
+  },
+  {
+   "name": "Hornsea 1 - Heron & Njord",
+   "country": "GBR",
+   "lat": 53.6815,
+   "lon": 1.4207,
+   "capacity_mw": 1200.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Walney 3",
+   "country": "GBR",
+   "lat": 54.09,
+   "lon": -3.74,
+   "capacity_mw": 660.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "London Array",
+   "country": "GBR",
+   "lat": 51.6217,
+   "lon": 1.4958,
+   "capacity_mw": 630.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Gemini",
+   "country": "NLD",
+   "lat": 54.036,
+   "lon": 5.963,
+   "capacity_mw": 600.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Beatrice",
+   "country": "GBR",
+   "lat": 58.0882,
+   "lon": -2.9502,
+   "capacity_mw": 588.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Gwynt y Mor",
+   "country": "GBR",
+   "lat": 53.454,
+   "lon": -3.6266,
+   "capacity_mw": 576.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Greater Gabbard",
+   "country": "GBR",
+   "lat": 51.9176,
+   "lon": 1.9284,
+   "capacity_mw": 504.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Dudgeon East",
+   "country": "GBR",
+   "lat": 53.1175,
+   "lon": 0.6135,
+   "capacity_mw": 402.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "BARD Offshore 1",
+   "country": "DEU",
+   "lat": 54.36,
+   "lon": 5.98,
+   "capacity_mw": 400.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Global Tech I",
+   "country": "DEU",
+   "lat": 54.509,
+   "lon": 6.367,
+   "capacity_mw": 400.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Rampion Offshore Wind Farm (Hastings Zone)",
+   "country": "GBR",
+   "lat": 50.64,
+   "lon": -0.18,
+   "capacity_mw": 400.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Anholt",
+   "country": "DNK",
+   "lat": 56.603,
+   "lon": 11.209,
+   "capacity_mw": 399.6,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "West of Duddon Sands",
+   "country": "GBR",
+   "lat": 53.9851,
+   "lon": -3.462,
+   "capacity_mw": 389.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Galloper Wind Farm",
+   "country": "GBR",
+   "lat": 51.88,
+   "lon": 2.04,
+   "capacity_mw": 353.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Sheringham Shoal BMU 1 & 2",
+   "country": "GBR",
+   "lat": 53.1353,
+   "lon": 1.1479,
+   "capacity_mw": 316.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Borkum Riffgrund I",
+   "country": "DEU",
+   "lat": 53.9667,
+   "lon": 6.55,
+   "capacity_mw": 312.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Amrumbank West",
+   "country": "DEU",
+   "lat": 54.5,
+   "lon": 7.7999,
+   "capacity_mw": 301.32,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Thanet",
+   "country": "GBR",
+   "lat": 51.4299,
+   "lon": 1.6334,
+   "capacity_mw": 300.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "OWP Nordsee Ost",
+   "country": "DEU",
+   "lat": 54.445,
+   "lon": 7.683,
+   "capacity_mw": 295.2,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Baltic 2",
+   "country": "DEU",
+   "lat": 54.983,
+   "lon": 13.162,
+   "capacity_mw": 288.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Butendiek",
+   "country": "DEU",
+   "lat": 55.019,
+   "lon": 7.774,
+   "capacity_mw": 288.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Meerwind S\u00fcdIOst",
+   "country": "DEU",
+   "lat": 54.392,
+   "lon": 7.704,
+   "capacity_mw": 288.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Race Bank (Phase 1)",
+   "country": "GBR",
+   "lat": 53.136,
+   "lon": 0.5892,
+   "capacity_mw": 286.5,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Offshore Windfarm Danysk",
+   "country": "DEU",
+   "lat": 55.1416,
+   "lon": 7.1945,
+   "capacity_mw": 284.4,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Lincs",
+   "country": "GBR",
+   "lat": 53.1842,
+   "lon": 0.4981,
+   "capacity_mw": 270.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Gode Wind 1 - Teil 1",
+   "country": "DEU",
+   "lat": 54.041,
+   "lon": 6.994,
+   "capacity_mw": 263.1,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Burbo Bank Extension (Burbo Bank 2)",
+   "country": "GBR",
+   "lat": 53.48,
+   "lon": -3.27,
+   "capacity_mw": 258.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Humber Gateway",
+   "country": "GBR",
+   "lat": 53.3875,
+   "lon": 0.5006,
+   "capacity_mw": 219.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Northeast Binnendijks",
+   "country": "NLD",
+   "lat": 52.588,
+   "lon": 4.223,
+   "capacity_mw": 217.5,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Northwind",
+   "country": "BEL",
+   "lat": 51.6186,
+   "lon": 2.8998,
+   "capacity_mw": 216.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Westereems",
+   "country": "NLD",
+   "lat": 53.4375,
+   "lon": 6.8613,
+   "capacity_mw": 213.3,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Westermost Rough",
+   "country": "GBR",
+   "lat": 53.0977,
+   "lon": 0.5615,
+   "capacity_mw": 210.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Horns Rev B",
+   "country": "DNK",
+   "lat": 55.6,
+   "lon": 7.5825,
+   "capacity_mw": 209.3,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Roedsand 2",
+   "country": "DNK",
+   "lat": 54.5228,
+   "lon": 11.5447,
+   "capacity_mw": 207.0,
+   "kind": "wind_offshore"
+  },
+  {
+   "name": "Trianel Windpark Borkum",
+   "country": "DEU",
+   "lat": 54.0416,
+   "lon": 6.4667,
+   "capacity_mw": 200.0,
+   "kind": "wind_offshore"
+  }
+ ]
+}
