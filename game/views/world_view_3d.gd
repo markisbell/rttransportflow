@@ -88,10 +88,16 @@ var tool_id := "":
 var camera: Camera3D
 var hover_tile := Vector2i(-1, -1)
 
+## Right-drag rotation feel: degrees of yaw per pixel of horizontal drag
+## (a full sweep across a 1280 px window is ~1.25 turns).
+const ROTATE_DEG_PER_PX := 0.35
+
 var _zoom := 44.0
 var _focus := Vector3(480.0, 0, 400.0)  # central Europe; re-centred on load
 var _yaw := 0.0
 var _yaw_target := 0.0
+var _rotating := false  # right mouse button held — drag rotates the view
+var _panning := false  # middle mouse button held — drag moves the map
 var _sun: DirectionalLight3D
 var _coarse: MeshInstance3D
 var _water: MeshInstance3D
@@ -188,7 +194,8 @@ func _build_camera() -> void:
 
 
 func _apply_camera() -> void:
-	# locked isometric: fixed pitch, yaw in 90° steps, orthographic zoom
+	# locked pitch isometric: free yaw (right-drag; Q/E step the quarter
+	# turns), orthographic zoom
 	var yaw := deg_to_rad(_yaw)
 	var direction := Vector3(sin(yaw), PITCH_RATIO, cos(yaw)).normalized()
 	camera.size = _zoom
@@ -220,6 +227,23 @@ func _apply_camera() -> void:
 static func fog_band(zoom: float) -> Vector2:
 	var half := 0.5 * zoom / PITCH_RATIO
 	return Vector2(STANDOFF + 0.45 * half, STANDOFF + 1.30 * half)
+
+
+## Ground displacement of the focus for a middle-drag of `relative` pixels —
+## grab-the-ground: the terrain point under the cursor follows the cursor.
+## Horizontally one pixel is zoom/viewport_h world units (ortho size is the
+## frame's vertical extent); vertically the same pixel spans 1/sin(pitch)
+## MORE ground, because the frame's height is a slanted cut across the
+## ground plane. Pure so test_world_view.gd can pin it.
+static func drag_pan(relative: Vector2, yaw_deg: float, zoom: float,
+		viewport_h: float) -> Vector3:
+	var per_px := zoom / viewport_h
+	var sin_pitch := PITCH_RATIO / sqrt(1.0 + PITCH_RATIO * PITCH_RATIO)
+	var yaw := deg_to_rad(yaw_deg)
+	var screen_right := Vector3(cos(yaw), 0, -sin(yaw))
+	var toward_camera := Vector3(sin(yaw), 0, cos(yaw))
+	return -(screen_right * (relative.x * per_px)
+		+ toward_camera * (relative.y * per_px / sin_pitch))
 
 
 func focus_tile(tile: Vector2i, zoom: float = -1.0) -> void:
@@ -663,6 +687,19 @@ func mouse_tile() -> Vector2i:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
+		var motion := event as InputEventMouseMotion
+		if _rotating:
+			# yaw only — pitch stays locked: the fog band and the whole
+			# streaming/LOD geometry are derived from PITCH_RATIO
+			_yaw = fposmod(_yaw - motion.relative.x * ROTATE_DEG_PER_PX, 360.0)
+			_yaw_target = _yaw
+			_apply_camera()
+			return
+		if _panning:
+			_focus += drag_pan(motion.relative, _yaw, _zoom,
+				get_viewport().get_visible_rect().size.y)
+			_apply_camera()
+			return
 		var tile := mouse_tile()
 		if tile != hover_tile:
 			hover_tile = tile
@@ -685,12 +722,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dragging = button.pressed
 				if button.pressed:
 					tile_clicked.emit(mouse_tile())
+			MOUSE_BUTTON_RIGHT:
+				_rotating = button.pressed
+			MOUSE_BUTTON_MIDDLE:
+				_panning = button.pressed
 	elif event is InputEventKey and (event as InputEventKey).pressed:
 		# camera only — building is menu-driven (no build hotkeys)
 		var step := maxf(2.0, _zoom * 0.08)  # pan scales with the zoom level
 		match (event as InputEventKey).keycode:
-			KEY_Q: _yaw_target = fmod(_yaw_target + 90.0, 360.0)
-			KEY_E: _yaw_target = fmod(_yaw_target - 90.0 + 360.0, 360.0)
+			# step to the NEXT quarter turn (floor/ceil, not +-90): after a
+			# free right-drag rotation the keys return the view to the grid
+			KEY_Q: _yaw_target = fposmod(
+				floorf(_yaw_target / 90.0) * 90.0 + 90.0, 360.0)
+			KEY_E: _yaw_target = fposmod(
+				ceilf(_yaw_target / 90.0) * 90.0 - 90.0, 360.0)
 			KEY_LEFT: _pan(Vector3(-step, 0, 0))
 			KEY_RIGHT: _pan(Vector3(step, 0, 0))
 			KEY_UP: _pan(Vector3(0, 0, -step))

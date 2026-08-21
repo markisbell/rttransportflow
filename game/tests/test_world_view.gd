@@ -51,6 +51,38 @@ func test_fog_band_invariants() -> void:
 			"%s: band exceeds camera.far" % ctx).is_true()
 
 
+func test_drag_pan_geometry() -> void:
+	var vh := 800.0
+	var zoom := 50.0
+	# Horizontal: one pixel is zoom/viewport_h world units; cursor right
+	# drags the ground right, so the focus moves LEFT (-x at yaw 0).
+	var h: Vector3 = WorldViewScript.drag_pan(Vector2(100, 0), 0.0, zoom, vh)
+	assert_float(h.x).is_equal_approx(-100.0 * zoom / vh, 1e-4)
+	assert_float(h.y).is_equal_approx(0.0, 1e-9)
+	assert_float(h.z).is_equal_approx(0.0, 1e-9)
+	# Vertical: a full-frame drag (viewport_h px) covers the frame's whole
+	# ground span, zoom/sin(pitch) — the slanted-cut factor the fog band's
+	# geometry note derives.
+	var pr: float = WorldViewScript.PITCH_RATIO
+	var sin_pitch := pr / sqrt(1.0 + pr * pr)
+	var v: Vector3 = WorldViewScript.drag_pan(Vector2(0, vh), 0.0, zoom, vh)
+	assert_float(v.length()).is_equal_approx(zoom / sin_pitch, 1e-4)
+	# cursor down -> ground follows toward the camera -> focus moves away
+	assert_float(v.z).is_less(0.0)
+	assert_float(v.x).is_equal_approx(0.0, 1e-9)
+
+
+func test_drag_pan_rotates_with_the_view() -> void:
+	# The same drag pans the same SCREEN direction at every yaw: magnitude
+	# is yaw-invariant, and the yaw-90 result is the yaw-0 result swung a
+	# quarter turn about UP.
+	var a: Vector3 = WorldViewScript.drag_pan(Vector2(60, -40), 0.0, 30.0, 800.0)
+	var b: Vector3 = WorldViewScript.drag_pan(Vector2(60, -40), 90.0, 30.0, 800.0)
+	assert_float(b.length()).is_equal_approx(a.length(), 1e-4)
+	assert_float((a.rotated(Vector3.UP, deg_to_rad(90.0)) - b).length()) \
+		.is_equal_approx(0.0, 1e-4)
+
+
 func test_fog_band_monotone_in_zoom() -> void:
 	# Zooming out widens the visible span, so the band must widen with it —
 	# a constant band would re-create the veil at some zoom.
