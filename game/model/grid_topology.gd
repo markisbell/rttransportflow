@@ -347,14 +347,26 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 			int(ceil(needs[line_seq] / (CIRCUIT_MVA * CIRCUIT_UTILISATION))),
 			int(branch.get("authored", 0))),
 			DEFAULT_PARALLEL, MAX_PARALLEL)
-		lines["lines"].append({
+		var entry := {
 			"id": "L%d" % line_seq,
 			"from_bus": "b%d" % bus_rename[branch["from"]],
 			"to_bus": "b%d" % bus_rename[branch["to"]],
 			"length_km": snappedf(int(branch["steps"]) * world.tile_km * SINUOSITY, 0.01),
 			"std_type": "490-AL1/64-ST1A 380.0",
 			"parallel": circuits,
-		})
+		}
+		if str(branch.get("kind", "")) == "cable_400":
+			# underground 380 kV XLPE: explicit parameters (the backend's
+			# from-parameters path) — low series impedance, ~20x the OHL
+			# charging, which the shunt compensation absorbs like any line.
+			# A line<->cable transition forms a bus via the kind-change rule,
+			# so a branch is never mixed.
+			entry["std_type"] = null
+			entry["r_ohm_per_km"] = 0.014
+			entry["x_ohm_per_km"] = 0.12
+			entry["c_nf_per_km"] = 230.0
+			entry["max_i_ka"] = 1.8
+		lines["lines"].append(entry)
 		line_seq += 1
 	if lines["lines"].is_empty():
 		return {"ok": false, "error": "no branches between buses", "warnings": warnings}

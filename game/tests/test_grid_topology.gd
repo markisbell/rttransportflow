@@ -174,3 +174,30 @@ func test_debounce_restarts_and_defers() -> void:
 	BuildSession.enabled = false
 	BuildSession._timer.stop()
 	BuildSession.build_status.disconnect(handler)
+
+
+func test_cable_transition_forms_bus_and_param_line() -> void:
+	# a line<->cable kind change must form a bus (the kind_change rule) and
+	# the cable branch must emit explicit parameters instead of a std_type
+	_load_fixture()
+	World.place_plant("gas_ccgt", Vector2i(4, 4))
+	for x in range(5, 10):
+		World.place_corridor(Vector2i(x, 4), "line_400")
+	for x in range(10, 15):
+		World.place_corridor(Vector2i(x, 4), "cable_400")
+	World.place_plant("gas_ccgt", Vector2i(15, 4))
+	var built := GridTopology.build(World)
+	assert_bool(built["ok"]).is_true()
+	var lines: Array = built["native"]["lines"]["lines"]
+	assert_int(lines.size()).is_greater_equal(2)
+	var cable: Dictionary = {}
+	var overhead: Dictionary = {}
+	for l: Dictionary in lines:
+		if l.get("std_type") == null:
+			cable = l
+		else:
+			overhead = l
+	assert_bool(not cable.is_empty()).override_failure_message(
+		"no parameter (cable) line emitted").is_true()
+	assert_float(float(cable["c_nf_per_km"])).is_greater(100.0)
+	assert_bool(not overhead.is_empty()).is_true()

@@ -79,6 +79,8 @@
     "line_cost_meur_per_km": {
         "line_400": 1.1,
         "line_220": 0.5,
+        "cable_400": 4.4,
+        "_cable_rationale": "underground 380 kV XLPE at the ledger-28 x4-over-overhead cost level; same submarine/mountain factors apply.",
         "_rationale": "GAME_DESIGN §1.5; ×2.2 submarine and ×1.6 mountain applied by the builder.",
         "hvdc": 1.4,
         "_hvdc_rationale": "PARAMETERS 1.16: 1.4 MEUR/km overhead bipole; submarine export cable 2.0 MEUR/km applied by the builder on sea tiles (s/S)."

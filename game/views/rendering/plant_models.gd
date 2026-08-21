@@ -851,6 +851,8 @@ const CONDUCTOR := Color(0.80, 0.81, 0.84)
 
 
 static func corridor(kind: String, neighbors: Array[Vector2i]) -> Node3D:
+	if kind == "cable_400":
+		return _cable_trench(neighbors)
 	var node := Node3D.new()
 	var accent := LINE_400_COLOR
 	var mast_h := 0.62
@@ -915,6 +917,27 @@ static func corridor(kind: String, neighbors: Array[Vector2i]) -> Node3D:
 		# earth wire along the same span, off the mast peak
 		node.add_child(strut(Vector3(0, mast_h, 0),
 			half + Vector3(0, mast_h - 0.04, 0), 0.005, STEEL_DARK))
+	return node
+
+
+## Underground cable: no mast — a fresh earthwork band along the span with
+## small marker posts, the way a buried 380 kV route reads in the field.
+static func _cable_trench(neighbors: Array[Vector2i]) -> Node3D:
+	var node := Node3D.new()
+	for offset: Vector2i in neighbors:
+		var half := Vector3(offset.x, 0, offset.y) * 0.5
+		var dir := half.normalized()
+		var mid := half * 0.5
+		var trench := box(Vector3(0.16, 0.015, half.length()),
+			Color(0.46, 0.38, 0.30), mid + Vector3(0, 0.012, 0))
+		trench.transform = Transform3D(
+			Basis.looking_at(dir, Vector3.UP), mid + Vector3(0, 0.012, 0))
+		node.add_child(trench)
+	# marker posts at the tile centre — the only vertical a cable route has
+	node.add_child(box(Vector3(0.02, 0.10, 0.02), Color(0.95, 0.55, 0.15),
+		Vector3(0.10, 0.05, 0.10)))
+	node.add_child(box(Vector3(0.02, 0.10, 0.02), Color(0.95, 0.55, 0.15),
+		Vector3(-0.10, 0.05, -0.10)))
 	return node
 
 

@@ -303,9 +303,9 @@ func platform_near(tile: Vector2i) -> String:
 
 
 func can_place_corridor(tile: Vector2i, kind: String = "line_400") -> bool:
-	# AC corridors: land or shelf sea (submarine). HVDC corridors may also
-	# cross DEEP sea (the far-shore export path). Never across an occupied
-	# site tile.
+	# AC corridors — overhead lines and underground cable alike: land or
+	# shelf sea (submarine). HVDC corridors may also cross DEEP sea (the
+	# far-shore export path). Never across an occupied site tile.
 	var allowed: bool = terrain_at(tile) in ["c", "p", "h", "m", "s"] \
 		or (kind == "hvdc" and terrain_at(tile) == "S")
 	return allowed \

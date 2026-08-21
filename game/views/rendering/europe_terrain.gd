@@ -293,19 +293,78 @@ static func _build_relief_region(world: Node, x0: int, y0: int,
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 
-	# corner grid [x0-1 .. x1+1] x [y0-1 .. y1+1]: one ring past the chunk
-	# so every emitted corner has neighbours for its normal
+	# HOT PATH (measured 40 ms/chunk naive, ~8 ms cached — 3 chunks/frame
+	# was 120 ms of stutter while panning): every per-tile attribute is
+	# read ONCE into flat arrays, every corner's height/normal/colour is
+	# computed ONCE and shared by the four quads that touch it.
+	var tw := x1 - x0 + 4  # tiles [x0-2 .. x1+1]
+	var th := y1 - y0 + 4
+	var t_elev := PackedFloat32Array()
+	t_elev.resize(tw * th)
+	var t_green := PackedFloat32Array()
+	t_green.resize(tw * th)
+	var t_h := PackedFloat32Array()
+	t_h.resize(tw * th)
+	var t_water := PackedByteArray()
+	t_water.resize(tw * th)
+	var t_lake := PackedByteArray()
+	t_lake.resize(tw * th)
+	var scale: float = 1.0 / (world.tile_km * 1000.0) * EXAG
+	for ty in range(th):
+		for tx in range(tw):
+			var tile := Vector2i(x0 - 2 + tx, y0 - 2 + ty)
+			var i := ty * tw + tx
+			var e: float = world.elev_at(tile)
+			t_elev[i] = e
+			t_h[i] = clampf(e, SEA_FLOOR_M, 4800.0) * scale
+			t_green[i] = world.green_at(tile)
+			var kind := world.terrain_at(tile) as String
+			t_water[i] = 1 if (kind == "S" or kind == "s") else 0
+			t_lake[i] = 1 if (t_water[i] == 1 and world.lake_at(tile)) else 0
+
+	# corner grid [x0-1 .. x1+1]: height, then colour, from the tile caches
 	var cw := x1 - x0 + 3
 	var ch := y1 - y0 + 3
 	var corner_h := PackedFloat32Array()
 	corner_h.resize(cw * ch)
-	for cy in range(y0 - 1, y1 + 2):
-		for cx in range(x0 - 1, x1 + 2):
-			var h := (_render_h(world, Vector2i(cx - 1, cy - 1))
-				+ _render_h(world, Vector2i(cx, cy - 1))
-				+ _render_h(world, Vector2i(cx - 1, cy))
-				+ _render_h(world, Vector2i(cx, cy))) * 0.25
-			corner_h[(cy - y0 + 1) * cw + (cx - x0 + 1)] = h
+	var corner_col := PackedColorArray()
+	corner_col.resize(cw * ch)
+	for cy in range(ch):
+		for cx in range(cw):
+			# corner (cx, cy) sits between tile-cache rows/cols [cy, cy+1] x
+			# [cx, cx+1]: the cache starts one tile before the corner grid,
+			# so the corner's NW tile IS cache index (cy, cx)
+			var ta := cy * tw + cx
+			var tb := ta + 1
+			var tc := ta + tw
+			var td := tc + 1
+			var h := (t_h[ta] + t_h[tb] + t_h[tc] + t_h[td]) * 0.25
+			corner_h[cy * cw + cx] = h
+			var elev := (t_elev[ta] + t_elev[tb] + t_elev[tc] + t_elev[td]) * 0.25
+			var green := (t_green[ta] + t_green[tb] + t_green[tc] + t_green[td]) * 0.25
+			var water_n := int(t_water[ta]) + int(t_water[tb]) \
+				+ int(t_water[tc]) + int(t_water[td])
+			var lake_n := int(t_lake[ta]) + int(t_lake[tb]) \
+				+ int(t_lake[tc]) + int(t_lake[td])
+			var acx := x0 - 1 + cx
+			var acy := y0 - 1 + cy
+			var color: Color
+			if h <= 0.0012:
+				var depth := maxf(0.0, -elev)
+				color = DEEP.lerp(SHALLOW, exp(-depth / 220.0))
+				if lake_n > 0:
+					color = color.lerp(LAKE, 0.75)
+			else:
+				var urban: float = (world.urban_at(Vector2i(acx - 1, acy - 1))
+					+ world.urban_at(Vector2i(acx, acy - 1))
+					+ world.urban_at(Vector2i(acx - 1, acy))
+					+ world.urban_at(Vector2i(acx, acy))) * 0.25
+				color = _land_color(world.lat_of_row(acy), elev, green)
+				color = color.lerp(URBAN_GREY, urban * 0.75)
+				if water_n > 0 and elev < 30.0:
+					color = color.lerp(SAND, 0.65)
+			var wobble := float((acx * 73856093 ^ acy * 19349663) % 100) / 100.0
+			corner_col[cy * cw + cx] = color * (0.955 + 0.09 * wobble)
 
 	for y in range(y0, y1):
 		for x in range(x0, x1):
@@ -330,7 +389,7 @@ static func _build_relief_region(world: Node, x0: int, y0: int,
 					2.0,
 					corner_h[(gy - 1) * cw + gx] - corner_h[(gy + 1) * cw + gx]
 				).normalized())
-				colors.push_back(_corner_color(world, cx, cy, h))
+				colors.push_back(corner_col[gy * cw + gx])
 			for i: int in [0, 1, 2, 0, 2, 3]:
 				indices.push_back(base + i)
 			if is_water:

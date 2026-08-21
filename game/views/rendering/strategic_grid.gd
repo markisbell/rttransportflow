@@ -31,6 +31,7 @@ static func build_mesh(world: Node) -> ArrayMesh:
 		var kind := str(world.corridors[tile])
 		var color: Color = PlantModels.HVDC_COLOR if kind == "hvdc" \
 			else PlantModels.LINE_220_COLOR if kind == "line_220" \
+			else Color(0.62, 0.16, 0.14) if kind == "cable_400" \
 			else PlantModels.LINE_400_COLOR
 		# centre-to-centre SEGMENTS toward every connected partner (drawn
 		# once, from the lexicographically smaller end): continuous ribbons

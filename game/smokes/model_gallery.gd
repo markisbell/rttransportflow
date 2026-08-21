@@ -13,7 +13,7 @@ const ROWS: Array = [
 	["nuclear", "coal", "lignite", "gas_ccgt", "gas_ocgt"],
 	["hydro_ps", "wind_onshore", "wind_offshore", "solar_pv", "battery"],
 	["electrolyzer", "h2_cavern", "hvdc_converter", "offshore_platform", "substation"],
-	["line_400", "line_220", "hvdc", "load_center_small", "load_center_large"],
+	["line_400", "line_220", "cable_400", "hvdc", "load_center_small"],
 ]
 const SPACING := 1.5
 
@@ -71,7 +71,7 @@ func run() -> void:
 func _model_for(kind: String) -> Node3D:
 	if kind.begins_with("load_center_"):
 		return PlantModels.load_center(kind.trim_prefix("load_center_"), 2)
-	if kind in ["line_400", "line_220", "hvdc"]:
+	if kind in ["line_400", "line_220", "hvdc", "cable_400"]:
 		var neighbors: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0),
 			Vector2i(0, 1)]
 		return PlantModels.corridor(kind, neighbors)

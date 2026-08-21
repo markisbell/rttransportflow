@@ -55,6 +55,8 @@ const ITEMS := [
 			"desc": "Forces a bus where corridors meet."},
 	]},
 	{"cat": "HVDC & Offshore", "items": [
+		{"tool": "corridor_cable", "label": "400 kV cable (underground)",
+			"hint": "buried/submarine AC: no pylons, ~4x the cost, heavy charging"},
 		{"tool": "corridor_hvdc", "label": "HVDC corridor",
 			"desc": "Point-to-point DC. May cross deep sea."},
 		{"tool": "hvdc_converter", "label": "HVDC converter 2 GW",
@@ -183,6 +185,7 @@ func _make_tile(item: Dictionary) -> Button:
 func _accent_for(tool_id: String) -> Color:
 	match tool_id:
 		"corridor_400": return Color(0.90, 0.25, 0.20)
+		"corridor_cable": return Color(0.62, 0.16, 0.14)
 		"corridor_220": return Color(0.20, 0.75, 0.35)
 		"corridor_hvdc", "hvdc_converter", "offshore_platform":
 			return Color(0.55, 0.25, 0.85)
@@ -223,6 +226,8 @@ func _render_thumbnails() -> void:
 				kind = "line_220"
 			elif tool_id == "corridor_hvdc":
 				kind = "hvdc"
+			elif tool_id == "corridor_cable":
+				kind = "cable_400"
 			sample = PlantModels.corridor(kind, [Vector2i(1, 0), Vector2i(-1, 0)])
 		else:
 			sample = PlantModels.make(tool_id)

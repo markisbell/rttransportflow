@@ -72,14 +72,14 @@ const FOCUS_BUILD_BUDGET := 60
 const DETAIL_MAX_SIZE := MAX_ZOOM + 1.0
 ## one coarse quad per COARSE_STEP tiles
 const COARSE_STEP := 8
-## Past this ortho size a single building or pylon is barely a pixel, so
-## component MODELS (city clusters, plant models, corridor pylons) are
-## dropped chunk-wise and rebuilt on the way back in. What represents the
-## grid above the band is the strategic ribbon layer (StrategicGrid): a
-## continental corridor web holds thousands of corridor tiles at ~90 nodes
-## each — building those as models at overview zoom is minutes of work for
-## sub-pixel geometry (found the hard way by the Germany 380 kV author).
-const MODEL_DETAIL_MAX_SIZE := 70.0
+## Past this ortho size component MODELS (city clusters, plant models,
+## corridor pylons) are dropped chunk-wise and rebuilt on the way back in;
+## the strategic ribbon layer carries the grid above the band. Deliberately
+## LOW (user direction): models are legible only up close anyway, and a
+## continental web at ~90 nodes per corridor tile is minutes of build work
+## for sub-pixel geometry — rendering the small portion you can actually
+## see is most of the smoothness budget.
+const MODEL_DETAIL_MAX_SIZE := 34.0
 
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
 ## drives the ghost preview and what a click builds.
@@ -125,6 +125,10 @@ var _sky_material: ProceduralSkyMaterial
 var _city_lights: MultiMeshInstance3D
 var _city_lights_material: StandardMaterial3D
 var _tod_cache := -1.0  # time-of-day fraction the lighting was last set for
+## resident wind-turbine rotors -> spin speed (rad/s from the LIVE weather
+## at build time). Model-band models are few, so per-frame rotation is
+## cheap; a freed chunk's rotors drop out via is_instance_valid.
+var _rotors := {}
 
 
 func _ready() -> void:
@@ -229,8 +233,9 @@ func _apply_camera() -> void:
 	if _strategic != null:
 		# the ribbon layer is the STRATEGIC representation: near the ground
 		# the pylon models carry the grid and a tile-wide ribbon would pave
-		# the countryside pink
-		_strategic.visible = _zoom > 55.0
+		# the countryside pink; the band overlaps the model band slightly
+		# so the handover never shows a gridless frame
+		_strategic.visible = _zoom > 30.0
 	_stream_dirty = true
 
 
@@ -389,6 +394,11 @@ func _build_city_lights() -> void:
 
 
 func _process(delta: float) -> void:
+	for rotor: Node3D in _rotors.keys():
+		if is_instance_valid(rotor):
+			rotor.rotate_z(float(_rotors[rotor]) * delta)
+		else:
+			_rotors.erase(rotor)
 	var tod := fmod(GameClock.t_sim, GameClock.SECONDS_PER_DAY) \
 		/ GameClock.SECONDS_PER_DAY
 	if absf(tod - _tod_cache) > 0.0003:  # ~26 sim-seconds; cheap either way
@@ -422,7 +432,42 @@ func _process(delta: float) -> void:
 	if _strategic_dirty and _strategic != null:
 		_strategic_dirty = false
 		_strategic.mesh = StrategicGrid.build_mesh(World)
-	_drain_pending(BUILD_PER_FRAME)
+	_drain_pending_budgeted()
+
+
+## Build chunks until the frame budget is spent (at least one): a fixed
+## chunks-per-frame count stuttered whenever chunks were expensive — the
+## budget makes streaming cost a bounded slice of every frame instead.
+const BUILD_BUDGET_MS := 6.0
+
+
+func _drain_pending_budgeted() -> void:
+	if _pending.is_empty():
+		return
+	var t0 := Time.get_ticks_usec()
+	var built := 0
+	while not _pending.is_empty():
+		if built > 0 and (Time.get_ticks_usec() - t0) / 1000.0 > BUILD_BUDGET_MS:
+			break
+		_build_chunk(_pending.pop_front())
+		built += 1
+
+
+## Turbine rotors spin IN THE WIND: speed from the live weather at the
+## tile's region, sampled when the model is built (a resident chunk's
+## weather does not change fast enough to matter).
+func _collect_rotors(model: Node3D, tile: Vector2i) -> void:
+	for rotor: Node3D in model.find_children("*", "Node3D", true, false):
+		if rotor.has_meta("rotor"):
+			var wind := 7.0
+			if Weather != null and Weather.has_method("wind_speed"):
+				var region: String = Weather.region_of_tile(tile,
+					BuildSession.map_projection())
+				if region != "":
+					wind = Weather.wind_speed(region,
+						World.terrain_at(tile) in ["s", "S"])
+			# 4 m/s barely turns, 12+ m/s is a busy 2 rad/s
+			_rotors[rotor] = clampf((wind - 3.0) * 0.22, 0.05, 2.2)
 
 
 # ─── coarse backdrop + water ──────────────────────────────────────────
@@ -636,6 +681,7 @@ func _populate_chunk(key: Vector2i) -> void:
 					model.position = _tile_origin(tile)
 					root.add_child(model)
 					plants[pid] = model
+					_collect_rotors(model, tile)
 			if World.corridors.has(tile):
 				_build_corridor(key, tile)
 			var lc_id := World.load_center_at(tile)
@@ -827,6 +873,7 @@ func _corridor_kind() -> String:
 		"corridor_400": return "line_400"
 		"corridor_220": return "line_220"
 		"corridor_hvdc": return "hvdc"
+		"corridor_cable": return "cable_400"
 	return "line_400"
 
 
