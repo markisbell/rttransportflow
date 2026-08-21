@@ -20,7 +20,11 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 PLATFORM="${1:-linux}"
-GODOT="${GODOT:-$ROOT/../infrastruct/.tools/godot/Godot_v4.7.1-stable_linux.x86_64}"
+# ONE Godot resolver, shared with start_game.sh (the toolchain used to be
+# pinned in two unrelated forms — a sibling-repo default here, a download
+# URL in CI; a machine without the sibling checkout hit a dead path).
+source "$ROOT/scripts/find_godot.sh"
+GODOT="$(find_godot)"
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
 [ -n "$VERSION" ] || VERSION="0.0.0"
 
@@ -31,7 +35,6 @@ case "$PLATFORM" in
 esac
 BUNDLE="build/dist/rttransportflow-$VERSION-$PLATFORM-x86_64"
 
-[ -x "$GODOT" ] || { echo "Godot not found at $GODOT (set GODOT=)" >&2; exit 1; }
 
 # --- 1. frozen backend ------------------------------------------------------
 # Reuse an existing freeze unless the sources are newer — PyInstaller costs

@@ -61,15 +61,23 @@ Per-phase log: [CLAUDE.md](CLAUDE.md) §6. Plan documents:
 
 ### Play the game
 
+From a source checkout (needs `./install.sh` once, and a Godot 4.7.1
+binary — `scripts/find_godot.sh` documents where it is looked for):
+
+```bash
+./start_game.sh                # sandbox: the inherited 2025 world
+./start_game.sh --campaign     # campaign mode (milestone tracker armed)
+./stop_game.sh                 # stop the game + its backend sidecar
+```
+
+The game spawns and supervises its own physics backend on port 8030;
+`.run/game.log` carries the session log. Or build the self-contained
+bundle (no Python on the player's machine):
+
 ```bash
 scripts/package_game.sh linux      # frozen backend + exported game + data
 build/dist/rttransportflow-*-linux-x86_64/rttransportflow.x86_64
 ```
-
-The bundle is self-contained — no Python on the player's machine. The game
-starts its own physics backend on port 8030 and logs to `.run/` beside the
-executable. From a source checkout, `install.sh` then opening `game/` in
-Godot 4.7 works too.
 
 ### Run the backend alone (teaching mode)
 
