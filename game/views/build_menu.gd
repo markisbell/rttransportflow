@@ -56,7 +56,7 @@ const ITEMS := [
 	]},
 	{"cat": "HVDC & Offshore", "items": [
 		{"tool": "corridor_cable", "label": "400 kV cable (underground)",
-			"hint": "buried/submarine AC: no pylons, ~4x the cost, heavy charging"},
+			"desc": "buried/submarine AC: no pylons, ~4x the cost, heavy charging"},
 		{"tool": "corridor_hvdc", "label": "HVDC corridor",
 			"desc": "Point-to-point DC. May cross deep sea."},
 		{"tool": "hvdc_converter", "label": "HVDC converter 2 GW",
