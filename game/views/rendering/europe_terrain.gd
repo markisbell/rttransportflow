@@ -72,6 +72,7 @@ const LUSH := Color(0.373, 0.514, 0.267)
 const FOREST := Color(0.153, 0.278, 0.141)
 const ROCK := Color(0.478, 0.443, 0.404)
 const SAND := Color(0.769, 0.706, 0.537)
+const URBAN_GREY := Color(0.556, 0.545, 0.529)  # concrete sprawl
 
 
 static func height_of(kind: String) -> float:
@@ -260,7 +261,8 @@ static func map_pixel(world: Node, tile: Vector2i) -> Color:
 		if world.lake_at(tile):
 			return LAKE
 		return DEEP.lerp(SHALLOW, exp(-maxf(0.0, -elev) / 220.0))
-	return _land_color(world.lat_of_row(tile.y), elev, world.green_at(tile))
+	return _land_color(world.lat_of_row(tile.y), elev, world.green_at(tile)) \
+		.lerp(URBAN_GREY, world.urban_at(tile) * 0.75)
 
 
 ## The one land-tint rule (mesh corners and minimap pixels alike): base
@@ -388,12 +390,14 @@ static func _shore_walls(world: Node, vertices: PackedVector3Array,
 static func _corner_color(world: Node, cx: int, cy: int, h: float) -> Color:
 	var elev := 0.0
 	var green := 0.0
+	var urban := 0.0
 	var water_n := 0
 	var lake_n := 0
 	for tile: Vector2i in [Vector2i(cx - 1, cy - 1), Vector2i(cx, cy - 1),
 			Vector2i(cx - 1, cy), Vector2i(cx, cy)]:
 		elev += world.elev_at(tile)
 		green += world.green_at(tile)
+		urban += world.urban_at(tile)
 		var kind := world.terrain_at(tile) as String
 		if kind == "S" or kind == "s":
 			water_n += 1
@@ -401,6 +405,7 @@ static func _corner_color(world: Node, cx: int, cy: int, h: float) -> Color:
 				lake_n += 1
 	elev *= 0.25
 	green *= 0.25
+	urban *= 0.25
 	var color: Color
 	if h <= 0.0012:  # under (or at) the water plane
 		var depth := maxf(0.0, -elev)
@@ -409,6 +414,7 @@ static func _corner_color(world: Node, cx: int, cy: int, h: float) -> Color:
 			color = color.lerp(LAKE, 0.75)
 	else:
 		color = _land_color(world.lat_of_row(cy), elev, green)
+		color = color.lerp(URBAN_GREY, urban * 0.75)  # concrete over the sprawl
 		if water_n > 0 and elev < 30.0:
 			color = color.lerp(SAND, 0.65)  # shoreline sand strip
 	# per-corner brightness hash: fields and stands, not billiard cloth

@@ -21,7 +21,22 @@ const ROCK_DENSITY := 1
 const MODELS := {
 	"tree": "res://assets/kenney/mini-forest/Models/GLB format/tree.glb",
 	"rocks": "res://assets/kenney/mini-forest/Models/GLB format/rocks-low.glb",
+	# urban sprawl (NE urban-areas footprints): commercial blocks in the
+	# dense core, suburban houses on the fringe — same CC0 kits the
+	# load-centre downtown clusters draw from
+	"block_a": "res://assets/kenney/city-kit-commercial/Models/GLB format/building-a.glb",
+	"block_b": "res://assets/kenney/city-kit-commercial/Models/GLB format/building-d.glb",
+	"block_c": "res://assets/kenney/city-kit-commercial/Models/GLB format/building-g.glb",
+	"house_a": "res://assets/kenney/city-kit-suburban/Models/GLB format/building-type-a.glb",
+	"house_b": "res://assets/kenney/city-kit-suburban/Models/GLB format/building-type-c.glb",
 }
+## ground footprint (in tiles) a building prop is normalized to — the GLBs
+## are authored at kit scale, so instances scale by TARGET/aabb-extent
+const BUILDING_FIT := {
+	"block_a": 0.30, "block_b": 0.30, "block_c": 0.30,
+	"house_a": 0.20, "house_b": 0.20,
+}
+const URBAN_MIN := 0.22  # sprawl starts above this footprint density
 
 ## a forest region is ~250 km across whatever the tile size is — frequency
 ## is cycles per TILE, so it has to follow the grid resolution or the same
@@ -32,6 +47,7 @@ const FOREST_SPAN_KM := 250.0
 ## Chunks are built and freed constantly; instantiating the source scene per
 ## chunk showed up immediately in the streaming budget.
 static var _mesh_cache := {}
+static var _extent_cache := {}  # prop -> max horizontal AABB extent
 ## one shared noise object, rebuilt only when the map resolution changes
 static var _noise: FastNoiseLite = null
 static var _noise_tile_km := 0.0
@@ -52,8 +68,9 @@ static func _field(tile_km: float) -> FastNoiseLite:
 static func placements_region(world: Node, x0: int, y0: int,
 		x1: int, y1: int) -> Dictionary:
 	var noise := _field(world.tile_km)
-	var out := {"tree": [] as Array[Transform3D],
-		"rocks": [] as Array[Transform3D]}
+	var out := {}
+	for prop_name: String in MODELS:
+		out[prop_name] = [] as Array[Transform3D]
 	for y in range(y0, y1):
 		for x in range(x0, x1):
 			var tile := Vector2i(x, y)
@@ -62,6 +79,13 @@ static func placements_region(world: Node, x0: int, y0: int,
 					or world.load_center_at(tile) != "":
 				continue
 			var kind := world.terrain_at(tile) as String
+			# urban sprawl rides the REAL footprint layer: the city's shape
+			# comes from the data, its buildings from the kits
+			var urban: float = world.urban_at(tile) \
+				if world.get("has_relief") else 0.0
+			if urban > URBAN_MIN and kind != "S" and kind != "s":
+				_scatter_buildings(world, out, tile, urban)
+				continue
 			var prop := ""
 			var count := 0
 			if world.get("has_relief"):
@@ -103,9 +127,36 @@ static func placements_region(world: Node, x0: int, y0: int,
 	return out
 
 
+## Buildings for one urban tile: count and mix follow the footprint
+## density (dense core -> commercial blocks, fringe -> houses); rotations
+## in quarter turns — cities are built on street grids, not scattered.
+static func _scatter_buildings(world: Node, out: Dictionary,
+		tile: Vector2i, urban: float) -> void:
+	var count := 2 + int(urban * 2.5)
+	var base_y := EuropeTerrain.ground_of(world, tile)
+	for i in range(count):
+		var h := _hash(tile.x, tile.y, i + 100)
+		var commercial := float(h % 100) / 100.0 < urban * 1.1 - 0.25
+		var prop: String = ("block_" + ["a", "b", "c"][(h / 7) % 3]) \
+			if commercial else ("house_" + ["a", "b"][(h / 7) % 2])
+		var fit: float = BUILDING_FIT[prop] / maxf(_prop_extent(prop), 0.001)
+		var ox := 0.14 + 0.72 * float(h % 1000) / 1000.0
+		var oz := 0.14 + 0.72 * float((h / 1000) % 1000) / 1000.0
+		var basis := Basis(Vector3.UP, PI * 0.5 * ((h / 13) % 4)) \
+			.scaled(Vector3.ONE * fit)
+		(out[prop] as Array[Transform3D]).append(Transform3D(basis,
+			Vector3(tile.x + ox, base_y, tile.y + oz)))
+
+
 ## Whole-map scatter (small maps, tests). The renderer streams instead.
 static func placements(world: Node) -> Dictionary:
 	return placements_region(world, 0, 0, world.width, world.height)
+
+
+static func _prop_extent(prop: String) -> float:
+	if not _extent_cache.has(prop):
+		_parts(prop)  # extraction also measures the AABB
+	return float(_extent_cache.get(prop, 1.0))
 
 
 static func _hash(x: int, y: int, i: int) -> int:
@@ -122,6 +173,8 @@ static func _parts(prop: String) -> Array:
 	var scene: PackedScene = load(MODELS[prop])
 	if scene != null:
 		var sample := scene.instantiate()
+		var bounds := PlantModels.aabb_of(sample)
+		_extent_cache[prop] = maxf(bounds.size.x, bounds.size.z)
 		# GLB models are authored around their own origin at their own scale;
 		# fold each source MeshInstance's local transform into the instances
 		# so a multi-part prop keeps its shape

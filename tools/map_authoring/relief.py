@@ -136,6 +136,16 @@ def build(map_path: Path) -> Path:
     lake_mask = np.array(ne.rasterize(lake_rings, tile_of, width, height))
     lake_mask &= water  # a lake byte on a land tile would be a lie
 
+    # --- urban footprints (NE urban areas: real MODIS-derived city shapes,
+    # public domain — Berlin's blob, the Ruhr sprawl). Blurred once so the
+    # density grades from dense core to fringe instead of a hard edge.
+    from scipy.ndimage import uniform_filter
+    urban_rings = ne.rings_in("urban", bbox, min_size=0.0008)
+    urban_mask = np.array(ne.rasterize(urban_rings, tile_of, width, height))
+    urban_mask &= ~water
+    urban = uniform_filter(urban_mask.astype(np.float64), size=3)
+    urban[water] = 0.0
+
     # --- vegetation density (the forest layer) ---------------------------
     lat_grid = lat0 - (tile_y + 0.5) * dlat
     # macro moisture: dry Mediterranean south, temperate centre, wet north
@@ -171,12 +181,15 @@ def build(map_path: Path) -> Path:
         "elev_b64": base64.b64encode(elev_bytes.tobytes()).decode(),
         "green_b64": base64.b64encode(green.tobytes()).decode(),
         "flags_b64": base64.b64encode(flags.tobytes()).decode(),
+        "urban_b64": base64.b64encode(
+            np.clip(urban * 255.0, 0, 255).astype(np.uint8).tobytes()).decode(),
     }
     target = map_path.with_name(map_path.stem + "_relief.json")
     target.write_text(json.dumps(out))
 
     land = ~water
     print(f"relief: {target.name} in {time.time() - t0:.1f} s — "
+          f"urban tiles {int((urban > 0.05).sum())}, "
           f"land elev {elev[land].min():.0f}..{elev[land].max():.0f} m, "
           f"lake tiles {int(lake_mask.sum())}, "
           f"green>128 on {int((green > 128).sum())} tiles, "

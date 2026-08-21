@@ -31,6 +31,7 @@ var has_relief := false
 var _relief_elev: PackedByteArray = PackedByteArray()
 var _relief_green: PackedByteArray = PackedByteArray()
 var _relief_flags: PackedByteArray = PackedByteArray()
+var _relief_urban: PackedByteArray = PackedByteArray()
 var _relief_elev_step := 22.0
 var _relief_elev_offset := -900.0
 var _relief_lat0 := 71.0
@@ -154,6 +155,9 @@ func load_relief(doc: Dictionary) -> bool:
 	_relief_elev = elev
 	_relief_green = green
 	_relief_flags = flags
+	# urban footprints arrived later than the first sidecars — optional
+	var urban := Marshalls.base64_to_raw(str(doc.get("urban_b64", "")))
+	_relief_urban = urban if urban.size() == n else PackedByteArray()
 	_relief_elev_step = float(doc.get("elev_step_m", 22.0))
 	_relief_elev_offset = float(doc.get("elev_offset_m", -900.0))
 	_relief_lat0 = float(doc.get("lat0", 71.0))
@@ -175,6 +179,27 @@ func green_at(tile: Vector2i) -> float:
 	if not has_relief or not in_bounds(tile):
 		return 0.0
 	return _relief_green[tile.y * width + tile.x] / 255.0
+
+
+## Urban footprint density 0..1 (NE urban areas) — drives the city sprawl
+## scatter, the concrete terrain tint and the night lights.
+func urban_at(tile: Vector2i) -> float:
+	if _relief_urban.is_empty() or not in_bounds(tile):
+		return 0.0
+	return _relief_urban[tile.y * width + tile.x] / 255.0
+
+
+## Tiles whose urban density exceeds `min_frac` (night lights, sprawl);
+## empty when the sidecar carries no urban layer.
+func urban_tiles(min_frac: float) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if _relief_urban.is_empty():
+		return out
+	var threshold := int(min_frac * 255.0)
+	for i in _relief_urban.size():
+		if _relief_urban[i] > threshold:
+			out.append(Vector2i(i % width, i / width))
+	return out
 
 
 func lake_at(tile: Vector2i) -> bool:

@@ -319,7 +319,7 @@ func _apply_daylight(tod: float) -> void:
 	if _city_lights != null:
 		var night_f := 1.0 - day_f
 		_city_lights.visible = night_f > 0.03
-		_city_lights_material.emission_energy_multiplier = 2.4 * night_f
+		_city_lights_material.emission_energy_multiplier = 1.5 * night_f
 	if _strategic != null:
 		# unshaded ribbons ignore the sun — dim them with it, or the grid
 		# blazes neon at midnight
@@ -328,25 +328,34 @@ func _apply_daylight(tod: float) -> void:
 			Color(level, level, level)
 
 
-## One emissive quad per load-centre tile — built once per map.
+## One emissive quad per lit tile — built once per map. With the urban
+## layer the lights trace the REAL city footprints (the satellite-at-night
+## shapes); without it they fall back to the load-centre tiles.
 func _build_city_lights() -> void:
 	if _city_lights != null:
 		_city_lights.queue_free()
-	var tiles: Array[Vector2i] = []
-	for lc_id: String in World.load_centers:
-		for tile: Vector2i in World.load_centers[lc_id]["tiles"]:
-			tiles.append(tile)
+	var tiles: Array[Vector2i] = World.urban_tiles(0.12)
+	var from_urban := not tiles.is_empty()
+	if not from_urban:
+		for lc_id: String in World.load_centers:
+			for tile: Vector2i in World.load_centers[lc_id]["tiles"]:
+				tiles.append(tile)
 	if tiles.is_empty():
 		return
 	var multi := MultiMesh.new()
 	multi.transform_format = MultiMesh.TRANSFORM_3D
 	var quad := PlaneMesh.new()
-	quad.size = Vector2(0.96, 0.96)
+	# oversized so neighbouring glows overlap into one continuous blob —
+	# hard per-tile squares read as a checkerboard, not a city at night
+	quad.size = Vector2(2.6, 2.6)
 	multi.mesh = quad
 	multi.instance_count = tiles.size()
 	for i in tiles.size():
 		var tile := tiles[i]
-		multi.set_instance_transform(i, Transform3D(Basis.IDENTITY,
+		# a village glows smaller and dimmer than a metro core
+		var glow_scale := 0.45 + 0.6 * World.urban_at(tile) if from_urban else 0.7
+		multi.set_instance_transform(i, Transform3D(
+			Basis.IDENTITY.scaled(Vector3(glow_scale, 1.0, glow_scale)),
 			Vector3(tile.x + 0.5, ground_y(tile) + 0.055, tile.y + 0.5)))
 	_city_lights = MultiMeshInstance3D.new()
 	_city_lights.multimesh = multi
@@ -355,6 +364,20 @@ func _build_city_lights() -> void:
 	_city_lights_material.emission_enabled = true
 	_city_lights_material.emission = CITY_LIGHT
 	_city_lights_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# radial falloff + additive blending: overlapping glows sum into the
+	# soft satellite-at-night blobs instead of tiling as opaque squares
+	var falloff := Gradient.new()
+	falloff.set_color(0, Color(1, 1, 1, 0.42))  # gentle: overlaps ACCUMULATE
+	falloff.set_color(1, Color(1, 1, 1, 0.0))
+	falloff.add_point(0.45, Color(1, 1, 1, 0.16))
+	var falloff_tex := GradientTexture2D.new()
+	falloff_tex.gradient = falloff
+	falloff_tex.fill = GradientTexture2D.FILL_RADIAL
+	falloff_tex.fill_from = Vector2(0.5, 0.5)
+	falloff_tex.fill_to = Vector2(0.5, 0.0)
+	_city_lights_material.albedo_texture = falloff_tex
+	_city_lights_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_city_lights_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	_city_lights.material_override = _city_lights_material
 	_city_lights.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_city_lights.visible = false

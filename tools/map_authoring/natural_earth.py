@@ -35,6 +35,7 @@ LAYERS = {
     "lakes": "ne_10m_lakes",
     "rivers": "ne_10m_rivers_lake_centerlines",
     "regions": "ne_10m_geography_regions_polys",
+    "urban": "ne_10m_urban_areas",  # MODIS-derived city footprints (PD)
 }
 
 
