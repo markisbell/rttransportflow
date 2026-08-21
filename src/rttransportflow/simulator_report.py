@@ -160,10 +160,15 @@ class ReportingMixin:
                                    "severity": "warning", "value": loading})
         for bus, vals in pf.get("buses", {}).items():
             vm = vals["vm_pu"]
-            if vm < 0.90 or vm > 1.10:
+            # TRANSMISSION bands, not the family's distribution ones: a
+            # 380 kV grid operates at 400-420 kV continuously (420 kV =
+            # 1.105 pu is the ENTSO-E continuous limit), so 1.05-1.08 pu
+            # is normal life, not a warning. The old 0.95/1.05 band paged
+            # the player about a perfectly healthy grid.
+            if vm < 0.90 or vm > 1.105:
                 violations.append({"element": bus, "kind": "voltage",
                                    "severity": "critical", "value": vm})
-            elif vm < 0.95 or vm > 1.05:
+            elif vm < 0.93 or vm > 1.08:
                 violations.append({"element": bus, "kind": "voltage",
                                    "severity": "warning", "value": vm})
         return violations

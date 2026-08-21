@@ -617,7 +617,10 @@ intended campaign policy lever, not a bug. Storage bids at opportunity cost
 - Violation kinds: `freq_alarm`, `ufls_stage`, `gen_trip_uf`, `gen_trip_of`,
   `rocof_dg_trip`, `island_blackout`, `fcr_exhausted`, `gfm_overload`,
   `fuel_starved`, `storage_empty|full`, `clamped` (+ family loading/voltage
-  kinds).
+  kinds). Voltage bands are TRANSMISSION practice (base 380 kV): warning
+  outside [0.93, 1.08] pu, critical outside [0.90, 1.105] pu — 420 kV
+  (1.105) is the ENTSO-E continuous limit, so 1.05-1.08 is normal
+  operation, not an alarm.
 - Divergence and blackout are DATA (HTTP 200); the idempotent last-t cache
   returns **before** any SoC/state integration (family rule).
 
