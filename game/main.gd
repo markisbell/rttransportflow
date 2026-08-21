@@ -124,6 +124,9 @@ func _take_screenshot() -> void:
 		GameClock.t_sim = float(OS.get_environment("SHOT_TIME")) * 3600.0
 	else:
 		GameClock.t_sim = 12.0 * 3600.0  # canon shots are midday
+	if OS.get_environment("SHOT_FAKE_WEEK") != "":
+		_fake_week()  # look harness: a synthetic measured half-week so the
+		# site notes' stacked charts render without a live backend
 	view.redraw()
 	var focus: Vector2i = (World.load_centers["berlin"]["tiles"] as Array)[0]
 	if OS.get_environment("SHOT_TILE") != "":  # "x,y" — aim the probe anywhere
@@ -223,3 +226,59 @@ func _boot_async(campaign: bool = false) -> void:
 	await BuildSession.build_status
 	BuildSession.enabled = true
 	GameClock.speed = 60.0
+
+
+## SHOT_FAKE_WEEK: seed ZoneHistory with a plausible synthetic week up to
+## "now" so the note charts can be reviewed without running the backend.
+## Probe-only — live play records the real measured wire results.
+func _fake_week() -> void:
+	var home := {}
+	for pid: String in World.plants:
+		var t: Vector2i = World.plants[pid]["tile"]
+		var best := ""
+		var best_d := 1e12
+		for zone: String in World.load_centers:
+			var zt: Vector2i = (World.load_centers[zone]["tiles"] as Array)[0]
+			var d := Vector2(t - zt).length_squared()
+			if d < best_d:
+				best_d = d
+				best = zone
+		home[pid] = best
+	Dispatch.home_zone = home
+	var t_now := GameClock.t_sim
+	var day0 := ZoneHistory.week_start_day()
+	var blocks := ZoneHistory.now_block()
+	for b in blocks + 1:
+		var t_days := day0 + b / 96.0
+		GameClock.t_sim = t_days * 86400.0
+		var hour := fmod(t_days, 1.0) * 24.0
+		var daylight := maxf(0.0, sin((hour - 6.0) / 12.0 * PI))
+		var devices := {}
+		for pid: String in World.plants:
+			var kind := str(World.plants[pid]["kind"])
+			var p_max := float(World.plants[pid].get("p_max_mw", 0.0))
+			var p := 0.0
+			match kind:
+				"nuclear":
+					p = p_max * 0.9
+				"coal", "lignite":
+					p = p_max * (0.45 + 0.35 * daylight)
+				"gas_ccgt", "gas_ocgt":
+					p = p_max * maxf(0.0, 0.55 * sin((hour - 16.0) / 5.0 * PI))
+				"wind_onshore", "wind_offshore", "offshore_platform":
+					p = p_max * (0.35 + 0.3 * sin(t_days * TAU * 0.9
+						+ float(pid.hash() % 7)))
+				"solar_pv":
+					p = p_max * daylight * 0.85
+				"hydro_ps":
+					p = p_max * 0.4 * sin((hour - 14.0) / 10.0 * PI)
+				"battery":
+					p = p_max * 0.5 * sin((hour - 15.0) / 9.0 * PI)
+				"electrolyzer":
+					p = -p_max * 0.7 * daylight
+				_:
+					continue
+			devices[pid] = {"p_mw": maxf(p, -p_max) if kind in ["hydro_ps",
+				"battery", "electrolyzer"] else clampf(p, 0.0, p_max)}
+		ZoneHistory._on_step(0, {"devices": devices})
+	GameClock.t_sim = t_now

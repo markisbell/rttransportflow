@@ -81,6 +81,13 @@ const COARSE_STEP := 8
 ## see is most of the smoothness budget.
 const MODEL_DETAIL_MAX_SIZE := 34.0
 
+## site notes: floating weekly graphs above cities and (closer in) plants;
+## capped nearest-first so the SubViewport count stays small
+const NOTE_ZONE_MAX_ZOOM := 70.0
+const NOTE_PLANT_MAX_ZOOM := 16.0
+const NOTE_ZONE_CAP := 6
+const NOTE_PLANT_CAP := 8
+
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
 ## drives the ghost preview and what a click builds.
 var tool_id := "":
@@ -122,6 +129,12 @@ var _components_dirty := false
 ## chunks awaiting component population (nearest-first), drained under the
 ## frame budget — see _sync_components for why this is never done inline
 var _populate_queue: Array[Vector2i] = []
+## floating site notes (city / plant weekly graphs) keyed "z:<id>"/"p:<pid>"
+var _notes_root: Node3D
+var _notes: Dictionary = {}
+var _note_accum := 0.0
+var _note_block := -1
+var _zone_anchor: Dictionary = {}  # zone id -> Vector2 tile centroid
 var _models_shown := true
 var _strategic: MeshInstance3D
 var _strategic_dirty := false
@@ -140,6 +153,8 @@ func _ready() -> void:
 	_build_camera()
 	_chunk_root = Node3D.new()
 	add_child(_chunk_root)
+	_notes_root = Node3D.new()
+	add_child(_notes_root)
 	_cursor = MeshInstance3D.new()
 	var cursor_mesh := PlaneMesh.new()
 	cursor_mesh.size = Vector2(1.0, 1.0)
@@ -442,6 +457,10 @@ func _process(delta: float) -> void:
 	if _strategic_dirty and _strategic != null:
 		_strategic_dirty = false
 		_strategic.mesh = StrategicGrid.build_mesh(World)
+	_note_accum += delta
+	if _note_accum >= 0.4:
+		_note_accum = 0.0
+		_sync_notes()
 	_drain_pending_budgeted()
 
 
@@ -819,6 +838,89 @@ func _sync_components() -> void:
 	for key: Vector2i in _wanted_chunks():
 		if _chunks.has(key):
 			_populate_queue.append(key)
+
+
+# ─── site notes (city / plant weekly graphs) ──────────────────────────
+
+## Reconcile the floating notes with the camera: cities inside the view
+## get one below NOTE_ZONE_MAX_ZOOM, individual plants join below
+## NOTE_PLANT_MAX_ZOOM, nearest-first under a hard cap. Charts refresh
+## when the 15-min block advances (ZoneHistory records per block), and a
+## note's viewport renders only on refresh — resident notes are free.
+func _sync_notes() -> void:
+	if not _map_ready:
+		return
+	var wanted := {}
+	var fp := Vector2(_focus.x, _focus.z)
+	if _zoom <= NOTE_ZONE_MAX_ZOOM:
+		var scored: Array = []
+		for zone: String in World.load_centers:
+			var a := _anchor_of(zone)
+			var d := a.distance_to(fp)
+			if d <= _zoom * 1.6 + 12.0:
+				scored.append({"z": zone, "d": d, "a": a})
+		scored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+			return float(x["d"]) < float(y["d"]))
+		for k in mini(scored.size(), NOTE_ZONE_CAP):
+			wanted["z:" + str((scored[k] as Dictionary)["z"])] = scored[k]
+	if _zoom <= NOTE_PLANT_MAX_ZOOM:
+		var pscored: Array = []
+		for pid: String in World.plants:
+			var kind := str(World.plants[pid]["kind"])
+			if kind == "h2_cavern":
+				continue  # no power trace to graph
+			var t: Vector2i = World.plants[pid]["tile"]
+			var a := Vector2(t.x + 0.5, t.y + 0.5)
+			var d := a.distance_to(fp)
+			if d <= _zoom * 1.6 + 6.0:
+				pscored.append({"p": pid, "kind": kind, "d": d, "a": a})
+		pscored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+			return float(x["d"]) < float(y["d"]))
+		for k in mini(pscored.size(), NOTE_PLANT_CAP):
+			wanted["p:" + str((pscored[k] as Dictionary)["p"])] = pscored[k]
+	for key: String in _notes.keys():
+		if not wanted.has(key):
+			(_notes[key] as SiteNote).queue_free()
+			_notes.erase(key)
+	var block := int(GameClock.t_sim / Dispatch.BLOCK_S)
+	var block_changed := block != _note_block
+	_note_block = block
+	for key: String in wanted:
+		var e: Dictionary = wanted[key]
+		var fresh := not _notes.has(key)
+		if fresh:
+			var note: SiteNote
+			if key.begins_with("z:"):
+				note = SiteNote.for_zone(str(e["z"]))
+			else:
+				note = SiteNote.for_plant(str(e["p"]), str(e["kind"]))
+			_notes_root.add_child(note)
+			_notes[key] = note
+		var n := _notes[key] as SiteNote
+		var a: Vector2 = e["a"]
+		var tile := Vector2i(int(a.x), int(a.y))
+		# neighbouring plant notes stagger to three heights so a packed
+		# park reads as separate cards instead of one pile
+		var lift := 1.0 + _zoom * 0.03
+		if key.begins_with("p:"):
+			lift += (absi(key.hash()) % 3) * 0.075 * _zoom
+		n.position = Vector3(a.x, ground_y(tile) + lift, a.y)
+		n.apply_zoom(_zoom)
+		if fresh or block_changed:
+			n.refresh()
+
+
+func _anchor_of(zone: String) -> Vector2:
+	if _zone_anchor.has(zone):
+		return _zone_anchor[zone]
+	var tiles: Array = (World.load_centers[zone] as Dictionary).get("tiles", [])
+	var c := Vector2.ZERO
+	for t: Vector2i in tiles:
+		c += Vector2(t.x + 0.5, t.y + 0.5)
+	if tiles.size() > 0:
+		c /= tiles.size()
+	_zone_anchor[zone] = c
+	return c
 
 
 func redraw() -> void:
