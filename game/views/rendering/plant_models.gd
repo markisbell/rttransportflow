@@ -845,13 +845,18 @@ static func _make_substation() -> Node3D:
 ## conductors reaching toward each connected neighbour, so adjacent tiles
 ## meet mid-edge and the line reads as continuous across the map.
 ## `neighbours` are the N/E/S/W offsets that carry the same corridor.
+## Conductors are aluminium — SILVER, never the voltage accent (the accent
+## stays on the mast peak cap, so the line language survives at a glance).
+const CONDUCTOR := Color(0.80, 0.81, 0.84)
+
+
 static func corridor(kind: String, neighbors: Array[Vector2i]) -> Node3D:
 	var node := Node3D.new()
 	var accent := LINE_400_COLOR
 	var mast_h := 0.62
-	var arms: Array[float] = [0.44, 0.56]  # crossarm heights
+	var arms: Array[float] = [0.44, 0.56]  # two circuits, three phases each
 	var arm_w := 0.30
-	var per_arm := 3  # conductors per crossarm
+	var per_arm := 3  # conductors per crossarm (one three-phase circuit)
 	match kind:
 		"line_220":
 			accent = LINE_220_COLOR
@@ -865,36 +870,51 @@ static func corridor(kind: String, neighbors: Array[Vector2i]) -> Node3D:
 			arms = [0.46]
 			arm_w = 0.22
 			per_arm = 2  # bipole: one conductor per pole
-	node.add_child(_lattice_mast(mast_h, accent))
-	# crossarms + insulator strings
-	var hangers: Array[Vector3] = []
+	# the tower FACES the line: crossarms perpendicular to the primary span,
+	# so the phases stay side by side instead of converging at the tile
+	# edge (they used to fan into the centreline and fan out again — a
+	# split-and-reconnect no real line has)
+	var yaw := 0.0
+	if not neighbors.is_empty():
+		var d0 := Vector3(neighbors[0].x, 0, neighbors[0].y)
+		yaw = atan2(d0.x, d0.z)
+	var tower := Node3D.new()
+	tower.rotation.y = yaw
+	node.add_child(tower)
+	tower.add_child(_lattice_mast(mast_h, accent))
+	# crossarms + insulator strings (tower-local X = across the line)
+	var hangers: Array[Vector3] = []  # LOCAL positions
 	for arm_y: float in arms:
-		node.add_child(box(Vector3(arm_w, 0.014, 0.014), STEEL, Vector3(0, arm_y, 0)))
-		node.add_child(strut(Vector3(-arm_w / 2.0, arm_y, 0),
+		tower.add_child(box(Vector3(arm_w, 0.014, 0.014), STEEL, Vector3(0, arm_y, 0)))
+		tower.add_child(strut(Vector3(-arm_w / 2.0, arm_y, 0),
 			Vector3(0, arm_y + 0.09, 0), 0.008, STEEL_DARK))
-		node.add_child(strut(Vector3(arm_w / 2.0, arm_y, 0),
+		tower.add_child(strut(Vector3(arm_w / 2.0, arm_y, 0),
 			Vector3(0, arm_y + 0.09, 0), 0.008, STEEL_DARK))
 		for c in per_arm:
 			var x := -arm_w / 2.0 + arm_w * c / float(maxi(per_arm - 1, 1))
 			if per_arm == 2:
 				x = -arm_w / 2.0 + arm_w * c
-			node.add_child(taper(0.006, 0.006, 0.05, Color(0.30, 0.26, 0.24),
+			tower.add_child(taper(0.006, 0.006, 0.05, Color(0.30, 0.26, 0.24),
 				Vector3(x, arm_y - 0.03, 0), 6))
 			hangers.append(Vector3(x, arm_y - 0.055, 0))
-	# half-span conductors toward every connected neighbour
+	# half-span conductors: every phase keeps its LATERAL offset relative
+	# to the span, so the wires run parallel — including diagonal spans,
+	# whose half-vector is simply half the way to the neighbour's centre
+	var spin := Basis(Vector3.UP, yaw)
 	for offset: Vector2i in neighbors:
-		var dir := Vector3(offset.x, 0, offset.y).normalized()
+		var half := Vector3(offset.x, 0, offset.y) * 0.5
+		var dir := half.normalized()
 		for hang: Vector3 in hangers:
-			# conductors leave the insulator and sag slightly to the tile edge
-			var edge := dir * 0.5 + Vector3(0, hang.y - 0.05, 0)
-			var mid := dir * 0.25 + Vector3(0, hang.y - 0.045, 0)
-			node.add_child(strut(hang, mid, 0.007, accent))
-			node.add_child(strut(mid, edge, 0.007, accent))
-	# earth wire along the same spans, off the mast peak
-	for offset: Vector2i in neighbors:
-		var dir := Vector3(offset.x, 0, offset.y).normalized()
+			var hw := spin * hang  # hanger in tile space
+			var flat := Vector3(hw.x, 0, hw.z)
+			var lateral := flat - dir * flat.dot(dir)
+			var edge := half + lateral + Vector3(0, hang.y - 0.05, 0)
+			var mid := half * 0.5 + lateral + Vector3(0, hang.y - 0.045, 0)
+			node.add_child(strut(hw, mid, 0.007, CONDUCTOR))
+			node.add_child(strut(mid, edge, 0.007, CONDUCTOR))
+		# earth wire along the same span, off the mast peak
 		node.add_child(strut(Vector3(0, mast_h, 0),
-			dir * 0.5 + Vector3(0, mast_h - 0.04, 0), 0.005, STEEL_DARK))
+			half + Vector3(0, mast_h - 0.04, 0), 0.005, STEEL_DARK))
 	return node
 
 

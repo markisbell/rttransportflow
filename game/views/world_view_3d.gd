@@ -142,6 +142,10 @@ func _ready() -> void:
 	var strategic_material := StandardMaterial3D.new()
 	strategic_material.vertex_color_use_as_albedo = true
 	strategic_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# the strategic layer must stay legible at the zooms it exists for —
+	# aerial haze would wash the thin ribbons out exactly there
+	strategic_material.disable_fog = true
+	strategic_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_strategic.material_override = strategic_material
 	_strategic.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_strategic)
@@ -651,6 +655,15 @@ func _populate_chunk(key: Vector2i) -> void:
 
 func _build_corridor(key: Vector2i, tile: Vector2i) -> void:
 	var chunk: Dictionary = _chunks[key]
+	if World.diag_fillers.has(tile):
+		# a diagonal-span corner filler carries no mast — its neighbours
+		# draw the conductors cutting across it
+		var stale := chunk["corridors"] as Dictionary
+		if stale.has(tile):
+			(stale[tile] as Node3D).queue_free()
+			stale.erase(tile)
+			(chunk["corridor_keys"] as Dictionary).erase(tile)
+		return
 	var kind := str(World.corridors[tile])
 	var neighbors := _corridor_neighbors(tile, kind)
 	# the cache key folds kind + which sides connect: a corridor is only
@@ -746,6 +759,14 @@ func _corridor_neighbors(tile: Vector2i, kind: String) -> Array[Vector2i]:
 			Vector2i(0, 1), Vector2i(-1, 0)]:
 		var n := tile + offset
 		var linked := str(World.corridors.get(n, "")) == kind
+		if linked and World.diag_fillers.has(n):
+			# the neighbour is a diagonal-span corner filler: the span cuts
+			# the corner, so the conductors head for the filler's OTHER
+			# neighbour instead — that Vector is the diagonal
+			var beyond := _filler_partner(n, tile, kind)
+			if beyond != Vector2i.ZERO:
+				out.append(beyond)
+				continue
 		if not linked and kind != "hvdc":
 			# AC corridors also dress toward what they serve
 			linked = World.plant_at(n) != "" or World.load_center_at(n) != ""
@@ -754,6 +775,17 @@ func _corridor_neighbors(tile: Vector2i, kind: String) -> Array[Vector2i]:
 		if linked:
 			out.append(offset)
 	return out
+
+
+## The offset (from `tile`) of the filler's other same-kind neighbour —
+## the far end of the diagonal span the filler stands in for.
+func _filler_partner(filler: Vector2i, tile: Vector2i, kind: String) -> Vector2i:
+	for offset: Vector2i in [Vector2i(0, -1), Vector2i(1, 0),
+			Vector2i(0, 1), Vector2i(-1, 0)]:
+		var n := filler + offset
+		if n != tile and str(World.corridors.get(n, "")) == kind:
+			return n - tile
+	return Vector2i.ZERO
 
 
 ## Apply the armed tool to a tile. The VIEW never owns state — every edit

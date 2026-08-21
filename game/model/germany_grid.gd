@@ -72,17 +72,59 @@ static func _lay(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 	var path := _route_astar(world, from_tile, to_tile, kind)
 	if path.is_empty():
 		return false
-	for tile: Vector2i in path:
+	var previous := path[0]
+	world.place_corridor(previous, kind)
+	for i in range(1, path.size()):
+		var tile := path[i]
+		var step := tile - previous
+		if step.x != 0 and step.y != 0:
+			# diagonal step: the corner FILLER keeps the web 4-connected
+			# (the topology walks the staircase unchanged); flagged so the
+			# renderer draws the span cutting across it
+			var corner := previous + Vector2i(step.x, 0)
+			var alt := previous + Vector2i(0, step.y)
+			if not _corner_ok(world, corner, kind):
+				corner = alt
+			var pre_existing: bool = world.corridors.has(corner)
+			world.place_corridor(corner, kind)
+			if not pre_existing \
+					and str(world.corridors.get(corner, "")) == kind:
+				world.diag_fillers[corner] = true
 		world.place_corridor(tile, kind)
+		previous = tile
 	return true
 
 
-## Deterministic A* (Manhattan heuristic, integer-bucket open list, LIFO
+static func _corner_ok(world: Node, corner: Vector2i, kind: String) -> bool:
+	if not world.can_place_corridor(corner, kind):
+		return false
+	if not world.corridors.has(corner):
+		return true
+	# an existing same-kind tile serves as the corner; hvdc may overlay AC
+	return str(world.corridors[corner]) == kind \
+		or (kind == "hvdc" and not world.dc_overlay.has(corner))
+
+
+## Route directions: 4 straight (cost 10) then 4 diagonal (cost 14 — the
+## octile ratio). Order is part of determinism.
+const ROUTE_DIRS: Array[Vector2i] = [
+	Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0),
+	Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+
+static func _octile(a: Vector2i, b: Vector2i) -> int:
+	var dx := absi(a.x - b.x)
+	var dy := absi(a.y - b.y)
+	return 10 * maxi(dx, dy) + 4 * mini(dx, dy)
+
+
+## Deterministic A* (octile heuristic, integer-bucket open list, LIFO
 ## within a bucket — a fixed rule, so the same seed always lays the same
 ## grid). NOT the shared DemoBuild.route: plain BFS explores an area
 ## quadratic in path length and 84 continental routes took minutes; A*
 ## walks a narrow corridor along the straight line instead. The shared
 ## BFS keeps its expansion order — existing builds pin their paths on it.
+## Diagonal steps need a placeable corner tile (the filler _lay adds).
 static func _route_astar(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 		kind: String) -> Array[Vector2i]:
 	var margin: int = world.tiles_for_km(BOX_MARGIN_KM)
@@ -93,7 +135,7 @@ static func _route_astar(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 	var g := {from_tile: 0}
 	var came := {from_tile: from_tile}
 	var open := {}  # f-score -> Array[Vector2i]
-	var f0 := absi(from_tile.x - to_tile.x) + absi(from_tile.y - to_tile.y)
+	var f0 := _octile(from_tile, to_tile)
 	open[f0] = [from_tile] as Array[Vector2i]
 	var f := f0
 	var f_max := f0
@@ -111,20 +153,26 @@ static func _route_astar(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 			path.append(from_tile)
 			path.reverse()
 			return path
-		for offset: Vector2i in GridTopology.NEIGHBORS:
+		for offset: Vector2i in ROUTE_DIRS:
 			var n := current + offset
 			if g.has(n):
 				continue
 			if n != to_tile and not _passable(world, n, to_tile, from_tile,
 					kind, bx0, bx1, by0, by1):
 				continue
+			var diagonal := offset.x != 0 and offset.y != 0
+			if diagonal and not (
+					_corner_ok(world, current + Vector2i(offset.x, 0), kind)
+					or _corner_ok(world, current + Vector2i(0, offset.y), kind)):
+				continue
 			# a crossing span costs extra, so DC routes cross AC lines
 			# perpendicular instead of riding along them as endless overlay
-			var step := 4 if (world.corridors.has(n)
-				and str(world.corridors.get(n, "")) != kind) else 1
+			var step := 14 if diagonal else 10
+			if world.corridors.has(n) and str(world.corridors.get(n, "")) != kind:
+				step += 30
 			g[n] = int(g[current]) + step
 			came[n] = current
-			var fn: int = g[n] + absi(n.x - to_tile.x) + absi(n.y - to_tile.y)
+			var fn: int = g[n] + _octile(n, to_tile)
 			if not open.has(fn):
 				open[fn] = [] as Array[Vector2i]
 			open[fn].append(n)
