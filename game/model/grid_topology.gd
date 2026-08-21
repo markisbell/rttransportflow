@@ -405,8 +405,11 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 		"description": "player-built grid (P5)",
 		# long EHV corridors need their charging compensated (shunt
 		# reactors at the stations) or the PF drowns in Mvar — the
-		# realistic continental grid measured 87 GVAr uncompensated
-		"shunt_comp": 0.9}
+		# realistic continental grid measured 87 GVAr uncompensated;
+		# FULL compensation (swept 0.84/0.9/0.95/1.0 on the live bundle:
+		# night-peak vm 1.105/1.087/1.070/1.053) — the overvoltage was the
+		# REMAINING charging (Ferranti at light load), so more, not less
+		"shunt_comp": 1.0}
 
 	# --- 7. wire devices (P7): storage, H2 chain, HVDC links + hubs -----
 	var wire: Dictionary = WireDeviceEmit.emit(world, hvdc_corridors, farm_hub,

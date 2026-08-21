@@ -221,6 +221,7 @@ func _schedule_restart(id: String, now: float) -> void:
 func _check_health(id: String) -> void:
 	var s: Dictionary = _sidecars[id]
 	var http: HTTPRequest = s["http"]
+	http.timeout = 4.0  # a hung probe must not silence the poller forever
 	var url := "http://127.0.0.1:%d/health" % port_of(id)
 	if http.request(url) != OK:
 		return
@@ -230,9 +231,18 @@ func _check_health(id: String) -> void:
 	var ok: bool = result[0] == HTTPRequest.RESULT_SUCCESS and result[1] == 200
 	if ok:
 		s["backoff_i"] = 0
+		s["health_misses"] = 0
 		_set_state(id, State.HEALTHY)
 	elif s["state"] == State.HEALTHY:
-		_set_state(id, State.DOWN)
+		# TOLERANCE, not a hair trigger: a hard power-flow retry ladder can
+		# stall the backend's event loop for a few seconds, and one missed
+		# probe used to declare it DOWN — the restart then bind-failed
+		# against the still-alive process in a loop while the in-flight
+		# step reply was lost (the live-game freeze, 2026-08-21)
+		s["health_misses"] = int(s.get("health_misses", 0)) + 1
+		if int(s["health_misses"]) >= 3:
+			s["health_misses"] = 0
+			_set_state(id, State.DOWN)
 
 
 func _notification(what: int) -> void:

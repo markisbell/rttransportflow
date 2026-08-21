@@ -30,6 +30,13 @@ const FAILED_ESCALATION_STEPS := 3
 ## consecutive transport failures before we assume a DEAF backend and
 ## force a re-register (a live process with a dead step channel)
 const TRANSPORT_FAILURES_BEFORE_RESET := 5
+## A step whose reply never arrives held in_flight FOREVER — the tick loop
+## then skipped as "busy" for eternity while health stayed green (the
+## live-game freeze: reply lost during a sidecar restart storm). Steps now
+## time out; a timeout counts as THREE transport failures because it costs
+## 15 s where a received error costs nothing — two timeouts must suffice
+## to declare the channel deaf and re-register.
+const STEP_TIMEOUT_S := 15.0
 
 var running := false
 var in_flight := false
@@ -190,9 +197,26 @@ func step_once(dt_s: float) -> Dictionary:
 		pending_events.clear()
 	if not watch.is_empty():
 		request["watch"] = watch.duplicate()
-	var result: Dictionary = await _bridge().step(ID, request)
+	var done := [false, {}]
+	_dispatch_step(request, done)
+	var deadline := Time.get_ticks_msec() + int(STEP_TIMEOUT_S * 1000.0)
+	while not done[0] and Time.get_ticks_msec() < deadline:
+		await Engine.get_main_loop().process_frame
 	in_flight = false
-	return _apply_result(t, result)
+	if not done[0]:
+		# the late reply (if it ever lands) goes nowhere: nothing reads
+		# `done` after this return, and the re-register resets the wire
+		consecutive_transport_failed += 2  # plus the one _apply_result adds
+		return _apply_result(t, {"_status": 0, "_error": "step_timeout"})
+	return _apply_result(t, done[1])
+
+
+## Fire the bridge call without awaiting it in step_once — the caller
+## races this against STEP_TIMEOUT_S.
+func _dispatch_step(request: Dictionary, done: Array) -> void:
+	var result: Dictionary = await _bridge().step(ID, request)
+	done[0] = true
+	done[1] = result
 
 
 func _apply_result(t: int, result: Dictionary) -> Dictionary:
