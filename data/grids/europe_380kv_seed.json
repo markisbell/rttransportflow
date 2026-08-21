@@ -812,32 +812,6 @@
    1000
   ]
  ],
- "plants": [
-  [
-   "emsland_gas",
-   "gas_ccgt",
-   52.47,
-   7.31
-  ],
-  [
-   "neurath_lignite",
-   "lignite",
-   51.04,
-   6.62
-  ],
-  [
-   "jaenschwalde_lignite",
-   "lignite",
-   51.83,
-   14.58
-  ],
-  [
-   "irsching_gas",
-   "gas_ccgt",
-   48.77,
-   11.55
-  ]
- ],
  "metro_feeds": {
   "hamburg": [
    "dollern",

@@ -20,6 +20,16 @@ extends RefCounted
 
 const GERMANY_SEED := "data/grids/germany_380kv_seed.json"
 const EUROPE_SEED := "data/grids/europe_380kv_seed.json"
+const PLANTS_SEED := "data/grids/europe_plants_seed.json"
+## Stations below this stay synthetic: every real site costs a tap bus,
+## and the 150-bus budget affords roughly fifty distinct stations — the
+## gigawatt class gets its real ground, the packed parks carry the rest
+## (measured: real-siting the full >=500 MW fleet put 244 buses on the
+## ledger).
+const REAL_SITE_MIN_MW := 1000.0
+## ...and at most this many real stations per metro: the budget affords
+## ~35 real stations continent-wide — each metro gets its biggest.
+const REAL_SITES_PER_METRO := 2
 const BOX_MARGIN_KM := 150.0  # route search box beyond the endpoints
 ## Corridors must not BRUSH a metro outside the plan: touching a foreign
 ## footprint connects its load with no fleet behind it (the P5 47.4 Hz
@@ -332,6 +342,7 @@ static func author_start(world: Node) -> bool:
 		sub_tiles[name] = _nearest_substation(world, raw)
 
 	var feeds: Dictionary = seed_doc.get("metro_feeds", {})
+	var real_fleet := _real_fleet(world)
 	var ok := true
 	for lc_id: String in Campaign.CONTINENTAL_CORE:
 		if not world.load_centers.has(lc_id) or not feeds.has(lc_id):
@@ -368,15 +379,71 @@ static func author_start(world: Node) -> bool:
 		# The feeds then carry only inter-metro exchange. Ring placement
 		# also packs the parks so their taps collapse into few buses.
 		var anchor: Vector2i = lc["tiles"][0]
+		# REAL plants first (GPPD, ledger 47), biggest-first until the need
+		# is met — the synthetic ladder only tops up what reality leaves
+		var real_used := 0
+		for plant: Dictionary in real_fleet.get(lc_id, []):
+			if placed >= need or real_used >= REAL_SITES_PER_METRO:
+				break
+			if float(plant["capacity_mw"]) < REAL_SITE_MIN_MW:
+				continue
+			var rkind := str(plant["kind"])
+			var station_mw := 0.0
+			var station_tap := Vector2i(-1, -1)
+			var size: float = world.PLANT_SIZES[rkind]
+			var units := clampi(int(round(float(plant["capacity_mw"]) / size)), 1, 3)
+			var snap: Vector2i = plant["tile"]
+			var snap_r := 20 if rkind == "lignite" else 8
+			for u in units:
+				# a web-adjacent tile near the real site needs NO spur (and
+				# no tap bus of its own); only stations away from any line
+				# pay for a spur
+				var site := _site_on_web(world, snap, rkind, banned, snap_r)
+				var needs_spur := site == Vector2i(-1, -1)
+				if needs_spur:
+					site = DemoBuild.find_site(world, rkind, snap, snap_r, banned)
+				if site == Vector2i(-1, -1):
+					break
+				var pid: String = world.place_plant(rkind, site)
+				if needs_spur:
+					var ptap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
+					var spur: Array[Vector2i] = []
+					if ptap != Vector2i(-1, -1):
+						spur = _spur(world, ptap, taps[count % taps.size()])
+					if spur.is_empty():
+						world.remove_plant(pid)
+						banned[site] = true
+						continue
+					for tile: Vector2i in spur:
+						world.place_corridor(tile, "line_400")
+				placed += size
+				count += 1
+				real_used += 1 if u == 0 else 0
+				station_mw += size
+				if station_tap == Vector2i(-1, -1):
+					for offset: Vector2i in GridTopology.NEIGHBORS:
+						if str(world.corridors.get(site + offset, "")) == "line_400":
+							station_tap = site + offset
+							break
+				snap = site  # a station's units stand together
+			if station_tap != Vector2i(-1, -1) and station_mw > 0.0:
+				# the zone balances in ENERGY, not geography: a gigawatt
+				# station 100-300 km from its metro transits the feed
+				# corridors at full output from the first startup profile
+				# on — its evacuation path must be sized for it (L107/L73
+				# duty-tripped at ~122 % and islanded an 8-unit pocket)
+				_author_evacuation(world, station_tap, taps[0], station_mw)
 		while placed < need:
+			# synthetic units stand ADJACENT TO THE WEB — no spur: a spur
+			# per unit fragmented the parks into dozens of lone tap buses;
+			# a unit strung along an existing corridor collapses into the
+			# same site-bus group as its neighbours (and plants along the
+			# lines is what the real countryside looks like)
 			var site := Vector2i(-1, -1)
 			var kind := ""
 			for candidate: String in _ladder_kinds(need - placed, placed, need):
-				site = DemoBuild.find_site(world, candidate, anchor,
-					world.tiles_for_km(150.0), banned)
-				if site == Vector2i(-1, -1):
-					site = DemoBuild.find_site(world, candidate, anchor,
-						world.tiles_for_km(400.0), banned)
+				site = _site_on_web(world, anchor, candidate, banned,
+					world.tiles_for_km(220.0))
 				if site != Vector2i(-1, -1):
 					kind = candidate
 					break
@@ -384,19 +451,23 @@ static func author_start(world: Node) -> bool:
 				push_warning("GridPlan: ladder exhausted for " + lc_id)
 				ok = false
 				break
-			var pid: String = world.place_plant(kind, site)
-			var plant_tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
-			var spur: Array[Vector2i] = []
-			if plant_tap != Vector2i(-1, -1):
-				spur = _spur(world, plant_tap, taps[count % taps.size()])
-			if spur.is_empty():
-				world.remove_plant(pid)
-				banned[site] = true
-				continue
-			for tile: Vector2i in spur:
-				world.place_corridor(tile, "line_400")
+			world.place_plant(kind, site)
 			placed += float(world.PLANT_SIZES[kind])
 			count += 1
+	# the collector web inside and between the plant parks is built HEAVY:
+	# every short segment there carries the accumulated output of the
+	# string of stations behind it, and the morning ramp runs ~1.5x the
+	# startup point (measured: 84 % at startup, 121 % at the ramp, duty
+	# trip, pocket blackout)
+	for pid: String in world.plants:
+		var pt: Vector2i = world.plants[pid]["tile"]
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var t := pt + Vector2i(dx, dy)
+				if str(world.corridors.get(t, "")) == "line_400":
+					world.corridor_circuits[t] = 12
+	_phs_pass(world, real_fleet.get("_phs", []), sub_tiles, feeds)
+	_offshore_pass(world, real_fleet.get("_offshore", []))
 	_halo = {}
 	return ok
 
@@ -429,3 +500,181 @@ static func _nearest_substation(world: Node, anchor: Vector2i) -> Vector2i:
 				if world.substations.has(tile):
 					return tile
 	return Vector2i(-1, -1)
+
+
+## The GPPD real fleet, deduped and assigned: metro id -> plants sorted
+## biggest-first, plus "_phs" and "_offshore" lists. Dedup keys on the
+## normalized name AND 3-tile proximity (GPPD carries duplicate rows).
+static func _real_fleet(world: Node) -> Dictionary:
+	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+		AppPaths.root() + "/" + PLANTS_SEED))
+	if not (doc is Dictionary):
+		return {}
+	var projection: Dictionary = BuildSession.map_projection()
+	var lon0 := float(projection["lon0"])
+	var lat0 := float(projection["lat0"])
+	var dlon := float(projection["deg_lon_per_tile"])
+	var dlat := float(projection["deg_lat_per_tile"])
+	var centers := {}
+	for lc_id: String in Campaign.CONTINENTAL_CORE:
+		if world.load_centers.has(lc_id):
+			centers[lc_id] = world.load_centers[lc_id]["tiles"][0]
+	var seen := {}
+	var out := {"_phs": [], "_offshore": []}
+	for p: Dictionary in doc["plants"]:
+		var tile := Vector2i(int((float(p["lon"]) - lon0) / dlon),
+			int((lat0 - float(p["lat"])) / dlat))
+		var dup := false
+		for d: Vector2i in seen.get(str(p["kind"]), []):
+			if maxi(absi(d.x - tile.x), absi(d.y - tile.y)) <= 3:
+				dup = true
+				break
+		if dup:
+			continue
+		if not seen.has(str(p["kind"])):
+			seen[str(p["kind"])] = []
+		(seen[str(p["kind"])] as Array).append(tile)
+		var entry := {"kind": p["kind"], "capacity_mw": p["capacity_mw"],
+			"tile": tile, "name": p["name"]}
+		if str(p["kind"]) == "hydro_ps":
+			(out["_phs"] as Array).append(entry)
+			continue
+		if str(p["kind"]) == "wind_offshore":
+			(out["_offshore"] as Array).append(entry)
+			continue
+		# nearest core metro within 60 tiles (300 km) claims the plant
+		var best := ""
+		var best_d := 60
+		for lc_id: String in centers:
+			var c: Vector2i = centers[lc_id]
+			var d := maxi(absi(c.x - tile.x), absi(c.y - tile.y))
+			if d < best_d:
+				best_d = d
+				best = lc_id
+		if best == "":
+			continue
+		if not out.has(best):
+			out[best] = []
+		(out[best] as Array).append(entry)
+	for key: String in out:
+		(out[key] as Array).sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return float(a["capacity_mw"]) > float(b["capacity_mw"]))
+	return out
+
+
+## The ten biggest real pumped-storage stations that can reach one of the
+## map's phs_site resource tiles: one 300 MW unit each (fixed unit sizes,
+## ledger Q4), spurred into the web toward the nearest substation.
+static func _phs_pass(world: Node, candidates: Array, sub_tiles: Dictionary,
+		feeds: Dictionary) -> void:
+	var placed := 0
+	for plant: Dictionary in candidates:
+		if placed >= 4:
+			break
+		var site := DemoBuild.find_site(world, "hydro_ps", plant["tile"], 20)
+		if site == Vector2i(-1, -1):
+			continue
+		var pid: String = world.place_plant("hydro_ps", site)
+		var tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
+		var spur: Array[Vector2i] = []
+		if tap != Vector2i(-1, -1):
+			spur = _spur(world, tap, _nearest_sub_tile(world, site, sub_tiles))
+		if spur.is_empty():
+			world.remove_plant(pid)
+			continue
+		for tile: Vector2i in spur:
+			world.place_corridor(tile, "line_400")
+		placed += 1
+
+
+## The eight biggest offshore parks whose export cable reaches the web:
+## near-shore AC over the shelf (P7's first connection path). Intermittent
+## capacity — deliberately NOT counted toward any metro's firm need.
+static func _offshore_pass(world: Node, candidates: Array) -> void:
+	var placed := 0
+	for plant: Dictionary in candidates:
+		if placed >= 4:
+			break
+		var units := 1  # one 500 MW unit per park: each extra sea spur costs buses
+		var anchor: Vector2i = plant["tile"]
+		var park_done := 0
+		for u in units:
+			var site := DemoBuild.find_site(world, "wind_offshore", anchor, 6)
+			if site == Vector2i(-1, -1):
+				break
+			var pid: String = world.place_plant("wind_offshore", site)
+			var tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
+			var spur: Array[Vector2i] = []
+			if tap != Vector2i(-1, -1):
+				spur = _spur(world, tap, _nearest_sub_tile(world, site, {}))
+			if spur.is_empty():
+				world.remove_plant(pid)
+				break
+			for tile: Vector2i in spur:
+				world.place_corridor(tile, "line_400")
+			anchor = site
+			park_done += 1
+		if park_done > 0:
+			placed += 1
+
+
+static func _nearest_sub_tile(world: Node, from_tile: Vector2i,
+		sub_tiles: Dictionary) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_d := 1 << 30
+	for tile: Vector2i in world.substations:
+		var d := maxi(absi(tile.x - from_tile.x), absi(tile.y - from_tile.y))
+		if d < best_d:
+			best_d = d
+			best = tile
+	return best
+
+
+## A placeable tile touching an existing AC corridor: ring search out from
+## the anchor. Deterministic (fixed scan order, first hit).
+static func _site_on_web(world: Node, anchor: Vector2i, kind: String,
+		banned: Dictionary, max_r: int) -> Vector2i:
+	for r in range(1, max_r + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var tile := anchor + Vector2i(dx, dy)
+				if banned.has(tile) or not world.can_place_plant(kind, tile):
+					continue
+				for offset: Vector2i in GridTopology.NEIGHBORS:
+					var n := tile + offset
+					if str(world.corridors.get(n, "")) == "line_400":
+						return tile
+	return Vector2i(-1, -1)
+
+
+## Raise the authored circuits along the existing-web path from a real
+## station's tap to its metro tap, sized for the station's output. BFS over
+## corridor tiles only (the web is small); no new corridors are laid.
+static func _author_evacuation(world: Node, from_tile: Vector2i,
+		to_tile: Vector2i, mw: float) -> void:
+	var need_circuits := clampi(int(ceil(mw / 500.0)), 4, 12)
+	var queue: Array[Vector2i] = [from_tile]
+	var head := 0
+	var came := {from_tile: from_tile}
+	while head < queue.size():
+		var current: Vector2i = queue[head]
+		head += 1
+		if current == to_tile:
+			break
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			var n := current + offset
+			if came.has(n):
+				continue
+			if str(world.corridors.get(n, "")) != "line_400":
+				continue
+			came[n] = current
+			queue.append(n)
+	if not came.has(to_tile):
+		return
+	var cur := to_tile
+	while cur != came[cur]:
+		world.corridor_circuits[cur] = maxi(
+			int(world.corridor_circuits.get(cur, 0)), need_circuits)
+		cur = came[cur]

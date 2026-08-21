@@ -435,6 +435,26 @@ docs/GAME_DESIGN.md.
     OSM/OpenInfraMap stays excluded (ODbL, ledger 38); plant-site realism
     is queued on the WRI Global Power Plant Database (CC-BY).
 
+47. **The inherited fleet stands on real ground** (GPPD integration,
+    2026-08-21): `europe_plants_seed.json` (WRI Global Power Plant
+    Database v1.3, CC-BY — the licence-clean answer to the OpenInfraMap
+    request) feeds `GridPlan.author_start`: the gigawatt class gets its
+    real sites (REAL_SITE_MIN_MW 1000, top-2 stations per metro — the
+    150-bus budget affords ~35 real stations; measured 244 buses when the
+    full >=500 MW fleet was real-sited), the top-4 real pumped-storage
+    stations snap to phs_site resources, the top-4 offshore parks connect
+    near-shore AC; synthetic units stand ADJACENT TO THE WEB (a spur per
+    unit fragmented the parks into lone tap buses) and the collector web
+    around plants is authored HEAVY (12 circuits) with per-station
+    evacuation paths — a real cluster's output transits its feed corridors
+    from the first startup profile on (zone balance is energy, not
+    geography; measured 84 % at startup, 121 % at the morning ramp, duty
+    trip, pocket blackout). 145 buses; campaign ★★★ with zero
+    trips/blackouts/UFLS; save_load bit-identical; dispatch prices
+    unchanged to the cent. Next per the owner's sequence: cables
+    (corridor kind with real cable charging — the shunt machinery is
+    ready for it).
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
