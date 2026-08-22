@@ -35003,7 +35003,8 @@
         398,
         379
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedlink A · Brunsbuettel"
     },
     {
       "pid": "hvdc_converter_2",
@@ -35012,7 +35013,8 @@
         398,
         485
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedlink A · Grossgartach"
     },
     {
       "pid": "hvdc_converter_3",
@@ -35021,7 +35023,8 @@
         401,
         379
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedlink B · Wilster"
     },
     {
       "pid": "hvdc_converter_4",
@@ -35030,7 +35033,8 @@
         412,
         466
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedlink B · Grafenrheinfeld"
     },
     {
       "pid": "hvdc_converter_5",
@@ -35039,7 +35043,8 @@
         432,
         416
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedostlink · Wolmirstedt"
     },
     {
       "pid": "hvdc_converter_6",
@@ -35048,7 +35053,8 @@
         441,
         497
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Suedostlink · Isar"
     },
     {
       "pid": "hvdc_converter_7",
@@ -35057,7 +35063,8 @@
         364,
         438
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Ultranet · Osterath"
     },
     {
       "pid": "hvdc_converter_8",
@@ -35066,7 +35073,8 @@
         388,
         483
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Ultranet · Philippsburg"
     },
     {
       "pid": "hvdc_converter_9",
@@ -35075,7 +35083,8 @@
         371,
         391
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "A Nord · Emden"
     },
     {
       "pid": "hvdc_converter_10",
@@ -35084,7 +35093,8 @@
         363,
         440
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "A Nord · Osterath"
     },
     {
       "pid": "hvdc_converter_11",
@@ -35093,7 +35103,8 @@
         403,
         379
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Nordlink · Wilster"
     },
     {
       "pid": "hvdc_converter_12",
@@ -35102,7 +35113,8 @@
         365,
         273
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Nordlink · Tonstad"
     },
     {
       "pid": "hvdc_converter_13",
@@ -35111,7 +35123,8 @@
         421,
         379
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Baltic Cable · Herrenwyk"
     },
     {
       "pid": "hvdc_converter_14",
@@ -35120,7 +35133,8 @@
         452,
         343
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Baltic Cable · Arrie"
     },
     {
       "pid": "hvdc_converter_15",
@@ -35129,7 +35143,8 @@
         440,
         381
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Kontek · Guestrow"
     },
     {
       "pid": "hvdc_converter_16",
@@ -35138,7 +35153,8 @@
         439,
         345
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Kontek · Bjaeverskov"
     },
     {
       "pid": "hvdc_converter_17",
@@ -35147,7 +35163,8 @@
         363,
         447
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Alegro · Oberzier"
     },
     {
       "pid": "hvdc_converter_18",
@@ -35156,7 +35173,8 @@
         350,
         449
       ],
-      "p_max_mw": 2000.0
+      "p_max_mw": 2000.0,
+      "name": "Alegro · Lixhe"
     },
     {
       "pid": "gas_ccgt_19",
@@ -35165,7 +35183,8 @@
         371,
         392
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Eems 1"
     },
     {
       "pid": "gas_ccgt_20",
@@ -35174,7 +35193,8 @@
         372,
         391
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Eems 2"
     },
     {
       "pid": "gas_ccgt_21",
@@ -35183,7 +35203,8 @@
         373,
         391
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Eems 3"
     },
     {
       "pid": "coal_22",
@@ -35192,7 +35213,8 @@
         373,
         394
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Eemshaven 1"
     },
     {
       "pid": "coal_23",
@@ -35201,7 +35223,8 @@
         374,
         395
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Eemshaven 2"
     },
     {
       "pid": "nuclear_24",
@@ -35210,7 +35233,8 @@
         337,
         411
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Randstad (NL) Nuclear 1"
     },
     {
       "pid": "coal_25",
@@ -35219,7 +35243,8 @@
         340,
         411
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Randstad (NL) Coal 1"
     },
     {
       "pid": "gas_ccgt_26",
@@ -35228,7 +35253,8 @@
         338,
         410
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Randstad (NL) Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_27",
@@ -35237,7 +35263,8 @@
         339,
         410
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Randstad (NL) Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_28",
@@ -35246,7 +35273,8 @@
         337,
         412
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Randstad (NL) Gas CCGT 3"
     },
     {
       "pid": "gas_ccgt_29",
@@ -35255,7 +35283,8 @@
         337,
         413
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Randstad (NL) Gas CCGT 4"
     },
     {
       "pid": "lignite_30",
@@ -35264,7 +35293,8 @@
         366,
         440
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Niederaussem power station 1"
     },
     {
       "pid": "lignite_31",
@@ -35273,7 +35303,8 @@
         363,
         437
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Niederaussem power station 2"
     },
     {
       "pid": "lignite_32",
@@ -35282,7 +35313,8 @@
         362,
         436
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Niederaussem power station 3"
     },
     {
       "pid": "gas_ccgt_33",
@@ -35291,7 +35323,8 @@
         379,
         429
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Gersteinwerk 1"
     },
     {
       "pid": "gas_ccgt_34",
@@ -35300,7 +35333,8 @@
         379,
         428
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Gersteinwerk 2"
     },
     {
       "pid": "gas_ccgt_35",
@@ -35309,7 +35343,8 @@
         379,
         427
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Gersteinwerk 3"
     },
     {
       "pid": "nuclear_36",
@@ -35318,7 +35353,8 @@
         361,
         428
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Rhine-Ruhr Nuclear 1"
     },
     {
       "pid": "nuclear_37",
@@ -35327,7 +35363,8 @@
         359,
         427
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Rhine-Ruhr Nuclear 2"
     },
     {
       "pid": "coal_38",
@@ -35336,7 +35373,8 @@
         366,
         431
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rhine-Ruhr Coal 1"
     },
     {
       "pid": "coal_39",
@@ -35345,7 +35383,8 @@
         367,
         430
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rhine-Ruhr Coal 2"
     },
     {
       "pid": "coal_40",
@@ -35354,7 +35393,8 @@
         368,
         430
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rhine-Ruhr Coal 3"
     },
     {
       "pid": "coal_41",
@@ -35363,7 +35403,8 @@
         369,
         430
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rhine-Ruhr Coal 4"
     },
     {
       "pid": "gas_ccgt_42",
@@ -35372,7 +35413,8 @@
         370,
         430
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_43",
@@ -35381,7 +35423,8 @@
         371,
         430
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_44",
@@ -35390,7 +35433,8 @@
         372,
         430
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 3"
     },
     {
       "pid": "gas_ccgt_45",
@@ -35399,7 +35443,8 @@
         361,
         426
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 4"
     },
     {
       "pid": "gas_ccgt_46",
@@ -35408,7 +35453,8 @@
         361,
         427
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 5"
     },
     {
       "pid": "gas_ccgt_47",
@@ -35417,7 +35463,8 @@
         361,
         429
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 6"
     },
     {
       "pid": "gas_ccgt_48",
@@ -35426,7 +35473,8 @@
         361,
         430
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Ruhr Gas CCGT 7"
     },
     {
       "pid": "coal_49",
@@ -35435,7 +35483,8 @@
         412,
         390
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Hamburg-Moorburg 1"
     },
     {
       "pid": "coal_50",
@@ -35444,7 +35493,8 @@
         413,
         390
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Hamburg-Moorburg 2"
     },
     {
       "pid": "nuclear_51",
@@ -35453,7 +35503,8 @@
         403,
         382
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "BROKDORF"
     },
     {
       "pid": "coal_52",
@@ -35462,7 +35513,8 @@
         410,
         385
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Hamburg Coal 1"
     },
     {
       "pid": "gas_ccgt_53",
@@ -35471,7 +35523,8 @@
         408,
         386
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Hamburg Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_54",
@@ -35480,7 +35533,8 @@
         407,
         384
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Hamburg Gas CCGT 2"
     },
     {
       "pid": "gas_ocgt_55",
@@ -35489,7 +35543,8 @@
         408,
         384
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Hamburg Gas OCGT 1"
     },
     {
       "pid": "coal_56",
@@ -35498,7 +35553,8 @@
         471,
         425
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Janschwalde power station 1"
     },
     {
       "pid": "coal_57",
@@ -35507,7 +35563,8 @@
         471,
         424
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Janschwalde power station 2"
     },
     {
       "pid": "coal_58",
@@ -35516,7 +35573,8 @@
         471,
         423
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Janschwalde power station 3"
     },
     {
       "pid": "lignite_59",
@@ -35525,7 +35583,8 @@
         476,
         431
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Boxberg power station 1"
     },
     {
       "pid": "lignite_60",
@@ -35534,7 +35593,8 @@
         475,
         430
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Boxberg power station 2"
     },
     {
       "pid": "lignite_61",
@@ -35543,7 +35603,8 @@
         474,
         429
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Boxberg power station 3"
     },
     {
       "pid": "gas_ocgt_62",
@@ -35552,7 +35613,8 @@
         456,
         408
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Berlin Gas OCGT 1"
     },
     {
       "pid": "gas_ocgt_63",
@@ -35561,7 +35623,8 @@
         454,
         409
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Berlin Gas OCGT 2"
     },
     {
       "pid": "lignite_64",
@@ -35570,7 +35633,8 @@
         473,
         428
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Turów 1"
     },
     {
       "pid": "lignite_65",
@@ -35579,7 +35643,8 @@
         472,
         427
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Turów 2"
     },
     {
       "pid": "lignite_66",
@@ -35588,7 +35653,8 @@
         463,
         438
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Pocerady power station"
     },
     {
       "pid": "coal_67",
@@ -35597,7 +35663,8 @@
         468,
         462
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Bohemia Coal 1"
     },
     {
       "pid": "coal_68",
@@ -35606,7 +35673,8 @@
         469,
         461
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Bohemia Coal 2"
     },
     {
       "pid": "gas_ccgt_69",
@@ -35615,7 +35683,8 @@
         470,
         461
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Bohemia Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_70",
@@ -35624,7 +35693,8 @@
         471,
         461
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Bohemia Gas CCGT 2"
     },
     {
       "pid": "lignite_71",
@@ -35633,7 +35703,8 @@
         532,
         456
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Bełchatów 1"
     },
     {
       "pid": "lignite_72",
@@ -35642,7 +35713,8 @@
         531,
         457
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Bełchatów 2"
     },
     {
       "pid": "lignite_73",
@@ -35651,7 +35723,8 @@
         529,
         459
       ],
-      "p_max_mw": 900.0
+      "p_max_mw": 900.0,
+      "name": "Bełchatów 3"
     },
     {
       "pid": "coal_74",
@@ -35660,7 +35733,8 @@
         526,
         462
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rybnik 1"
     },
     {
       "pid": "coal_75",
@@ -35669,7 +35743,8 @@
         525,
         462
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rybnik 2"
     },
     {
       "pid": "coal_76",
@@ -35678,7 +35753,8 @@
         534,
         458
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Upper Silesia Coal 1"
     },
     {
       "pid": "coal_77",
@@ -35687,7 +35763,8 @@
         534,
         457
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Upper Silesia Coal 2"
     },
     {
       "pid": "gas_ccgt_78",
@@ -35696,7 +35773,8 @@
         532,
         459
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Upper Silesia Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_79",
@@ -35705,7 +35783,8 @@
         531,
         460
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Upper Silesia Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_80",
@@ -35714,7 +35793,8 @@
         535,
         456
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Upper Silesia Gas CCGT 3"
     },
     {
       "pid": "gas_ccgt_81",
@@ -35723,7 +35803,8 @@
         530,
         458
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Upper Silesia Gas CCGT 4"
     },
     {
       "pid": "coal_82",
@@ -35732,7 +35813,8 @@
         565,
         426
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Kozienice 1"
     },
     {
       "pid": "coal_83",
@@ -35741,7 +35823,8 @@
         566,
         425
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Kozienice 2"
     },
     {
       "pid": "coal_84",
@@ -35750,7 +35833,8 @@
         566,
         424
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Kozienice 3"
     },
     {
       "pid": "gas_ccgt_85",
@@ -35759,7 +35843,8 @@
         610,
         360
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Elektrenai (Lithuania) Thermal Power Plant Lithuania 1"
     },
     {
       "pid": "gas_ccgt_86",
@@ -35768,7 +35853,8 @@
         611,
         359
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Elektrenai (Lithuania) Thermal Power Plant Lithuania 2"
     },
     {
       "pid": "gas_ccgt_87",
@@ -35777,7 +35863,8 @@
         610,
         358
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Elektrenai (Lithuania) Thermal Power Plant Lithuania 3"
     },
     {
       "pid": "coal_88",
@@ -35786,7 +35873,8 @@
         559,
         414
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Warsaw–Łódź Coal 1"
     },
     {
       "pid": "gas_ccgt_89",
@@ -35795,7 +35883,8 @@
         560,
         413
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Warsaw–Łódź Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_90",
@@ -35804,7 +35893,8 @@
         561,
         413
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Warsaw–Łódź Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_91",
@@ -35813,7 +35903,8 @@
         562,
         413
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Warsaw–Łódź Gas CCGT 3"
     },
     {
       "pid": "nuclear_92",
@@ -35822,7 +35913,8 @@
         532,
         542
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Paksi Atomerőmű"
     },
     {
       "pid": "gas_ccgt_93",
@@ -35831,7 +35923,8 @@
         500,
         505
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Simmering 1"
     },
     {
       "pid": "gas_ccgt_94",
@@ -35840,7 +35933,8 @@
         501,
         505
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Simmering 2"
     },
     {
       "pid": "coal_95",
@@ -35849,7 +35943,8 @@
         495,
         505
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Vienna Coal 1"
     },
     {
       "pid": "coal_96",
@@ -35858,7 +35953,8 @@
         494,
         503
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Vienna Coal 2"
     },
     {
       "pid": "gas_ccgt_97",
@@ -35867,7 +35963,8 @@
         495,
         503
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Vienna Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_98",
@@ -35876,7 +35973,8 @@
         496,
         503
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Vienna Gas CCGT 2"
     },
     {
       "pid": "nuclear_99",
@@ -35885,7 +35983,8 @@
         409,
         505
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Kernkraft Gundremmingen 1"
     },
     {
       "pid": "nuclear_100",
@@ -35894,7 +35993,8 @@
         408,
         505
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Kernkraft Gundremmingen 2"
     },
     {
       "pid": "nuclear_101",
@@ -35903,7 +36003,8 @@
         434,
         494
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "ISAR-2"
     },
     {
       "pid": "coal_102",
@@ -35912,7 +36013,8 @@
         431,
         505
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Bavaria Coal 1"
     },
     {
       "pid": "coal_103",
@@ -35921,7 +36023,8 @@
         429,
         507
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Bavaria Coal 2"
     },
     {
       "pid": "gas_ccgt_104",
@@ -35930,7 +36033,8 @@
         428,
         504
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Bavaria Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_105",
@@ -35939,7 +36043,8 @@
         430,
         504
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Bavaria Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_106",
@@ -35948,7 +36053,8 @@
         428,
         505
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Bavaria Gas CCGT 3"
     },
     {
       "pid": "coal_107",
@@ -35957,7 +36063,8 @@
         390,
         481
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "GKM (Mannheim) power station 1"
     },
     {
       "pid": "coal_108",
@@ -35966,7 +36073,8 @@
         390,
         482
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "GKM (Mannheim) power station 2"
     },
     {
       "pid": "coal_109",
@@ -35975,7 +36083,8 @@
         386,
         488
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rheinhafen-Dampfkraftwerk 1"
     },
     {
       "pid": "coal_110",
@@ -35984,7 +36093,8 @@
         387,
         487
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rheinhafen-Dampfkraftwerk 2"
     },
     {
       "pid": "coal_111",
@@ -35993,7 +36103,8 @@
         396,
         491
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Baden-Württemberg Coal 1"
     },
     {
       "pid": "coal_112",
@@ -36002,7 +36113,8 @@
         397,
         490
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Baden-Württemberg Coal 2"
     },
     {
       "pid": "gas_ccgt_113",
@@ -36011,7 +36123,8 @@
         399,
         490
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Baden-Württemberg Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_114",
@@ -36020,7 +36133,8 @@
         397,
         489
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Baden-Württemberg Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_115",
@@ -36029,7 +36143,8 @@
         399,
         489
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Baden-Württemberg Gas CCGT 3"
     },
     {
       "pid": "gas_ocgt_116",
@@ -36038,7 +36153,8 @@
         400,
         489
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Baden-Württemberg Gas OCGT 1"
     },
     {
       "pid": "coal_117",
@@ -36047,7 +36163,8 @@
         396,
         464
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Staudinger power station"
     },
     {
       "pid": "nuclear_118",
@@ -36056,7 +36173,8 @@
         378,
         458
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Rhine-Main Nuclear 1"
     },
     {
       "pid": "nuclear_119",
@@ -36065,7 +36183,8 @@
         372,
         452
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Rhine-Main Nuclear 2"
     },
     {
       "pid": "coal_120",
@@ -36074,7 +36193,8 @@
         390,
         461
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Rhine-Main Coal 1"
     },
     {
       "pid": "gas_ccgt_121",
@@ -36083,7 +36203,8 @@
         391,
         461
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Main Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_122",
@@ -36092,7 +36213,8 @@
         389,
         462
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Main Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_123",
@@ -36101,7 +36223,8 @@
         393,
         462
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhine-Main Gas CCGT 3"
     },
     {
       "pid": "gas_ocgt_124",
@@ -36110,7 +36233,8 @@
         389,
         463
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Rhine-Main Gas OCGT 1"
     },
     {
       "pid": "nuclear_125",
@@ -36119,7 +36243,8 @@
         304,
         444
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "GRAVELINES 1"
     },
     {
       "pid": "nuclear_126",
@@ -36128,7 +36253,8 @@
         305,
         444
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "GRAVELINES 2"
     },
     {
       "pid": "nuclear_127",
@@ -36137,7 +36263,8 @@
         306,
         444
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "GRAVELINES 3"
     },
     {
       "pid": "nuclear_128",
@@ -36146,7 +36273,8 @@
         331,
         437
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "DOEL 4 1"
     },
     {
       "pid": "nuclear_129",
@@ -36155,7 +36283,8 @@
         331,
         435
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "DOEL 4 2"
     },
     {
       "pid": "nuclear_130",
@@ -36164,7 +36293,8 @@
         283,
         470
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "PALUEL 1"
     },
     {
       "pid": "nuclear_131",
@@ -36173,7 +36303,8 @@
         284,
         470
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "PALUEL 2"
     },
     {
       "pid": "nuclear_132",
@@ -36182,7 +36313,8 @@
         285,
         470
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "PALUEL 3"
     },
     {
       "pid": "nuclear_133",
@@ -36191,7 +36323,8 @@
         275,
         528
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "CHINON 1"
     },
     {
       "pid": "nuclear_134",
@@ -36200,7 +36333,8 @@
         274,
         528
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "CHINON 2"
     },
     {
       "pid": "coal_135",
@@ -36209,7 +36343,8 @@
         302,
         487
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Île-de-France Coal 1"
     },
     {
       "pid": "coal_136",
@@ -36218,7 +36353,8 @@
         303,
         487
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Île-de-France Coal 2"
     },
     {
       "pid": "coal_137",
@@ -36227,7 +36363,8 @@
         305,
         487
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Île-de-France Coal 3"
     },
     {
       "pid": "coal_138",
@@ -36236,7 +36373,8 @@
         301,
         488
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Île-de-France Coal 4"
     },
     {
       "pid": "coal_139",
@@ -36245,7 +36383,8 @@
         301,
         489
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Île-de-France Coal 5"
     },
     {
       "pid": "gas_ccgt_140",
@@ -36254,7 +36393,8 @@
         301,
         490
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_141",
@@ -36263,7 +36403,8 @@
         301,
         491
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_142",
@@ -36272,7 +36413,8 @@
         303,
         486
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 3"
     },
     {
       "pid": "gas_ccgt_143",
@@ -36281,7 +36423,8 @@
         305,
         486
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 4"
     },
     {
       "pid": "gas_ccgt_144",
@@ -36290,7 +36433,8 @@
         306,
         487
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 5"
     },
     {
       "pid": "gas_ccgt_145",
@@ -36299,7 +36443,8 @@
         301,
         492
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 6"
     },
     {
       "pid": "gas_ccgt_146",
@@ -36308,7 +36453,8 @@
         303,
         485
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Île-de-France Gas CCGT 7"
     },
     {
       "pid": "gas_ocgt_147",
@@ -36317,7 +36463,8 @@
         305,
         485
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Île-de-France Gas OCGT 1"
     },
     {
       "pid": "nuclear_148",
@@ -36326,7 +36473,8 @@
         339,
         586
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "CRUAS 1"
     },
     {
       "pid": "nuclear_149",
@@ -36335,7 +36483,8 @@
         340,
         582
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "CRUAS 2"
     },
     {
       "pid": "nuclear_150",
@@ -36344,7 +36493,8 @@
         338,
         592
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "TRICASTIN 1 1"
     },
     {
       "pid": "nuclear_151",
@@ -36353,7 +36503,8 @@
         339,
         587
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "TRICASTIN 1 2"
     },
     {
       "pid": "gas_ccgt_152",
@@ -36362,7 +36513,8 @@
         337,
         558
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Rhône-Alpes Gas CCGT 1"
     },
     {
       "pid": "nuclear_153",
@@ -36371,7 +36523,8 @@
         378,
         513
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "FESSENHEIM"
     },
     {
       "pid": "nuclear_154",
@@ -36380,7 +36533,8 @@
         385,
         520
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Kernkraftwerk Leibstadt"
     },
     {
       "pid": "coal_155",
@@ -36389,7 +36543,8 @@
         389,
         521
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Swiss Plateau Coal 1"
     },
     {
       "pid": "gas_ccgt_156",
@@ -36398,7 +36553,8 @@
         387,
         522
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Swiss Plateau Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_157",
@@ -36407,7 +36563,8 @@
         386,
         520
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Swiss Plateau Gas CCGT 2"
     },
     {
       "pid": "gas_ocgt_158",
@@ -36416,7 +36573,8 @@
         387,
         520
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "Swiss Plateau Gas OCGT 1"
     },
     {
       "pid": "gas_ocgt_159",
@@ -36425,7 +36583,8 @@
         444,
         578
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "PORTO TOLLE 1"
     },
     {
       "pid": "gas_ocgt_160",
@@ -36434,7 +36593,8 @@
         443,
         577
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "PORTO TOLLE 2"
     },
     {
       "pid": "gas_ocgt_161",
@@ -36443,7 +36603,8 @@
         439,
         573
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "PORTO TOLLE 3"
     },
     {
       "pid": "gas_ocgt_162",
@@ -36452,7 +36613,8 @@
         395,
         565
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "TURBIGO 1"
     },
     {
       "pid": "gas_ocgt_163",
@@ -36461,7 +36623,8 @@
         395,
         564
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "TURBIGO 2"
     },
     {
       "pid": "gas_ocgt_164",
@@ -36470,7 +36633,8 @@
         395,
         563
       ],
-      "p_max_mw": 200.0
+      "p_max_mw": 200.0,
+      "name": "TURBIGO 3"
     },
     {
       "pid": "nuclear_165",
@@ -36479,7 +36643,8 @@
         363,
         544
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Po Valley (Milan–Turin) Nuclear 1"
     },
     {
       "pid": "nuclear_166",
@@ -36488,7 +36653,8 @@
         362,
         545
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Po Valley (Milan–Turin) Nuclear 2"
     },
     {
       "pid": "nuclear_167",
@@ -36497,7 +36663,8 @@
         362,
         548
       ],
-      "p_max_mw": 1600.0
+      "p_max_mw": 1600.0,
+      "name": "Po Valley (Milan–Turin) Nuclear 3"
     },
     {
       "pid": "coal_168",
@@ -36506,7 +36673,8 @@
         398,
         564
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Po Valley (Milan–Turin) Coal 1"
     },
     {
       "pid": "coal_169",
@@ -36515,7 +36683,8 @@
         397,
         563
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Po Valley (Milan–Turin) Coal 2"
     },
     {
       "pid": "coal_170",
@@ -36524,7 +36693,8 @@
         395,
         566
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Po Valley (Milan–Turin) Coal 3"
     },
     {
       "pid": "coal_171",
@@ -36533,7 +36703,8 @@
         395,
         567
       ],
-      "p_max_mw": 800.0
+      "p_max_mw": 800.0,
+      "name": "Po Valley (Milan–Turin) Coal 4"
     },
     {
       "pid": "gas_ccgt_172",
@@ -36542,7 +36713,8 @@
         395,
         562
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Po Valley (Milan–Turin) Gas CCGT 1"
     },
     {
       "pid": "gas_ccgt_173",
@@ -36551,7 +36723,8 @@
         397,
         562
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Po Valley (Milan–Turin) Gas CCGT 2"
     },
     {
       "pid": "gas_ccgt_174",
@@ -36560,7 +36733,8 @@
         395,
         568
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Po Valley (Milan–Turin) Gas CCGT 3"
     },
     {
       "pid": "gas_ccgt_175",
@@ -36569,7 +36743,8 @@
         395,
         561
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Po Valley (Milan–Turin) Gas CCGT 4"
     },
     {
       "pid": "gas_ccgt_176",
@@ -36578,7 +36753,8 @@
         397,
         561
       ],
-      "p_max_mw": 600.0
+      "p_max_mw": 600.0,
+      "name": "Po Valley (Milan–Turin) Gas CCGT 5"
     },
     {
       "pid": "hydro_ps_177",
@@ -36587,7 +36763,8 @@
         367,
         572
       ],
-      "p_max_mw": 300.0
+      "p_max_mw": 300.0,
+      "name": "GRAND MAISON"
     },
     {
       "pid": "hydro_ps_178",
@@ -36596,7 +36773,8 @@
         392,
         549
       ],
-      "p_max_mw": 300.0
+      "p_max_mw": 300.0,
+      "name": "RONCOVALGRANDE"
     },
     {
       "pid": "hydro_ps_179",
@@ -36605,7 +36783,8 @@
         429,
         536
       ],
-      "p_max_mw": 300.0
+      "p_max_mw": 300.0,
+      "name": "EDOLO"
     },
     {
       "pid": "hydro_ps_180",
@@ -36614,7 +36793,8 @@
         546,
         488
       ],
-      "p_max_mw": 300.0
+      "p_max_mw": 300.0,
+      "name": "Cierny Vah Pumped Storage Hydroelectric Power Plant Slovakia"
     },
     {
       "pid": "wind_offshore_181",
@@ -36623,7 +36803,8 @@
         292,
         384
       ],
-      "p_max_mw": 500.0
+      "p_max_mw": 500.0,
+      "name": "Hornsea 1 - Heron & Njord"
     },
     {
       "pid": "wind_offshore_182",
@@ -36632,7 +36813,8 @@
         221,
         375
       ],
-      "p_max_mw": 500.0
+      "p_max_mw": 500.0,
+      "name": "Walney 3"
     },
     {
       "pid": "wind_offshore_183",
@@ -36641,7 +36823,8 @@
         293,
         430
       ],
-      "p_max_mw": 500.0
+      "p_max_mw": 500.0,
+      "name": "London Array"
     },
     {
       "pid": "wind_offshore_184",
@@ -36650,7 +36833,8 @@
         354,
         376
       ],
-      "p_max_mw": 500.0
+      "p_max_mw": 500.0,
+      "name": "Gemini"
     }
   ],
   "next_pid": 185

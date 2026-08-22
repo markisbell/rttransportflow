@@ -29,14 +29,6 @@ const GROUP_COLORS := {
 }
 const STACK_ORDER: Array[String] = ["nuclear", "lignite", "coal", "gas",
 	"h2", "hydro", "wind_off", "wind_on", "solar", "battery", "transfer"]
-const KIND_LABELS := {
-	"nuclear": "Nuclear", "coal": "Coal", "lignite": "Lignite",
-	"gas_ccgt": "Gas CCGT", "gas_ocgt": "Gas OCGT", "hydro_ps": "Pumped hydro",
-	"wind_onshore": "Wind onshore", "wind_offshore": "Wind offshore",
-	"offshore_platform": "Offshore hub", "solar_pv": "Solar PV",
-	"battery": "Battery", "electrolyzer": "Electrolyzer",
-	"hvdc_converter": "HVDC converter",
-}
 
 const ACCENT := Color8(127, 209, 255)   # rtpowerflow's sparkline blue
 const TEXT := Color(0.92, 0.94, 0.97)
@@ -135,7 +127,8 @@ func _add_layer(group: String, sign: float, cum: Array) -> void:
 
 func _refresh_plant() -> void:
 	var plant: Dictionary = World.plants.get(pid, {})
-	_title = "%s  ·  %s" % [str(KIND_LABELS.get(plant_kind, plant_kind)), pid]
+	_title = "%s  ·  %s" % [str(plant.get("name", pid)),
+		str(World.KIND_LABELS.get(plant_kind, plant_kind))]
 	var p_max := float(plant.get("p_max_mw", 0.0))
 	_load.clear()
 	_forecast.clear()

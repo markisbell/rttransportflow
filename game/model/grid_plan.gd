@@ -82,7 +82,9 @@ static func author(world: Node, projection: Dictionary,
 			failed.append("%s-%s" % [line[0], line[1]])
 	var laid_dc := 0
 	for link: Array in seed_doc["dc_links"]:
-		if _lay_dc(world, tiles[link[1]], tiles[link[2]]):
+		if _lay_dc(world, tiles[link[1]], tiles[link[2]],
+				str(link[0]).capitalize(),
+				str(link[1]).capitalize(), str(link[2]).capitalize()):
 			laid_dc += 1
 		else:
 			failed.append(str(link[0]))
@@ -214,7 +216,8 @@ static func _route_astar(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 ## A DC link: converter stations beside both endpoints, hvdc corridor
 ## between the converters' free flanks (P7 topology: converter pair +
 ## continuous hvdc web = link).
-static func _lay_dc(world: Node, from_tile: Vector2i, to_tile: Vector2i) -> bool:
+static func _lay_dc(world: Node, from_tile: Vector2i, to_tile: Vector2i,
+		link_name := "", from_name := "", to_name := "") -> bool:
 	var conv_a := _nearest_placeable(world, "hvdc_converter", from_tile)
 	var conv_b := _nearest_placeable(world, "hvdc_converter", to_tile)
 	if conv_a == Vector2i(-1, -1) or conv_b == Vector2i(-1, -1):
@@ -223,8 +226,11 @@ static func _lay_dc(world: Node, from_tile: Vector2i, to_tile: Vector2i) -> bool
 	var tap_b := _free_flank(world, conv_b)
 	if tap_a == Vector2i(-1, -1) or tap_b == Vector2i(-1, -1):
 		return false
-	world.place_plant("hvdc_converter", conv_a)
-	world.place_plant("hvdc_converter", conv_b)
+	var pid_a: String = world.place_plant("hvdc_converter", conv_a)
+	var pid_b: String = world.place_plant("hvdc_converter", conv_b)
+	if link_name != "":  # real DC-project names from the seed
+		world.plants[pid_a]["name"] = "%s · %s" % [link_name, from_name]
+		world.plants[pid_b]["name"] = "%s · %s" % [link_name, to_name]
 	if not _lay(world, tap_a, tap_b, "hvdc"):
 		return false
 	return true
@@ -382,6 +388,7 @@ static func author_start(world: Node) -> bool:
 		# REAL plants first (GPPD, ledger 47), biggest-first until the need
 		# is met — the synthetic ladder only tops up what reality leaves
 		var real_used := 0
+		var unit_n := {}  # per-metro synthetic numbering, per kind
 		for plant: Dictionary in real_fleet.get(lc_id, []):
 			if placed >= need or real_used >= REAL_SITES_PER_METRO:
 				break
@@ -405,6 +412,8 @@ static func author_start(world: Node) -> bool:
 				if site == Vector2i(-1, -1):
 					break
 				var pid: String = world.place_plant(rkind, site)
+				world.plants[pid]["name"] = str(plant["name"]) if units == 1 \
+					else "%s %d" % [str(plant["name"]), u + 1]
 				if needs_spur:
 					var ptap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
 					var spur: Array[Vector2i] = []
@@ -451,7 +460,11 @@ static func author_start(world: Node) -> bool:
 				push_warning("GridPlan: ladder exhausted for " + lc_id)
 				ok = false
 				break
-			world.place_plant(kind, site)
+			var spid: String = world.place_plant(kind, site)
+			# synthetic units get a readable name: metro + kind + number
+			unit_n[kind] = int(unit_n.get(kind, 0)) + 1
+			world.plants[spid]["name"] = "%s %s %d" % [str(lc["name"]),
+				str(world.KIND_LABELS.get(kind, kind)), unit_n[kind]]
 			placed += float(world.PLANT_SIZES[kind])
 			count += 1
 	# the collector web inside and between the plant parks is built HEAVY:
@@ -575,6 +588,7 @@ static func _phs_pass(world: Node, candidates: Array, sub_tiles: Dictionary,
 		if site == Vector2i(-1, -1):
 			continue
 		var pid: String = world.place_plant("hydro_ps", site)
+		world.plants[pid]["name"] = str(plant["name"])
 		var tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
 		var spur: Array[Vector2i] = []
 		if tap != Vector2i(-1, -1):
@@ -603,6 +617,7 @@ static func _offshore_pass(world: Node, candidates: Array) -> void:
 			if site == Vector2i(-1, -1):
 				break
 			var pid: String = world.place_plant("wind_offshore", site)
+			world.plants[pid]["name"] = str(plant["name"])
 			var tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
 			var spur: Array[Vector2i] = []
 			if tap != Vector2i(-1, -1):

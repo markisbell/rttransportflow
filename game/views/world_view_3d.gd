@@ -81,16 +81,12 @@ const COARSE_STEP := 8
 ## see is most of the smoothness budget.
 const MODEL_DETAIL_MAX_SIZE := 34.0
 
-## site notes: far out, cities (and mid-zoom plants) carry a NAME TAG so
-## the player can orient over a bare continent; at the model band — the
-## zoom where buildings and trees appear — a tag switches to the weekly
-## graph. Charts are capped nearest-first (SubViewport cost); tags are
-## cheap Label3Ds.
-const ZONE_CHART_MAX_ZOOM := MODEL_DETAIL_MAX_SIZE
-const PLANT_CHART_MAX_ZOOM := 16.0
+## site notes: cities (always) and plants (below PLANT_TAG_MAX_ZOOM)
+## carry a location pin + name so the player can orient; CLICKING a pin
+## toggles that site's weekly graph open above it (charts were in the way
+## when automatic — player report). Tags are cheap Label3Ds; a chart is a
+## SubViewport that renders once per block.
 const PLANT_TAG_MAX_ZOOM := 60.0
-const NOTE_ZONE_CAP := 6
-const NOTE_PLANT_CAP := 8
 const TAG_PLANT_CAP := 16
 
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
@@ -139,6 +135,7 @@ var _notes_root: Node3D
 var _notes: Dictionary = {}
 var _note_accum := 0.0
 var _note_block := -1
+var _chart_open := {}  # note key -> true; toggled by clicking the pin
 var _zone_anchor: Dictionary = {}  # zone id -> Vector2 tile centroid
 var _models_shown := true
 var _strategic: MeshInstance3D
@@ -331,14 +328,26 @@ const NIGHT_FOG := Color(0.05, 0.06, 0.10)
 const CITY_LIGHT := Color(1.0, 0.80, 0.45)
 
 
+## The sun rotates in DISCRETE steps (infrastruct's SUN_QUANT lesson): a
+## continuously creeping light re-fits the shadow map every frame and
+## every shadow edge texel crawls. Snapped to a fixed grid the map is
+## rock-stable between steps; one 0.75-degree jump is invisible next to
+## continuous shimmer. Colors and energy stay continuous.
+const SUN_QUANT_DEG := 0.75
+
+
 func _apply_daylight(tod: float) -> void:
 	# solar elevation proxy: -1 (midnight) .. +1 (noon)
 	var sun_e := sin((tod - 0.25) * TAU)
 	var day_f := smoothstep(-0.10, 0.30, sun_e)
 	var dusk_f := 1.0 - clampf(absf(sun_e) / 0.30, 0.0, 1.0)  # peak near horizon
+	# the azimuth sweeps a REAL half circle (infrastruct): rise EAST, noon
+	# SOUTH, set WEST — shadows tell the time of day; at night the sun
+	# parks as faint moonlight wherever it set
+	var day_win := clampf((tod * 24.0 - 5.5) / 14.0, 0.0, 1.0)
 	_sun.rotation_degrees = Vector3(
-		-lerpf(10.0, 52.0, clampf(sun_e, 0.0, 1.0)),
-		-34.0 + (tod - 0.5) * 70.0, 0.0)
+		-snappedf(lerpf(10.0, 52.0, clampf(sun_e, 0.0, 1.0)), SUN_QUANT_DEG),
+		snappedf(lerpf(-90.0, 90.0, day_win), SUN_QUANT_DEG), 0.0)
 	_sun.light_energy = 1.45 * day_f + 0.06
 	_sun.light_color = NIGHT_SUN.lerp(DAY_SUN, day_f).lerp(DUSK_SUN, dusk_f * 0.7)
 	_sun.shadow_enabled = day_f > 0.05  # moonlight shadows sparkle on iGPUs
@@ -857,23 +866,13 @@ func _sync_notes() -> void:
 		return
 	var wanted := {}
 	var fp := Vector2(_focus.x, _focus.z)
-	var zone_chart := _zoom <= ZONE_CHART_MAX_ZOOM
-	# cities: a chart inside the model band, a name tag at EVERY zoom
-	# beyond it — the tag is how the player orients over a bare continent
-	var scored: Array = []
+	# cities at every zoom — the tags are how the player orients; a city
+	# whose pin was clicked carries its chart instead
 	for zone: String in World.load_centers:
-		var a := _anchor_of(zone)
-		var d := a.distance_to(fp)
-		if not zone_chart or d <= _zoom * 1.6 + 12.0:
-			scored.append({"z": zone, "d": d, "a": a, "mode":
-				"chart" if zone_chart else "tag"})
-	scored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
-		return float(x["d"]) < float(y["d"]))
-	var zone_cap := NOTE_ZONE_CAP if zone_chart else scored.size()
-	for k in mini(scored.size(), zone_cap):
-		wanted["z:" + str((scored[k] as Dictionary)["z"])] = scored[k]
+		var key := "z:" + zone
+		wanted[key] = {"z": zone, "a": _anchor_of(zone),
+			"mode": "chart" if _chart_open.has(key) else "tag"}
 	if _zoom <= PLANT_TAG_MAX_ZOOM:
-		var plant_chart := _zoom <= PLANT_CHART_MAX_ZOOM
 		var pscored: Array = []
 		for pid: String in World.plants:
 			var kind := str(World.plants[pid]["kind"])
@@ -883,13 +882,14 @@ func _sync_notes() -> void:
 			var a := Vector2(t.x + 0.5, t.y + 0.5)
 			var d := a.distance_to(fp)
 			if d <= _zoom * 1.6 + 6.0:
-				pscored.append({"p": pid, "kind": kind, "d": d, "a": a,
-					"mode": "chart" if plant_chart else "tag"})
+				pscored.append({"p": pid, "kind": kind, "d": d, "a": a})
 		pscored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
 			return float(x["d"]) < float(y["d"]))
-		var cap := NOTE_PLANT_CAP if plant_chart else TAG_PLANT_CAP
-		for k in mini(pscored.size(), cap):
-			wanted["p:" + str((pscored[k] as Dictionary)["p"])] = pscored[k]
+		for k in mini(pscored.size(), TAG_PLANT_CAP):
+			var e: Dictionary = pscored[k]
+			var key := "p:" + str(e["p"])
+			e["mode"] = "chart" if _chart_open.has(key) else "tag"
+			wanted[key] = e
 	var block := int(GameClock.t_sim / Dispatch.BLOCK_S)
 	var block_changed := block != _note_block
 	_note_block = block
@@ -904,13 +904,8 @@ func _sync_notes() -> void:
 		var mode := str(e["mode"])
 		var fresh := not _notes.has(key)
 		if fresh:
-			var node: Node3D
-			if mode == "tag":
-				node = _make_tag(key, e)
-			elif key.begins_with("z:"):
-				node = SiteNote.for_zone(str(e["z"]))
-			else:
-				node = SiteNote.for_plant(str(e["p"]), str(e["kind"]))
+			var node := _make_tag(key, e) if mode == "tag" \
+				else _make_chart(key, e)
 			_notes_root.add_child(node)
 			_notes[key] = {"node": node, "mode": mode}
 		var n := (_notes[key] as Dictionary)["node"] as Node3D
@@ -925,9 +920,13 @@ func _sync_notes() -> void:
 		if mode == "tag":
 			_scale_tag(n, _zoom)
 		else:
-			(n as SiteNote).apply_zoom(_zoom)
+			var pin := n.get_node("pin") as Sprite3D
+			pin.pixel_size = _zoom * 0.0001
+			var note := n.get_node("note") as SiteNote
+			note.apply_zoom(_zoom)
+			note.position.y = PIN_TEX_H * pin.pixel_size
 			if fresh or block_changed:
-				(n as SiteNote).refresh()
+				note.refresh()
 
 
 ## Location-pin colors: one glance separates a city from a plant.
@@ -940,8 +939,7 @@ const PIN_TEX_H := 328.0  # texture height in px (icons/location_pin.svg)
 ## The far-zoom orientation tag: the openclipart location pin (CC0,
 ## assets/icons) with its tip on the site, category-tinted, the name
 ## floating above. Constant screen size via _scale_tag in the sync.
-func _make_tag(key: String, e: Dictionary) -> Node3D:
-	var tag := Node3D.new()
+func _make_pin(is_city: bool) -> Sprite3D:
 	var pin := Sprite3D.new()
 	pin.name = "pin"
 	pin.texture = PIN_TEXTURE
@@ -951,7 +949,42 @@ func _make_tag(key: String, e: Dictionary) -> Node3D:
 	pin.render_priority = 17
 	# centered sprite, shifted half a height up: the TIP marks the site
 	pin.offset = Vector2(0, PIN_TEX_H / 2.0)
-	tag.add_child(pin)
+	pin.modulate = PIN_CITY if is_city else PIN_PLANT
+	return pin
+
+
+## Clicked pin -> its site's chart opens above it (pin stays: click again
+## to close). The chart replaces the name label — its title carries it.
+func _make_chart(key: String, e: Dictionary) -> Node3D:
+	var holder := Node3D.new()
+	holder.add_child(_make_pin(key.begins_with("z:")))
+	var note: SiteNote
+	if key.begins_with("z:"):
+		note = SiteNote.for_zone(str(e["z"]))
+	else:
+		note = SiteNote.for_plant(str(e["p"]), str(e["kind"]))
+	note.name = "note"
+	holder.add_child(note)
+	return holder
+
+
+## The pins are the chart TOGGLES: hit-test a click against every visible
+## pin's screen box (billboards have no collision shapes to pick).
+func _pin_hit(mouse: Vector2) -> String:
+	for key: String in _notes:
+		var node := (_notes[key] as Dictionary)["node"] as Node3D
+		if not is_instance_valid(node):
+			continue
+		var anchor := camera.unproject_position(node.global_position)
+		if absf(mouse.x - anchor.x) < 16.0 \
+				and mouse.y > anchor.y - 40.0 and mouse.y < anchor.y + 6.0:
+			return key
+	return ""
+
+
+func _make_tag(key: String, e: Dictionary) -> Node3D:
+	var tag := Node3D.new()
+	tag.add_child(_make_pin(key.begins_with("z:")))
 	var label := Label3D.new()
 	label.name = "tag_name"
 	if key.begins_with("z:"):
@@ -960,16 +993,16 @@ func _make_tag(key: String, e: Dictionary) -> Node3D:
 			.get("name", zone))
 		label.modulate = Color(0.96, 0.97, 1.0)
 		label.font_size = 64
-		pin.modulate = PIN_CITY
 	else:
 		var kind := str(e["kind"])
-		label.text = "%s\n%s" % [str(ZoneChart.KIND_LABELS.get(kind, kind)),
-			str(e["p"])]
+		label.text = "%s\n%s" % [
+			str((World.plants.get(str(e["p"]), {}) as Dictionary) \
+				.get("name", e["p"])),
+			str(World.KIND_LABELS.get(kind, kind))]
 		var group := str(ZoneHistory.GROUP_OF_KIND.get(kind, ""))
 		label.modulate = (ZoneChart.GROUP_COLORS.get(group,
 			Color(0.9, 0.92, 0.95)) as Color).lightened(0.45)
 		label.font_size = 44
-		pin.modulate = PIN_PLANT
 	label.outline_size = 16
 	label.outline_modulate = Color(0.05, 0.07, 0.10, 0.9)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -986,8 +1019,11 @@ func _scale_tag(tag: Node3D, zoom: float) -> void:
 	var label := tag.get_node("tag_name") as Label3D
 	pin.pixel_size = zoom * 0.0001
 	label.pixel_size = zoom * 0.00034
+	# the label's CENTER must clear the pin head by half the text block,
+	# or the name sits on the pin (player report) — lines x font/2 + gap
+	var lines := label.text.count("\n") + 1
 	label.position.y = PIN_TEX_H * pin.pixel_size \
-		+ 40.0 * label.pixel_size
+		+ (0.5 * label.font_size * lines + 30.0) * label.pixel_size
 
 
 func _anchor_of(zone: String) -> Vector2:
@@ -1180,6 +1216,15 @@ func _unhandled_input(event: InputEvent) -> void:
 					_zoom = clampf(_zoom * 1.12, MIN_ZOOM, MAX_ZOOM)
 					_apply_camera()
 			MOUSE_BUTTON_LEFT:
+				if button.pressed:
+					var hit := _pin_hit(button.position)
+					if hit != "":
+						if _chart_open.has(hit):
+							_chart_open.erase(hit)
+						else:
+							_chart_open[hit] = true
+						_sync_notes()
+						return  # a pin click toggles a chart, never builds
 				_dragging = button.pressed
 				if button.pressed:
 					tile_clicked.emit(mouse_tile())

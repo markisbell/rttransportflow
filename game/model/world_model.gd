@@ -82,6 +82,16 @@ const DEVICE_KINDS: Array[String] = ["battery", "electrolyzer", "h2_cavern",
 	"hvdc_converter", "offshore_platform"]
 
 ## Default unit sizes per kind (PARAMETERS §1; balancing constants)
+## Display names for plant kinds — ONE source (tags, charts, menus).
+const KIND_LABELS := {
+	"nuclear": "Nuclear", "coal": "Coal", "lignite": "Lignite",
+	"gas_ccgt": "Gas CCGT", "gas_ocgt": "Gas OCGT", "hydro_ps": "Pumped hydro",
+	"wind_onshore": "Wind onshore", "wind_offshore": "Wind offshore",
+	"offshore_platform": "Offshore hub", "solar_pv": "Solar PV",
+	"battery": "Battery", "electrolyzer": "Electrolyzer",
+	"h2_cavern": "H2 cavern", "hvdc_converter": "HVDC converter",
+}
+
 const PLANT_SIZES := {
 	"nuclear": 1600.0, "coal": 800.0, "lignite": 900.0,
 	"gas_ccgt": 600.0, "gas_ocgt": 200.0, "hydro_ps": 300.0,
@@ -427,7 +437,7 @@ func serialize() -> Dictionary:
 		var row := {"pid": pid, "kind": p["kind"],
 			"tile": [(p["tile"] as Vector2i).x, (p["tile"] as Vector2i).y],
 			"p_max_mw": p["p_max_mw"]}
-		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id"]:
+		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				row[extra] = p[extra]
 		plant_list.append(row)
@@ -456,7 +466,7 @@ func restore(envelope: Dictionary) -> bool:
 		var tile := Vector2i(int(p["tile"][0]), int(p["tile"][1]))
 		var entry := {"kind": str(p["kind"]), "tile": tile,
 			"p_max_mw": float(p["p_max_mw"])}
-		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id"]:
+		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				entry[extra] = p[extra]
 		plants[str(p["pid"])] = entry
