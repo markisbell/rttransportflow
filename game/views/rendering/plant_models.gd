@@ -850,6 +850,29 @@ static func _make_substation() -> Node3D:
 const CONDUCTOR := Color(0.80, 0.81, 0.84)
 
 
+## A corridor tile AT SEA: the cable lies on the seabed — what the player
+## sees is the marker-buoy line tracing the route (orange for AC cable,
+## violet-tinted for DC), one buoy at the tile centre and one toward each
+## connected side. The view floats the whole node on the water plane.
+static func sea_cable(kind: String, neighbors: Array[Vector2i]) -> Node3D:
+	var root := Node3D.new()
+	var color := HVDC_COLOR.lightened(0.25) if kind == "hvdc" \
+		else Color(1.0, 0.58, 0.12)
+	root.add_child(_buoy(color, Vector3.ZERO))
+	for offset: Vector2i in neighbors:
+		root.add_child(_buoy(color,
+			Vector3(offset.x * 0.33, 0.0, offset.y * 0.33)))
+	return root
+
+
+static func _buoy(color: Color, at: Vector3) -> MeshInstance3D:
+	var buoy := MeshInstance3D.new()
+	buoy.mesh = _sphere_mesh(0.045, 0.06, 8, 4, false)
+	buoy.material_override = flat(color)
+	buoy.position = at
+	return buoy
+
+
 static func corridor(kind: String, neighbors: Array[Vector2i]) -> Node3D:
 	if kind == "cable_400":
 		return _cable_trench(neighbors)

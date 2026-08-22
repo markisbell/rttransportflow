@@ -40,9 +40,15 @@ func run() -> void:
 		return
 
 	for _i in range(SETTLE_BLOCKS):
+		var t0 := Time.get_ticks_msec()
 		var result: Dictionary = await Orchestrator.step_once(900.0)
+		print("SLR settle %d: %d ms, http %d, dt_done %s" % [_i,
+			Time.get_ticks_msec() - t0, int(result.get("_status", 0)),
+			str(result.get("dt_done_s", "?"))])
 		if result.get("_status", 0) != 200:
-			_fail(TAG, "settle step failed")
+			_fail(TAG, "settle step failed: http %d, status '%s', error '%s'" % [
+				int(result.get("_status", 0)), str(result.get("status", "")),
+				str(result.get("_error", ""))])
 			return
 
 	print("SLR pre-save islands: ", JSON.stringify(

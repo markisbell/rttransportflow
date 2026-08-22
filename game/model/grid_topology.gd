@@ -25,6 +25,8 @@ const DEFAULT_PARALLEL := 4
 ## actually schedules against (the rest is N-1 margin). Used to size a
 ## branch's circuit count from the capacity it joins.
 const CIRCUIT_MVA := 625.0
+## one 400 kV XLPE cable circuit at 1.8 kA (the emitted max_i_ka)
+const CIRCUIT_MVA_CABLE := 1100.0
 const CIRCUIT_UTILISATION := 0.9
 ## Ledger 29's fleet-sizing margin: the LIVE weather-driven peak runs above
 ## the map's static peak_mw_2025, so builds size generation at 1.35x the
@@ -79,13 +81,28 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	var farm_hub := {}  # wind_offshore pid -> platform pid
 	for pid: String in world.plants:
 		var p: Dictionary = world.plants[pid]
-		if str(p["kind"]) == "wind_offshore" \
-				and world.terrain_at(p["tile"]) == "S":
+		if str(p["kind"]) != "wind_offshore":
+			continue
+		var terr := str(world.terrain_at(p["tile"]))
+		# Deep-sea farms ALWAYS export over a platform. SHELF farms bind
+		# only when they have no AC export of their own: the German Bight
+		# is shallow end to end, yet its parks export over converter
+		# platforms in reality (the BorWin pattern) — depth was a proxy
+		# for DISTANCE, and connectivity is the honest criterion.
+		var ac_connected := false
+		if terr == "s":
+			for offset: Vector2i in NEIGHBORS:
+				if world.corridors.has((p["tile"] as Vector2i) + offset):
+					ac_connected = true
+					break
+		if terr == "S" or (terr == "s" and not ac_connected):
 			var platform: String = world.platform_near(p["tile"])
 			if platform == "":
-				warnings.append("far-shore farm %s has no platform in range — dropped" % pid)
-			else:
-				farm_hub[pid] = platform
+				if terr == "S":
+					warnings.append(
+						"far-shore farm %s has no platform in range — dropped" % pid)
+				continue  # unconnected shelf farm without a hub: AC rules apply
+			farm_hub[pid] = platform
 
 	# --- adjacency structures ------------------------------------------
 	var site_of_tile := {}  # corridor-adjacent tile -> "plant:<pid>"|"lc:<id>"
@@ -342,11 +359,23 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	var line_seq := 0
 	for branch: Dictionary in kept_branches:
 		# authored upgrades win where the local flow estimate cannot see
-		# meshed transfers (ledger 45); the estimator still sizes bridges
+		# meshed transfers (ledger 45); the estimator still sizes bridges.
+		# CABLES get a lower floor: one 400 kV cable circuit carries ~2x an
+		# overhead circuit, and every parallel cable adds ~11 MVAr/km of
+		# charging — the overhead min-4 clamp on a 100 km offshore export
+		# quadrupled its reactive injection for no capacity reason
+		var is_cable: bool = str(branch.get("kind", "")) == "cable_400"
+		# a 400 kV XLPE circuit at 1.8 kA carries ~1.2 GVA — twice an
+		# overhead circuit — and every parallel cable adds ~10.4 MVAr/km
+		# of charging, so sizing cables in overhead units DOUBLED the
+		# copper and the reactive injection (vm 3.2 pu, mass trips, the
+		# boot blackout). Radial exports run a single circuit in reality.
+		var per_circuit: float = CIRCUIT_MVA_CABLE if is_cable else CIRCUIT_MVA
+		var floor_par: int = 1 if is_cable else DEFAULT_PARALLEL
 		var circuits: int = clampi(maxi(
-			int(ceil(needs[line_seq] / (CIRCUIT_MVA * CIRCUIT_UTILISATION))),
+			int(ceil(needs[line_seq] / (per_circuit * CIRCUIT_UTILISATION))),
 			int(branch.get("authored", 0))),
-			DEFAULT_PARALLEL, MAX_PARALLEL)
+			floor_par, MAX_PARALLEL)
 		var entry := {
 			"id": "L%d" % line_seq,
 			"from_bus": "b%d" % bus_rename[branch["from"]],

@@ -208,7 +208,14 @@ func step_once(dt_s: float) -> Dictionary:
 		request["watch"] = watch.duplicate()
 	var done := [false, {}]
 	_dispatch_step(request, done)
-	var deadline := Time.get_ticks_msec() + int(STEP_TIMEOUT_S * 1000.0)
+	# the deadline SCALES with the requested dt: the 15 s floor is sized
+	# for interactive steps (0.1-6 s), but smokes drive 900 s wire steps
+	# whose first ALERT-settling block legitimately costs ~7-20 s of wall
+	# — a flat cap sat exactly on that measurement and made save_load
+	# flaky (passed at 14.x s in the morning sweep, timed out at 15.01 s
+	# beside the running game)
+	var cap_s := maxf(STEP_TIMEOUT_S, dt_s * 0.05)
+	var deadline := Time.get_ticks_msec() + int(cap_s * 1000.0)
 	while not done[0] and Time.get_ticks_msec() < deadline:
 		await Engine.get_main_loop().process_frame
 	in_flight = false

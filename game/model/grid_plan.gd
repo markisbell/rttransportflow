@@ -366,9 +366,9 @@ static func author_start(world: Node) -> bool:
 				Vector2i(-1, -1))
 			if sub_tile == Vector2i(-1, -1):
 				continue
-			var tap: Vector2i = taps[i % taps.size()]
-			world.place_corridor(tap, "line_400")
-			if not _lay(world, sub_tile, tap, "line_400", 12):
+			var tap2: Vector2i = taps[i % taps.size()]
+			world.place_corridor(tap2, "line_400")
+			if not _lay(world, sub_tile, tap2, "line_400", 12):
 				push_warning("GridPlan: feed %s -> %s unroutable"
 					% [feed_names[i], lc_id])
 				ok = false
@@ -480,27 +480,104 @@ static func author_start(world: Node) -> bool:
 				if str(world.corridors.get(t, "")) == "line_400":
 					world.corridor_circuits[t] = 12
 	_phs_pass(world, real_fleet.get("_phs", []), sub_tiles, feeds)
-	_offshore_pass(world, real_fleet.get("_offshore", []))
+	_city_cable_pass(world)
+	var hub_used := _hub_pass(world, real_fleet.get("_offshore", []),
+		sub_tiles)
+	var ac_candidates: Array = []
+	for p: Dictionary in real_fleet.get("_offshore", []):
+		if not hub_used.has(str(p["name"])):
+			ac_candidates.append(p)
+	_offshore_pass(world, ac_candidates)
 	_halo = {}
 	return ok
+
+
+## From the 400 kV ring into the city, the feed's LAST stretch runs as
+## underground cable — overhead ends at the nearest substation or
+## junction outside the metro (the real transition-station pattern).
+## The walk stops exactly ON a tile that already forms a bus, so the
+## line|cable kind change never costs a node-budget slot.
+static func _city_cable_pass(world: Node) -> void:
+	for lc_id: String in Campaign.CONTINENTAL_CORE:
+		if not world.load_centers.has(lc_id):
+			continue
+		for lc_tile: Vector2i in world.load_centers[lc_id]["tiles"]:
+			for offset: Vector2i in GridTopology.NEIGHBORS:
+				var entry: Vector2i = lc_tile + offset
+				if str(world.corridors.get(entry, "")) == "line_400":
+					_cable_entry(world, entry)
+
+
+## Only SHORT urban approaches are cabled (real practice: a handful of
+## km of 400 kV cable into the city, never the whole feed) — 56 km of
+## 12-circuit cable injects ~7 GVAr of charging, and twenty such feeds
+## diverged the PF outright and blacked the world out at boot (found
+## live). Longer feeds keep their overhead line.
+const CITY_CABLE_MAX_TILES := 4  # <= 20 km underground approach
+
+
+static func _cable_entry(world: Node, entry: Vector2i) -> void:
+	var path: Array[Vector2i] = []
+	var prev := Vector2i(-99999, -99999)
+	var current := entry
+	for _i in CITY_CABLE_MAX_TILES + 1:
+		if world.substations.has(current) or world.diag_fillers.has(current):
+			break  # substation = the transition bus; fillers stay overhead
+		var degree := 0
+		var next := Vector2i(-99999, -99999)
+		for o: Vector2i in GridTopology.NEIGHBORS:
+			var n := current + o
+			if world.corridors.has(n):
+				degree += 1
+				if n != prev:
+					next = n
+		if current != entry and degree > 2:
+			break  # junction: already a bus, overhead continues from here
+		path.append(current)
+		if next.x < -90000 or str(world.corridors.get(next, "")) != "line_400":
+			break
+		prev = current
+		current = next
+	if path.size() > CITY_CABLE_MAX_TILES:
+		return  # a long feed stays overhead — cable is the exception
+	# walk must have ENDED on a bus-forming tile (substation or junction);
+	# a dead-end break converts a stub whose far end is mid-corridor and
+	# would buy a kind-change bus for nothing
+	if not (world.substations.has(current) or world.diag_fillers.has(current)):
+		var degree := 0
+		for o: Vector2i in GridTopology.NEIGHBORS:
+			if world.corridors.has(current + o):
+				degree += 1
+		if degree <= 2:
+			return
+	for tile: Vector2i in path:
+		var circuits: int = world.corridor_circuits.get(tile, 0)
+		world.remove_corridor(tile)
+		world.place_corridor(tile, "cable_400")
+		if circuits > 0:
+			# one 400 kV cable circuit carries ~2x an overhead circuit
+			# (1.8 kA vs 0.85): half the circuits move the same power and
+			# HALVE the charging injection
+			world.corridor_circuits[tile] = maxi(2, circuits / 2)
 
 
 ## Short plant spur into the web: bounded BFS that stops on the FIRST
 ## existing corridor tile (spurs merge into trunks, never lay parallels).
 static func _spur(world: Node, from_tile: Vector2i,
-		toward: Vector2i) -> Array[Vector2i]:
+		toward: Vector2i, kind := "line_400") -> Array[Vector2i]:
 	var margin: int = world.tiles_for_km(60.0)
 	var bx0 := mini(from_tile.x, toward.x) - margin
 	var bx1 := maxi(from_tile.x, toward.x) + margin
 	var by0 := mini(from_tile.y, toward.y) - margin
 	var by1 := maxi(from_tile.y, toward.y) + margin
 	var passable := func(n: Vector2i) -> bool:
+		var k := str(world.corridors.get(n, ""))
 		return n.x >= bx0 and n.x <= bx1 and n.y >= by0 and n.y <= by1 \
 			and not _halo.has(n) \
-			and str(world.corridors.get(n, "line_400")) == "line_400" \
-			and world.can_place_corridor(n, "line_400")
+			and (k == kind or k == "line_400" \
+				or (k == "" and world.can_place_corridor(n, kind)))
 	return DemoBuild.route(world, from_tile, toward, true, {}, passable,
-		["line_400"])
+		["line_400", kind])
 
 
 static func _nearest_substation(world: Node, anchor: Vector2i) -> Vector2i:
@@ -601,15 +678,81 @@ static func _phs_pass(world: Node, candidates: Array, sub_tiles: Dictionary,
 		placed += 1
 
 
-## The eight biggest offshore parks whose export cable reaches the web:
-## near-shore AC over the shelf (P7's first connection path). Intermittent
+## The German Bight exports over a converter platform (the BorWin
+## pattern, ledger 27): the big far parks bind to the platform by
+## proximity — no AC spur, no bus cost — and the platform lands its DC
+## export at the Diele substation, TenneT's real landing point. Returns
+## the names it consumed so the AC pass skips them.
+static func _hub_pass(world: Node, candidates: Array,
+		sub_tiles: Dictionary) -> Array:
+	var used: Array = []
+	var bight: Array = []
+	var centroid := Vector2.ZERO
+	for p: Dictionary in candidates:
+		var t: Vector2i = p["tile"]
+		if t.x >= 344 and t.x <= 372 and t.y >= 358 and t.y <= 386:
+			bight.append(p)
+			centroid += Vector2(t)
+	if bight.size() < 2:
+		return used  # no cluster, no platform
+	centroid /= bight.size()
+	var plat_site := DemoBuild.find_site(world, "offshore_platform",
+		Vector2i(int(centroid.x), int(centroid.y)), 8)
+	var diele: Vector2i = sub_tiles.get("diele", Vector2i(-1, -1))
+	if plat_site == Vector2i(-1, -1) or diele == Vector2i(-1, -1):
+		return used
+	var conv_site := DemoBuild.find_site(world, "hvdc_converter", diele, 6)
+	if conv_site == Vector2i(-1, -1):
+		return used
+	var plat_pid: String = world.place_plant("offshore_platform", plat_site)
+	var conv_pid: String = world.place_plant("hvdc_converter", conv_site)
+	world.plants[plat_pid]["name"] = "BorWin platform"
+	world.plants[conv_pid]["name"] = "BorWin · Diele"
+	var flank_a := _free_flank(world, plat_site)
+	var flank_b := _free_flank(world, conv_site)
+	if flank_a == Vector2i(-1, -1) or flank_b == Vector2i(-1, -1) \
+			or not _lay(world, flank_a, flank_b, "hvdc"):
+		world.remove_plant(plat_pid)
+		world.remove_plant(conv_pid)
+		return used
+	var reach: int = world.hub_bind_tiles()
+	for p: Dictionary in bight:
+		if used.size() >= 4:
+			break
+		var t: Vector2i = p["tile"]
+		if maxi(absi(t.x - plat_site.x), absi(t.y - plat_site.y)) > reach:
+			continue
+		var site := t if world.can_place_plant("wind_offshore", t) \
+			else DemoBuild.find_site(world, "wind_offshore", t, 4)
+		if site == Vector2i(-1, -1):
+			continue
+		var pid: String = world.place_plant("wind_offshore", site)
+		world.plants[pid]["name"] = str(p["name"])
+		used.append(str(p["name"]))
+	return used
+
+
+## Near-shore AC parks: the biggest CONTINENTALLY REACHABLE parks export
+## over a submarine cable to the web — capped at the §1.16 150 km AC
+## limit, so a UK park can never end up wired to Belgium by sea pylons
+## (which is exactly what the capacity-only pick did). Intermittent
 ## capacity — deliberately NOT counted toward any metro's firm need.
 static func _offshore_pass(world: Node, candidates: Array) -> void:
 	var placed := 0
+	# 80 km, not the §1.16 150: charging eats an AC cable's ampacity with
+	# distance, and past ~80 km the export is DC territory — which is WHY
+	# the far parks go to the platform instead
+	var cable_cap: int = world.tiles_for_km(80.0)
 	for plant: Dictionary in candidates:
 		if placed >= 4:
 			break
-		var units := 1  # one 500 MW unit per park: each extra sea spur costs buses
+		# UK-side waters (west of ~2.5 E): those parks belong to the UK
+		# grid, which is not in the world — the 150 km cap alone let
+		# London Array wire itself to Belgium
+		var pt: Vector2i = plant["tile"]
+		if pt.x < 309 and pt.y < 480:
+			continue
+		var units := 2  # two 500 MW units stand together: one shared spur
 		var anchor: Vector2i = plant["tile"]
 		var park_done := 0
 		for u in units:
@@ -617,16 +760,25 @@ static func _offshore_pass(world: Node, candidates: Array) -> void:
 			if site == Vector2i(-1, -1):
 				break
 			var pid: String = world.place_plant("wind_offshore", site)
-			world.plants[pid]["name"] = str(plant["name"])
+			world.plants[pid]["name"] = str(plant["name"]) if units == 1 \
+				else "%s %d" % [str(plant["name"]), u + 1]
+			if u > 0:
+				anchor = site
+				park_done += 1
+				continue  # the second unit shares the first unit's cable
 			var tap: Vector2i = DemoBuild.tap_for(world, [site], _halo)
 			var spur: Array[Vector2i] = []
 			if tap != Vector2i(-1, -1):
-				spur = _spur(world, tap, _nearest_sub_tile(world, site, {}))
-			if spur.is_empty():
-				world.remove_plant(pid)
+				spur = _spur(world, tap,
+					_nearest_sub_tile(world, site, {}), "cable_400")
+			if spur.is_empty() or spur.size() > cable_cap:
+				# too far for AC: the park stays if a platform can bind it
+				# (connectivity binding routes it over the hub), else out
+				if str(world.platform_near(site)) == "":
+					world.remove_plant(pid)
 				break
 			for tile: Vector2i in spur:
-				world.place_corridor(tile, "line_400")
+				world.place_corridor(tile, "cable_400")
 			anchor = site
 			park_done += 1
 		if park_done > 0:

@@ -143,6 +143,8 @@ var _strategic_dirty := false
 var _sky_material: ProceduralSkyMaterial
 var _city_lights: MultiMeshInstance3D
 var _city_lights_material: StandardMaterial3D
+var _light_zone: Array[String] = []  # glow instance -> nearest zone id
+var _light_supply := {}              # zone id -> last applied supply
 var _tod_cache := -1.0  # time-of-day fraction the lighting was last set for
 ## resident wind-turbine rotors -> spin speed (rad/s from the LIVE weather
 ## at build time). Model-band models are few, so per-frame rotation is
@@ -386,12 +388,19 @@ func _build_city_lights() -> void:
 		return
 	var multi := MultiMesh.new()
 	multi.transform_format = MultiMesh.TRANSFORM_3D
+	multi.use_colors = true  # per-instance dimming: a blacked-out zone's
+	# lights GO OUT (player request) — supply drives the instance color
 	var quad := PlaneMesh.new()
 	# oversized so neighbouring glows overlap into one continuous blob —
 	# hard per-tile squares read as a checkerboard, not a city at night
 	quad.size = Vector2(2.6, 2.6)
 	multi.mesh = quad
 	multi.instance_count = tiles.size()
+	var anchors := {}
+	for lc_id: String in World.load_centers:
+		anchors[lc_id] = _anchor_of(lc_id)
+	_light_zone.clear()
+	_light_zone.resize(tiles.size())
 	for i in tiles.size():
 		var tile := tiles[i]
 		# a village glows smaller and dimmer than a metro core
@@ -399,9 +408,22 @@ func _build_city_lights() -> void:
 		multi.set_instance_transform(i, Transform3D(
 			Basis.IDENTITY.scaled(Vector3(glow_scale, 1.0, glow_scale)),
 			Vector3(tile.x + 0.5, ground_y(tile) + 0.055, tile.y + 0.5)))
+		multi.set_instance_color(i, Color.WHITE)
+		# each glow belongs to its nearest load centre: that zone's supply
+		# state dims it (UFLS) or kills it (blackout)
+		var best := ""
+		var best_d := 1e12
+		var tp := Vector2(tile.x + 0.5, tile.y + 0.5)
+		for lc_id: String in anchors:
+			var d: float = tp.distance_squared_to(anchors[lc_id])
+			if d < best_d:
+				best_d = d
+				best = lc_id
+		_light_zone[i] = best
 	_city_lights = MultiMeshInstance3D.new()
 	_city_lights.multimesh = multi
 	_city_lights_material = StandardMaterial3D.new()
+	_city_lights_material.vertex_color_use_as_albedo = true
 	_city_lights_material.albedo_color = CITY_LIGHT
 	_city_lights_material.emission_enabled = true
 	_city_lights_material.emission = CITY_LIGHT
@@ -475,6 +497,7 @@ func _process(delta: float) -> void:
 	if _note_accum >= 0.4:
 		_note_accum = 0.0
 		_sync_notes()
+		_update_light_supply()
 	_drain_pending_budgeted()
 
 
@@ -782,9 +805,13 @@ func _build_corridor(key: Vector2i, tile: Vector2i) -> void:
 		return
 	var kind := str(World.corridors[tile])
 	var neighbors := _corridor_neighbors(tile, kind)
+	# at sea EVERY corridor is a submarine cable — what renders is its
+	# marker buoys, never pylons marching across the water (player report:
+	# offshore parks and NordLink alike were strung on sea pylons)
+	var at_sea: bool = World.terrain_at(tile) in ["S", "s"]
 	# the cache key folds kind + which sides connect: a corridor is only
 	# rebuilt when its SHAPE changes, not when a distant tile is edited
-	var shape := kind
+	var shape := kind + ("~sea" if at_sea else "")
 	for offset: Vector2i in neighbors:
 		shape += "|%d,%d" % [offset.x, offset.y]
 	var keys := chunk["corridor_keys"] as Dictionary
@@ -794,10 +821,13 @@ func _build_corridor(key: Vector2i, tile: Vector2i) -> void:
 	if nodes.has(tile):
 		(nodes[tile] as Node3D).queue_free()
 		nodes.erase(tile)
-	var model := PlantModels.corridor(kind, neighbors)
+	var model := PlantModels.sea_cable(kind, neighbors) if at_sea \
+		else PlantModels.corridor(kind, neighbors)
 	if model == null:
 		return
 	model.position = _tile_origin(tile)
+	if at_sea:  # buoys bob on the water plane, not on the seabed
+		model.position.y = EuropeTerrain.water_level(World) + 0.012
 	(chunk["root"] as Node3D).add_child(model)
 	nodes[tile] = model
 	keys[tile] = shape
@@ -861,6 +891,33 @@ func _sync_components() -> void:
 ## NOTE_PLANT_MAX_ZOOM, nearest-first under a hard cap. Charts refresh
 ## when the 15-min block advances (ZoneHistory records per block), and a
 ## note's viewport renders only on refresh — resident notes are free.
+## A blacked-out zone's night glow goes OUT; a UFLS-shed zone dims to
+## its supplied fraction (player request: "if there is a blackout,
+## lights should go out accordingly"). Instance colors are rewritten
+## only for zones whose supply actually changed.
+func _update_light_supply() -> void:
+	if _city_lights == null or _light_zone.is_empty():
+		return
+	var zones: Dictionary = Orchestrator.latest().get("zones", {})
+	if zones.is_empty():
+		return
+	var changed := {}
+	for zone_id: Variant in zones:
+		var supplied := clampf(float((zones[zone_id] as Dictionary) \
+			.get("supplied", 1.0)), 0.0, 1.0)
+		if absf(float(_light_supply.get(zone_id, 1.0)) - supplied) > 0.02:
+			_light_supply[zone_id] = supplied
+			changed[str(zone_id)] = supplied
+	if changed.is_empty():
+		return
+	var multi := _city_lights.multimesh
+	for i in _light_zone.size():
+		var zone := _light_zone[i]
+		if changed.has(zone):
+			var f: float = changed[zone]
+			multi.set_instance_color(i, Color(f, f, f))
+
+
 func _sync_notes() -> void:
 	if not _map_ready:
 		return
