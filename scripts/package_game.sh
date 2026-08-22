@@ -79,6 +79,9 @@ if [ "$PLATFORM" = "macos" ]; then
 else
     mkdir -p "$BUNDLE/backend" "$BUNDLE/orchestration"
     cp "build/dist/$PLATFORM/$EXE" "$BUNDLE/$EXE"
+    if [ "$PLATFORM" = "windows" ] && [ -f "build/dist/$PLATFORM/rttransportflow.console.exe" ]; then
+        cp "build/dist/$PLATFORM/rttransportflow.console.exe" "$BUNDLE/"
+    fi
     chmod +x "$BUNDLE/$EXE"
     cp -r "$FROZEN" "$BUNDLE/backend/"
     # data/ ships beside the executable (read through absolute paths, not res://)
@@ -170,6 +173,24 @@ if [ "$PLATFORM" = "macos" ] && [ "$(uname)" = "Darwin" ]; then
         exit 1
     fi
 fi
+if [ "$PLATFORM" = "windows" ] && [ "$(uname -o 2>/dev/null)" = "Msys" ]; then
+    # the windowed exe has NO stdout on Windows — the smoke verdict needs
+    # the console wrapper the preset now ships alongside
+    echo "==> verifying bundle (scripted boot + a simulated day)"
+    TIMEOUT_CMD="timeout 900"
+    command -v timeout >/dev/null 2>&1 || TIMEOUT_CMD=""
+    ( cd "$BUNDLE" && RTTF_PORT_OFFSET=5 $TIMEOUT_CMD \
+        "./rttransportflow.console.exe" --headless -- \
+        --smoke=boot_and_day > package_verify.log 2>&1 ) || true
+    if grep -q '"ok":true' "$BUNDLE/package_verify.log"; then
+        grep -h '^SMOKE' "$BUNDLE/package_verify.log"
+        rm -f "$BUNDLE/package_verify.log"
+    else
+        echo "bundle verification FAILED — see $BUNDLE/package_verify.log" >&2
+        tail -20 "$BUNDLE/package_verify.log" >&2
+        exit 1
+    fi
+fi
 if [ "$PLATFORM" = "linux" ]; then
     echo "==> verifying bundle (scripted boot + a simulated day)"
     ( cd "$BUNDLE" && RTTF_PORT_OFFSET=5 timeout 600 "./$EXE" --headless -- \
@@ -185,6 +206,12 @@ if [ "$PLATFORM" = "linux" ]; then
 fi
 
 # --- 5. archive -------------------------------------------------------------
+if [ "$PLATFORM" = "windows" ] && command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -Command \
+        "Compress-Archive -Force -Path '$(cygpath -w "$BUNDLE")' -DestinationPath '$(cygpath -w "$BUNDLE.zip")'"
+    echo "==> $BUNDLE.zip ($(du -h "$BUNDLE.zip" | cut -f1))"
+    exit 0
+fi
 if [ "$PLATFORM" = "macos" ] && command -v ditto >/dev/null 2>&1; then
     # ditto preserves the code signatures a plain zip can strip
     ditto -c -k --keepParent "$BUNDLE" "$BUNDLE.zip"

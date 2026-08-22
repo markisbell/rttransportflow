@@ -6,6 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PY=".venv/bin/python"
+BACKEND_BIN="rttransportflow-backend"
+DATA_SEP=":"
+# Windows (git-bash on the CI runner): venv layout and PyInstaller's
+# --add-data separator both differ
+if [ -x ".venv/Scripts/python.exe" ]; then
+    PY=".venv/Scripts/python.exe"
+    BACKEND_BIN="rttransportflow-backend.exe"
+    DATA_SEP=";"
+fi
 OUT="build/freeze"
 LOG="$OUT/build.log"
 mkdir -p "$OUT"
@@ -17,7 +26,7 @@ mkdir -p "$OUT"
     --collect-all numba \
     --collect-all llvmlite \
     --hidden-import rttransportflow.main \
-    --add-data "$(pwd)/data:data" \
+    --add-data "$(pwd)/data${DATA_SEP}data" \
     scripts/freeze_entry.py > "$LOG" 2>&1 || { tail -30 "$LOG" >&2; exit 1; }
 
 # Fail on numba warnings EXCEPT the known-benign OPTIONAL threading layers
@@ -34,7 +43,7 @@ fi
 PORT=8033
 RTTRANSPORTFLOW_PORT=$PORT RTTRANSPORTFLOW_AUTOSTART=false \
 RTTRANSPORTFLOW_EXTERNAL_CLOCK=true \
-    "$OUT/dist/rttransportflow-backend/rttransportflow-backend" &
+    "$OUT/dist/rttransportflow-backend/$BACKEND_BIN" &
 PID=$!
 trap 'kill $PID 2>/dev/null || true' EXIT
 

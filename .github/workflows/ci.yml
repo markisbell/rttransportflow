@@ -169,3 +169,46 @@ jobs:
           name: rttransportflow-macos-arm64
           path: build/dist/rttransportflow-*-macos-arm64.zip
           if-no-files-found: error
+
+  windows-bundle:
+    # The Windows installer, same shape as macos-bundle: PyInstaller
+    # freezes for its build host, so the backend must be built ON Windows.
+    # Manual trigger; Windows runner minutes bill at 2x.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: |
+          pip install -e ".[dev]" pyinstaller
+          python -m venv .venv --system-site-packages
+      - name: Fetch Godot (Windows editor + export templates)
+        run: |
+          curl -sSL -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip
+          unzip -q godot.zip
+          echo "GODOT=$PWD/Godot_v4.7.1-stable_win64.exe" >> "$GITHUB_ENV"
+          curl -sSL -o templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          unzip -q templates.tpz
+          DEST="$APPDATA/Godot/export_templates/4.7.1.stable"
+          mkdir -p "$DEST"
+          mv templates/* "$DEST"/
+      - name: Import project
+        run: |
+          cd game
+          "$GODOT" --headless --import --path . || true
+      - name: Package and verify (plays the bundle)
+        run: ./scripts/package_game.sh windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rttransportflow-windows-x86_64
+          path: build/dist/rttransportflow-*-windows-x86_64.zip
+          if-no-files-found: error
