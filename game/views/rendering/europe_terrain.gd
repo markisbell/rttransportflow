@@ -72,7 +72,21 @@ const LUSH := Color(0.373, 0.514, 0.267)
 const FOREST := Color(0.153, 0.278, 0.141)
 const ROCK := Color(0.478, 0.443, 0.404)
 const SAND := Color(0.769, 0.706, 0.537)
-const URBAN_GREY := Color(0.556, 0.545, 0.529)  # concrete sprawl
+# Warm brown-grey, the satellite tone of built-up ground. Two failed
+# tries are baked into this choice: a mid concrete grey AND a dark
+# asphalt both converged with pale farmland under the filmic tonemap +
+# aerial fog (a red-canary render proved the blend footprint perfect —
+# the CONTRAST was dying, not the logic). Fog whitens luminance but
+# keeps hue, so the city tone must differ from the greens in HUE.
+const URBAN_GREY := Color(0.52, 0.44, 0.37)
+
+
+## Built-up ground must READ as city against the countryside: the linear
+## 0.75x blend left Berlin's 0.89 density a grey-olive that still scanned
+## as green (measured (0.46, 0.51, 0.39)). The smoothstep saturates metro
+## cores to near-full concrete while the suburban fringe keeps a tinge.
+static func urban_blend(color: Color, urban: float) -> Color:
+	return color.lerp(URBAN_GREY, smoothstep(0.08, 0.55, urban) * 0.92)
 
 
 static func height_of(kind: String) -> float:
@@ -261,8 +275,8 @@ static func map_pixel(world: Node, tile: Vector2i) -> Color:
 		if world.lake_at(tile):
 			return LAKE
 		return DEEP.lerp(SHALLOW, exp(-maxf(0.0, -elev) / 220.0))
-	return _land_color(world.lat_of_row(tile.y), elev, world.green_at(tile)) \
-		.lerp(URBAN_GREY, world.urban_at(tile) * 0.75)
+	return urban_blend(_land_color(world.lat_of_row(tile.y), elev,
+		world.green_at(tile)), world.urban_at(tile))
 
 
 ## The one land-tint rule (mesh corners and minimap pixels alike): base
@@ -360,7 +374,7 @@ static func _build_relief_region(world: Node, x0: int, y0: int,
 					+ world.urban_at(Vector2i(acx - 1, acy))
 					+ world.urban_at(Vector2i(acx, acy))) * 0.25
 				color = _land_color(world.lat_of_row(acy), elev, green)
-				color = color.lerp(URBAN_GREY, urban * 0.75)
+				color = urban_blend(color, urban)
 				if water_n > 0 and elev < 30.0:
 					color = color.lerp(SAND, 0.65)
 			var wobble := float((acx * 73856093 ^ acy * 19349663) % 100) / 100.0
@@ -507,7 +521,7 @@ static func _corner_color(world: Node, cx: int, cy: int, h: float) -> Color:
 			color = color.lerp(LAKE, 0.75)
 	else:
 		color = _land_color(world.lat_of_row(cy), elev, green)
-		color = color.lerp(URBAN_GREY, urban * 0.75)  # concrete over the sprawl
+		color = urban_blend(color, urban)  # concrete over the sprawl
 		if water_n > 0 and elev < 30.0:
 			color = color.lerp(SAND, 0.65)  # shoreline sand strip
 	# per-corner brightness hash: fields and stands, not billiard cloth

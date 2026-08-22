@@ -81,12 +81,17 @@ const COARSE_STEP := 8
 ## see is most of the smoothness budget.
 const MODEL_DETAIL_MAX_SIZE := 34.0
 
-## site notes: floating weekly graphs above cities and (closer in) plants;
-## capped nearest-first so the SubViewport count stays small
-const NOTE_ZONE_MAX_ZOOM := 70.0
-const NOTE_PLANT_MAX_ZOOM := 16.0
+## site notes: far out, cities (and mid-zoom plants) carry a NAME TAG so
+## the player can orient over a bare continent; at the model band — the
+## zoom where buildings and trees appear — a tag switches to the weekly
+## graph. Charts are capped nearest-first (SubViewport cost); tags are
+## cheap Label3Ds.
+const ZONE_CHART_MAX_ZOOM := MODEL_DETAIL_MAX_SIZE
+const PLANT_CHART_MAX_ZOOM := 16.0
+const PLANT_TAG_MAX_ZOOM := 60.0
 const NOTE_ZONE_CAP := 6
 const NOTE_PLANT_CAP := 8
+const TAG_PLANT_CAP := 16
 
 ## The tool the HUD has armed (a WorldModel kind, "corridor_*" or "") —
 ## drives the ghost preview and what a click builds.
@@ -852,18 +857,23 @@ func _sync_notes() -> void:
 		return
 	var wanted := {}
 	var fp := Vector2(_focus.x, _focus.z)
-	if _zoom <= NOTE_ZONE_MAX_ZOOM:
-		var scored: Array = []
-		for zone: String in World.load_centers:
-			var a := _anchor_of(zone)
-			var d := a.distance_to(fp)
-			if d <= _zoom * 1.6 + 12.0:
-				scored.append({"z": zone, "d": d, "a": a})
-		scored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
-			return float(x["d"]) < float(y["d"]))
-		for k in mini(scored.size(), NOTE_ZONE_CAP):
-			wanted["z:" + str((scored[k] as Dictionary)["z"])] = scored[k]
-	if _zoom <= NOTE_PLANT_MAX_ZOOM:
+	var zone_chart := _zoom <= ZONE_CHART_MAX_ZOOM
+	# cities: a chart inside the model band, a name tag at EVERY zoom
+	# beyond it — the tag is how the player orients over a bare continent
+	var scored: Array = []
+	for zone: String in World.load_centers:
+		var a := _anchor_of(zone)
+		var d := a.distance_to(fp)
+		if not zone_chart or d <= _zoom * 1.6 + 12.0:
+			scored.append({"z": zone, "d": d, "a": a, "mode":
+				"chart" if zone_chart else "tag"})
+	scored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+		return float(x["d"]) < float(y["d"]))
+	var zone_cap := NOTE_ZONE_CAP if zone_chart else scored.size()
+	for k in mini(scored.size(), zone_cap):
+		wanted["z:" + str((scored[k] as Dictionary)["z"])] = scored[k]
+	if _zoom <= PLANT_TAG_MAX_ZOOM:
+		var plant_chart := _zoom <= PLANT_CHART_MAX_ZOOM
 		var pscored: Array = []
 		for pid: String in World.plants:
 			var kind := str(World.plants[pid]["kind"])
@@ -873,41 +883,77 @@ func _sync_notes() -> void:
 			var a := Vector2(t.x + 0.5, t.y + 0.5)
 			var d := a.distance_to(fp)
 			if d <= _zoom * 1.6 + 6.0:
-				pscored.append({"p": pid, "kind": kind, "d": d, "a": a})
+				pscored.append({"p": pid, "kind": kind, "d": d, "a": a,
+					"mode": "chart" if plant_chart else "tag"})
 		pscored.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
 			return float(x["d"]) < float(y["d"]))
-		for k in mini(pscored.size(), NOTE_PLANT_CAP):
+		var cap := NOTE_PLANT_CAP if plant_chart else TAG_PLANT_CAP
+		for k in mini(pscored.size(), cap):
 			wanted["p:" + str((pscored[k] as Dictionary)["p"])] = pscored[k]
-	for key: String in _notes.keys():
-		if not wanted.has(key):
-			(_notes[key] as SiteNote).queue_free()
-			_notes.erase(key)
 	var block := int(GameClock.t_sim / Dispatch.BLOCK_S)
 	var block_changed := block != _note_block
 	_note_block = block
+	for key: String in _notes.keys():
+		var have: Dictionary = _notes[key]
+		if not wanted.has(key) \
+				or str((wanted[key] as Dictionary)["mode"]) != str(have["mode"]):
+			(have["node"] as Node3D).queue_free()
+			_notes.erase(key)
 	for key: String in wanted:
 		var e: Dictionary = wanted[key]
+		var mode := str(e["mode"])
 		var fresh := not _notes.has(key)
 		if fresh:
-			var note: SiteNote
-			if key.begins_with("z:"):
-				note = SiteNote.for_zone(str(e["z"]))
+			var node: Node3D
+			if mode == "tag":
+				node = _make_tag(key, e)
+			elif key.begins_with("z:"):
+				node = SiteNote.for_zone(str(e["z"]))
 			else:
-				note = SiteNote.for_plant(str(e["p"]), str(e["kind"]))
-			_notes_root.add_child(note)
-			_notes[key] = note
-		var n := _notes[key] as SiteNote
+				node = SiteNote.for_plant(str(e["p"]), str(e["kind"]))
+			_notes_root.add_child(node)
+			_notes[key] = {"node": node, "mode": mode}
+		var n := (_notes[key] as Dictionary)["node"] as Node3D
 		var a: Vector2 = e["a"]
 		var tile := Vector2i(int(a.x), int(a.y))
 		# neighbouring plant notes stagger to three heights so a packed
 		# park reads as separate cards instead of one pile
 		var lift := 1.0 + _zoom * 0.03
-		if key.begins_with("p:"):
+		if key.begins_with("p:") and mode == "chart":
 			lift += (absi(key.hash()) % 3) * 0.075 * _zoom
 		n.position = Vector3(a.x, ground_y(tile) + lift, a.y)
-		n.apply_zoom(_zoom)
-		if fresh or block_changed:
-			n.refresh()
+		if mode == "tag":
+			(n as Label3D).pixel_size = _zoom * 0.00034
+		else:
+			(n as SiteNote).apply_zoom(_zoom)
+			if fresh or block_changed:
+				(n as SiteNote).refresh()
+
+
+## The far-zoom orientation tag: name (city) or kind + id (plant), tinted
+## by the source palette, constant screen size via pixel_size in the sync.
+func _make_tag(key: String, e: Dictionary) -> Label3D:
+	var label := Label3D.new()
+	if key.begins_with("z:"):
+		var zone := str(e["z"])
+		label.text = str((World.load_centers[zone] as Dictionary) \
+			.get("name", zone))
+		label.modulate = Color(0.96, 0.97, 1.0)
+		label.font_size = 64
+	else:
+		var kind := str(e["kind"])
+		label.text = "%s\n%s" % [str(ZoneChart.KIND_LABELS.get(kind, kind)),
+			str(e["p"])]
+		var group := str(ZoneHistory.GROUP_OF_KIND.get(kind, ""))
+		label.modulate = (ZoneChart.GROUP_COLORS.get(group,
+			Color(0.9, 0.92, 0.95)) as Color).lightened(0.45)
+		label.font_size = 44
+	label.outline_size = 16
+	label.outline_modulate = Color(0.05, 0.07, 0.10, 0.9)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.render_priority = 18
+	return label
 
 
 func _anchor_of(zone: String) -> Vector2:
