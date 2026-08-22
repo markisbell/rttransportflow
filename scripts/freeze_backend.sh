@@ -33,11 +33,11 @@ mkdir -p "$OUT"
     --add-data "${DATA_ROOT}${DATA_SEP}data" \
     scripts/freeze_entry.py > "$LOG" 2>&1 || { tail -30 "$LOG" >&2; exit 1; }
 
-# Fail on numba warnings EXCEPT the known-benign OPTIONAL threading layers
-# (Linux: libtbb; macOS: libomp — numba falls back to its default workqueue
-# layer either way; only numba being absent would be the silent-slow-path
-# family gotcha).
-if grep "WARNING" "$LOG" | grep -i "numba" | grep -v "libtbb" | grep -qv "libomp"; then
+# Fail on numba warnings EXCEPT the known-benign OPTIONAL threading layers,
+# one spelling per platform (Linux libtbb, macOS libomp, Windows tbb12.dll —
+# numba falls back to its default workqueue layer either way; only numba
+# being absent would be the silent-slow-path family gotcha).
+if grep "WARNING" "$LOG" | grep -i "numba" | grep -qviE "libtbb|libomp|tbb12"; then
     echo "freeze log WARNS about numba — inspect $LOG" >&2
     grep "WARNING" "$LOG" | grep -i "numba" >&2
     exit 1
