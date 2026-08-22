@@ -911,12 +911,11 @@ func _sync_notes() -> void:
 		var n := (_notes[key] as Dictionary)["node"] as Node3D
 		var a: Vector2 = e["a"]
 		var tile := Vector2i(int(a.x), int(a.y))
-		# neighbouring plant notes stagger to three heights so a packed
-		# park reads as separate cards instead of one pile
-		var lift := 1.0 + _zoom * 0.03
-		if key.begins_with("p:") and mode == "chart":
-			lift += (absi(key.hash()) % 3) * 0.075 * _zoom
-		n.position = Vector3(a.x, ground_y(tile) + lift, a.y)
+		# SAME lift in both modes — the pin is the chart's toggle, and a
+		# toggle that jumps when clicked reads as broken (the old
+		# three-height stagger applied only in chart mode, so opening a
+		# chart hoisted its own pin; player report)
+		n.position = Vector3(a.x, ground_y(tile) + 1.0 + _zoom * 0.03, a.y)
 		if mode == "tag":
 			_scale_tag(n, _zoom)
 		else:
