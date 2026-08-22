@@ -1005,6 +1005,10 @@ func _make_tag(key: String, e: Dictionary) -> Node3D:
 		label.font_size = 44
 	label.outline_size = 16
 	label.outline_modulate = Color(0.05, 0.07, 0.10, 0.9)
+	# BOTTOM-aligned: the text block GROWS UPWARD from the node origin, so
+	# the lift below needs no guess about line count or outline height
+	# (the half-height estimate left two-line plant names on the pin)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.render_priority = 18
@@ -1019,11 +1023,9 @@ func _scale_tag(tag: Node3D, zoom: float) -> void:
 	var label := tag.get_node("tag_name") as Label3D
 	pin.pixel_size = zoom * 0.0001
 	label.pixel_size = zoom * 0.00034
-	# the label's CENTER must clear the pin head by half the text block,
-	# or the name sits on the pin (player report) — lines x font/2 + gap
-	var lines := label.text.count("\n") + 1
-	label.position.y = PIN_TEX_H * pin.pixel_size \
-		+ (0.5 * label.font_size * lines + 30.0) * label.pixel_size
+	# bottom-aligned text: its lowest line starts this gap above the pin
+	# head and grows upward — fully clear at any line count
+	label.position.y = PIN_TEX_H * pin.pixel_size + 26.0 * label.pixel_size
 
 
 func _anchor_of(zone: String) -> Vector2:
