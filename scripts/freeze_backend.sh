@@ -10,10 +10,14 @@ BACKEND_BIN="rttransportflow-backend"
 DATA_SEP=":"
 # Windows (git-bash on the CI runner): venv layout and PyInstaller's
 # --add-data separator both differ
+DATA_ROOT="$(pwd)/data"
 if [ -x ".venv/Scripts/python.exe" ]; then
     PY=".venv/Scripts/python.exe"
     BACKEND_BIN="rttransportflow-backend.exe"
     DATA_SEP=";"
+    # a POSIX /d/a/... path reaches Windows PyInstaller mangled to \d\a\...
+    # once the ';' defeats MSYS auto-conversion — hand it D:/a/... directly
+    DATA_ROOT="$(pwd -W)/data"
 fi
 OUT="build/freeze"
 LOG="$OUT/build.log"
@@ -26,7 +30,7 @@ mkdir -p "$OUT"
     --collect-all numba \
     --collect-all llvmlite \
     --hidden-import rttransportflow.main \
-    --add-data "$(pwd)/data${DATA_SEP}data" \
+    --add-data "${DATA_ROOT}${DATA_SEP}data" \
     scripts/freeze_entry.py > "$LOG" 2>&1 || { tail -30 "$LOG" >&2; exit 1; }
 
 # Fail on numba warnings EXCEPT the known-benign OPTIONAL threading layers
