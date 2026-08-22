@@ -129,12 +129,24 @@ read-only and break its own log directory.) Apple Silicon only.
 EOF
 
 # --- 3b. sign (macOS) -------------------------------------------------------
-# Ad-hoc, AFTER the payload injection: modifying a signed .app breaks its
-# seal, and unsigned arm64 binaries do not run at all. --deep also stamps
-# the frozen backend nested inside Contents/MacOS.
+# Every Mach-O must carry a signature on arm64 — and every one already
+# DOES (the linker ad-hoc signs at build time; PyInstaller binaries come
+# signed). What broke was the .app's bundle SEAL when the payload went in,
+# and `codesign --deep` cannot repair it: it trips over the PyInstaller
+# dist's framework-shaped directories ("bundle format unrecognized ...
+# In subcomponent: .../backend/rttransportflow-backend/"). So: re-sign
+# payload Mach-Os individually as a belt, then re-seal the app WITHOUT
+# --deep, best-effort — an ad-hoc app is refused by Gatekeeper with or
+# without a valid seal (the README's xattr -cr is the real unlock), and
+# execution does not check the seal. The play-test below is the gate.
 if [ "$PLATFORM" = "macos" ] && command -v codesign >/dev/null 2>&1; then
-    echo "==> ad-hoc signing"
-    codesign --force --deep --sign - "$BUNDLE/rttransportflow.app"
+    echo "==> ad-hoc signing payload Mach-Os"
+    find "$BUNDLE/rttransportflow.app/Contents/MacOS/backend" -type f \
+            \( -name "*.dylib" -o -name "*.so" -o -perm -u+x \) | while read -r f; do
+        file -b "$f" | grep -q "Mach-O" && codesign --force --sign - "$f" || true
+    done
+    codesign --force --sign - "$BUNDLE/rttransportflow.app" \
+        || echo "WARN: app seal not restored (harmless for an ad-hoc bundle)"
 fi
 
 # --- 4. verify by playing it ------------------------------------------------
