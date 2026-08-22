@@ -4091,6 +4091,118 @@
    "kind": "nuclear"
   },
   {
+   "name": "Cestas",
+   "country": "FRA",
+   "lat": 44.7242,
+   "lon": -0.815,
+   "capacity_mw": 301.36417,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Solara4",
+   "country": "PRT",
+   "lat": 37.365,
+   "lon": -7.665,
+   "capacity_mw": 218.8,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "SOLABEN 3",
+   "country": "ESP",
+   "lat": 39.226,
+   "lon": -5.3905,
+   "capacity_mw": 200.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Don Rodrigo",
+   "country": "ESP",
+   "lat": 37.228,
+   "lon": -5.867,
+   "capacity_mw": 175.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Meuro Solar Power Plant",
+   "country": "DEU",
+   "lat": 51.5446,
+   "lon": 13.9795,
+   "capacity_mw": 166.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "PLANTA SOLAR TERMICA SOLNOVA 1",
+   "country": "ESP",
+   "lat": 37.4179,
+   "lon": -6.2771,
+   "capacity_mw": 150.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "EXTRESOL-1",
+   "country": "ESP",
+   "lat": 38.64,
+   "lon": -6.744,
+   "capacity_mw": 149.8,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "ANDASOL-3",
+   "country": "ESP",
+   "lat": 37.2281,
+   "lon": -3.0511,
+   "capacity_mw": 149.7,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Templin Solar Power Plant",
+   "country": "DEU",
+   "lat": 53.0295,
+   "lon": 13.5425,
+   "capacity_mw": 128.4,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Blizhnyaya Rechitsa 2",
+   "country": "BLR",
+   "lat": 53.625,
+   "lon": 31.6,
+   "capacity_mw": 109.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Jocksdorf Solar Power Plant",
+   "country": "DEU",
+   "lat": 51.6597,
+   "lon": 14.6261,
+   "capacity_mw": 103.9,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "PLANTA SOLAR TERMICA HELIOENERGY 1",
+   "country": "ESP",
+   "lat": 37.5729,
+   "lon": -5.1449,
+   "capacity_mw": 100.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "PST SOLACOR 1",
+   "country": "ESP",
+   "lat": 37.9582,
+   "lon": -4.4981,
+   "capacity_mw": 100.0,
+   "kind": "solar_pv"
+  },
+  {
+   "name": "Palma del Rio CSP",
+   "country": "ESP",
+   "lat": 37.648,
+   "lon": -5.254,
+   "capacity_mw": 100.0,
+   "kind": "solar_pv"
+  },
+  {
    "name": "Hornsea 1 - Heron & Njord",
    "country": "GBR",
    "lat": 53.6815,
@@ -4369,6 +4481,150 @@
    "lon": 6.4667,
    "capacity_mw": 200.0,
    "kind": "wind_offshore"
+  },
+  {
+   "name": "Clyde Wind Farm",
+   "country": "GBR",
+   "lat": 55.4416,
+   "lon": -3.5427,
+   "capacity_mw": 350.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "UW Bertikow",
+   "country": "DEU",
+   "lat": 53.2641,
+   "lon": 14.048,
+   "capacity_mw": 340.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Whitelee",
+   "country": "GBR",
+   "lat": 55.6812,
+   "lon": -4.2791,
+   "capacity_mw": 322.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Parc Eolien Tarfaya",
+   "country": "MAR",
+   "lat": 35.611,
+   "lon": -5.432,
+   "capacity_mw": 301.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Bjorkhojden",
+   "country": "SWE",
+   "lat": 63.423,
+   "lon": 16.1473,
+   "capacity_mw": 288.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Alto Douro",
+   "country": "PRT",
+   "lat": 41.0696,
+   "lon": -7.5769,
+   "capacity_mw": 253.2,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "WPP Cogealac",
+   "country": "ROU",
+   "lat": 44.5903,
+   "lon": 28.5653,
+   "capacity_mw": 246.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Alto Minho I",
+   "country": "PRT",
+   "lat": 42.0154,
+   "lon": -8.3456,
+   "capacity_mw": 240.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Kilgallioch wind farm",
+   "country": "GBR",
+   "lat": 54.9885,
+   "lon": -4.8017,
+   "capacity_mw": 239.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Stronelairg Wind Farm",
+   "country": "GBR",
+   "lat": 57.1269,
+   "lon": -4.5264,
+   "capacity_mw": 228.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Whitelee 2",
+   "country": "GBR",
+   "lat": 55.6772,
+   "lon": -4.2868,
+   "capacity_mw": 217.02,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Windpark Reu\u00dfenk\u00f6ge",
+   "country": "DEU",
+   "lat": 54.6409,
+   "lon": 9.0139,
+   "capacity_mw": 189.312,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Dorenell Wind Farm (Previously Site A and B Scaut Hill)",
+   "country": "GBR",
+   "lat": 57.3509,
+   "lon": -3.1317,
+   "capacity_mw": 177.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Clyde Wind Farm Extension (Clyde 2)",
+   "country": "GBR",
+   "lat": 55.5041,
+   "lon": -3.5479,
+   "capacity_mw": 172.8,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "SWM Wind Havelland GmbH & Co. KG",
+   "country": "DEU",
+   "lat": 52.3869,
+   "lon": 12.5636,
+   "capacity_mw": 171.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Alto da Coutada",
+   "country": "PRT",
+   "lat": 41.5452,
+   "lon": -7.5545,
+   "capacity_mw": 165.6,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "Smola",
+   "country": "NOR",
+   "lat": 63.4106,
+   "lon": 7.9099,
+   "capacity_mw": 160.0,
+   "kind": "wind_onshore"
+  },
+  {
+   "name": "SVETI NIKOLA",
+   "country": "BGR",
+   "lat": 43.4229,
+   "lon": 28.376,
+   "capacity_mw": 156.0,
+   "kind": "wind_onshore"
   }
  ]
 }

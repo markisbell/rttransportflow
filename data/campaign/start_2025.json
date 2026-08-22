@@ -18012,6 +18012,126 @@
       "line_400"
     ],
     [
+      456,
+      528,
+      "line_400"
+    ],
+    [
+      456,
+      527,
+      "line_400"
+    ],
+    [
+      456,
+      526,
+      "line_400"
+    ],
+    [
+      456,
+      525,
+      "line_400"
+    ],
+    [
+      456,
+      524,
+      "line_400"
+    ],
+    [
+      456,
+      523,
+      "line_400"
+    ],
+    [
+      456,
+      522,
+      "line_400"
+    ],
+    [
+      456,
+      521,
+      "line_400"
+    ],
+    [
+      456,
+      520,
+      "line_400"
+    ],
+    [
+      456,
+      519,
+      "line_400"
+    ],
+    [
+      456,
+      518,
+      "line_400"
+    ],
+    [
+      456,
+      517,
+      "line_400"
+    ],
+    [
+      456,
+      516,
+      "line_400"
+    ],
+    [
+      456,
+      515,
+      "line_400"
+    ],
+    [
+      456,
+      514,
+      "line_400"
+    ],
+    [
+      456,
+      513,
+      "line_400"
+    ],
+    [
+      456,
+      512,
+      "line_400"
+    ],
+    [
+      456,
+      511,
+      "line_400"
+    ],
+    [
+      456,
+      510,
+      "line_400"
+    ],
+    [
+      456,
+      509,
+      "line_400"
+    ],
+    [
+      456,
+      508,
+      "line_400"
+    ],
+    [
+      456,
+      507,
+      "line_400"
+    ],
+    [
+      456,
+      506,
+      "line_400"
+    ],
+    [
+      456,
+      505,
+      "line_400"
+    ],
+    [
       339,
       411,
       "cable_400"
@@ -36089,7 +36209,7 @@
         549
       ],
       "p_max_mw": 300.0,
-      "name": "RONCOVALGRANDE"
+      "name": "Limmern"
     },
     {
       "pid": "hydro_ps_179",
@@ -36112,7 +36232,87 @@
       "name": "Cierny Vah Pumped Storage Hydroelectric Power Plant Slovakia"
     },
     {
-      "pid": "offshore_platform_181",
+      "pid": "hydro_ps_181",
+      "kind": "hydro_ps",
+      "tile": [
+        456,
+        529
+      ],
+      "p_max_mw": 300.0,
+      "name": "Malta main stage"
+    },
+    {
+      "pid": "wind_onshore_182",
+      "kind": "wind_onshore",
+      "tile": [
+        462,
+        397
+      ],
+      "p_max_mw": 200.0,
+      "name": "UW Bertikow 1"
+    },
+    {
+      "pid": "wind_onshore_183",
+      "kind": "wind_onshore",
+      "tile": [
+        461,
+        396
+      ],
+      "p_max_mw": 200.0,
+      "name": "UW Bertikow 2"
+    },
+    {
+      "pid": "wind_onshore_184",
+      "kind": "wind_onshore",
+      "tile": [
+        401,
+        360
+      ],
+      "p_max_mw": 200.0,
+      "name": "Windpark Reußenköge"
+    },
+    {
+      "pid": "wind_onshore_185",
+      "kind": "wind_onshore",
+      "tile": [
+        443,
+        411
+      ],
+      "p_max_mw": 200.0,
+      "name": "SWM Wind Havelland GmbH & Co. KG"
+    },
+    {
+      "pid": "solar_pv_186",
+      "kind": "solar_pv",
+      "tile": [
+        463,
+        436
+      ],
+      "p_max_mw": 150.0,
+      "name": "Meuro Solar Power Plant"
+    },
+    {
+      "pid": "solar_pv_187",
+      "kind": "solar_pv",
+      "tile": [
+        460,
+        398
+      ],
+      "p_max_mw": 150.0,
+      "name": "Templin Solar Power Plant"
+    },
+    {
+      "pid": "solar_pv_188",
+      "kind": "solar_pv",
+      "tile": [
+        476,
+        428
+      ],
+      "p_max_mw": 150.0,
+      "name": "Jocksdorf Solar Power Plant"
+    },
+    {
+      "pid": "offshore_platform_189",
       "kind": "offshore_platform",
       "tile": [
         360,
@@ -36122,7 +36322,7 @@
       "name": "BorWin platform"
     },
     {
-      "pid": "hvdc_converter_182",
+      "pid": "hvdc_converter_190",
       "kind": "hvdc_converter",
       "tile": [
         374,
@@ -36132,7 +36332,7 @@
       "name": "BorWin · Diele"
     },
     {
-      "pid": "wind_offshore_183",
+      "pid": "wind_offshore_191",
       "kind": "wind_offshore",
       "tile": [
         355,
@@ -36142,7 +36342,7 @@
       "name": "Gemini"
     },
     {
-      "pid": "wind_offshore_184",
+      "pid": "wind_offshore_192",
       "kind": "wind_offshore",
       "tile": [
         356,
@@ -36152,7 +36352,7 @@
       "name": "BARD Offshore 1"
     },
     {
-      "pid": "wind_offshore_185",
+      "pid": "wind_offshore_193",
       "kind": "wind_offshore",
       "tile": [
         361,
@@ -36162,7 +36362,7 @@
       "name": "Global Tech I"
     },
     {
-      "pid": "wind_offshore_186",
+      "pid": "wind_offshore_194",
       "kind": "wind_offshore",
       "tile": [
         363,
@@ -36172,7 +36372,7 @@
       "name": "Borkum Riffgrund I"
     },
     {
-      "pid": "wind_offshore_188",
+      "pid": "wind_offshore_196",
       "kind": "wind_offshore",
       "tile": [
         380,
@@ -36182,7 +36382,7 @@
       "name": "Amrumbank West 1"
     },
     {
-      "pid": "wind_offshore_190",
+      "pid": "wind_offshore_198",
       "kind": "wind_offshore",
       "tile": [
         379,
@@ -36192,7 +36392,7 @@
       "name": "Butendiek 1"
     },
     {
-      "pid": "wind_offshore_192",
+      "pid": "wind_offshore_200",
       "kind": "wind_offshore",
       "tile": [
         369,
@@ -36202,7 +36402,7 @@
       "name": "Gode Wind 1 - Teil 1 1"
     },
     {
-      "pid": "wind_offshore_193",
+      "pid": "wind_offshore_201",
       "kind": "wind_offshore",
       "tile": [
         331,
@@ -36212,7 +36412,7 @@
       "name": "Northeast Binnendijks 1"
     },
     {
-      "pid": "wind_offshore_194",
+      "pid": "wind_offshore_202",
       "kind": "wind_offshore",
       "tile": [
         330,
@@ -36222,7 +36422,7 @@
       "name": "Northeast Binnendijks 2"
     },
     {
-      "pid": "wind_offshore_195",
+      "pid": "wind_offshore_203",
       "kind": "wind_offshore",
       "tile": [
         312,
@@ -36232,7 +36432,7 @@
       "name": "Northwind 1"
     },
     {
-      "pid": "wind_offshore_196",
+      "pid": "wind_offshore_204",
       "kind": "wind_offshore",
       "tile": [
         311,
@@ -36242,7 +36442,7 @@
       "name": "Northwind 2"
     },
     {
-      "pid": "wind_offshore_197",
+      "pid": "wind_offshore_205",
       "kind": "wind_offshore",
       "tile": [
         367,
@@ -36252,5 +36452,5 @@
       "name": "Westereems 1"
     }
   ],
-  "next_pid": 200
+  "next_pid": 208
 }

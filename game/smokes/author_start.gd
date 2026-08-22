@@ -30,8 +30,11 @@ func run() -> void:
 	# round-trip: the envelope must restore
 	World.clear_build()
 	check("restores", World.restore(envelope))
+	# the renewable BASE (real onshore wind + solar parks, GPPD) is part
+	# of the inherited 2025 world by owner direction (2026-08-22); the
+	# FLEX journey — batteries, electrolysis, caverns — stays the player's
 	check("no_prebuilt_flex", _count_kind("battery") == 0
-		and _count_kind("wind_onshore") == 0)
+		and _count_kind("electrolyzer") == 0)
 	check("no_cavern", _count_kind("h2_cavern") == 0)
 	_finish(TAG, {"plants": World.plants.size(),
 		"corridors": World.corridors.size()})

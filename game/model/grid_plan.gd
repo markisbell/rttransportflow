@@ -481,6 +481,7 @@ static func author_start(world: Node) -> bool:
 					world.corridor_circuits[t] = 12
 	_phs_pass(world, real_fleet.get("_phs", []), sub_tiles, feeds)
 	_city_cable_pass(world)
+	_renewables_pass(world, real_fleet.get("_renewable", []))
 	var hub_used := _hub_pass(world, real_fleet.get("_offshore", []),
 		sub_tiles)
 	var ac_candidates: Array = []
@@ -627,10 +628,28 @@ static func _real_fleet(world: Node) -> Dictionary:
 		var entry := {"kind": p["kind"], "capacity_mw": p["capacity_mw"],
 			"tile": tile, "name": p["name"]}
 		if str(p["kind"]) == "hydro_ps":
-			(out["_phs"] as Array).append(entry)
+			# continental reach only — Cruachan stood in Scotland with no
+			# grid to join (same fence as thermal and the renewables)
+			for lc_id: String in centers:
+				var c: Vector2i = centers[lc_id]
+				if maxi(absi(c.x - tile.x), absi(c.y - tile.y)) < 60:
+					(out["_phs"] as Array).append(entry)
+					break
 			continue
 		if str(p["kind"]) == "wind_offshore":
 			(out["_offshore"] as Array).append(entry)
+			continue
+		if str(p["kind"]) in ["solar_pv", "wind_onshore"]:
+			# reach-checked like the thermal fleet: a park the core web
+			# cannot touch (Iberia, UK, Scandinavia) waits for its region
+			var reachable := false
+			for lc_id: String in centers:
+				var c: Vector2i = centers[lc_id]
+				if maxi(absi(c.x - tile.x), absi(c.y - tile.y)) < 60:
+					reachable = true
+					break
+			if reachable:
+				(out.get_or_add("_renewable", []) as Array).append(entry)
 			continue
 		# nearest core metro within 60 tiles (300 km) claims the plant
 		var best := ""
@@ -659,7 +678,7 @@ static func _phs_pass(world: Node, candidates: Array, sub_tiles: Dictionary,
 		feeds: Dictionary) -> void:
 	var placed := 0
 	for plant: Dictionary in candidates:
-		if placed >= 4:
+		if placed >= 6:
 			break
 		var site := DemoBuild.find_site(world, "hydro_ps", plant["tile"], 20)
 		if site == Vector2i(-1, -1):
@@ -676,6 +695,28 @@ static func _phs_pass(world: Node, candidates: Array, sub_tiles: Dictionary,
 		for tile: Vector2i in spur:
 			world.place_corridor(tile, "line_400")
 		placed += 1
+
+
+## The big REAL solar parks and onshore wind farms (GPPD, the 2025
+## renewable base the inherited world was missing): web-adjacent near
+## their real sites — no spur, ~one bus-group per park — with their real
+## names. Intermittent capacity, never counted toward firm need.
+static func _renewables_pass(world: Node, candidates: Array) -> void:
+	for plant: Dictionary in candidates:
+		var kind := str(plant["kind"])
+		var size: float = world.PLANT_SIZES[kind]
+		var units := clampi(int(round(float(plant["capacity_mw"]) / size)), 1, 3)
+		var anchor: Vector2i = plant["tile"]
+		var done := 0
+		for u in units:
+			var site := _site_on_web(world, anchor, kind, _halo, 10)
+			if site == Vector2i(-1, -1):
+				break
+			var pid: String = world.place_plant(kind, site)
+			world.plants[pid]["name"] = str(plant["name"]) if units == 1 \
+				else "%s %d" % [str(plant["name"]), u + 1]
+			anchor = site
+			done += 1
 
 
 ## The German Bight exports over a converter platform (the BorWin

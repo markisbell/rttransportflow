@@ -103,6 +103,10 @@ def build() -> Path:
             kind = "gas_ocgt"
         elif fuel == "Wind" and cap >= 200 and terrain(lat, lon) in ("S", "s"):
             kind = "wind_offshore"
+        elif fuel == "Wind" and cap >= 150 and terrain(lat, lon) in ("c", "p", "h"):
+            kind = "wind_onshore"
+        elif fuel == "Solar" and cap >= 100:
+            kind = "solar_pv"
         if kind == "":
             continue
         out.append({"name": r["name"], "country": r["country"],
