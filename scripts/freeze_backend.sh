@@ -25,6 +25,7 @@ mkdir -p "$OUT"
 # would be the silent-slow-path family gotcha).
 if grep "WARNING" "$LOG" | grep -i "numba" | grep -qv "libtbb"; then
     echo "freeze log WARNS about numba — inspect $LOG" >&2
+    grep "WARNING" "$LOG" | grep -i "numba" >&2
     exit 1
 fi
 
