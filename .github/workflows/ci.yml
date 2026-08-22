@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # manual: the macOS bundle build (macOS runner minutes are 10x billed,
+  # so it is never part of the per-push matrix)
+  workflow_dispatch:
 
 jobs:
   test:
@@ -124,3 +127,45 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/backend:latest
             ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+
+  macos-bundle:
+    # The macOS installer (player request 2026-08-22). PyInstaller cannot
+    # cross-compile, so the frozen backend MUST be built on a Mac — this
+    # job is the project's only Mac. Manual trigger (gh workflow run ci.yml)
+    # because macOS runner minutes bill at 10x. Apple Silicon only: the
+    # macos-14 runner is arm64 and so is everything it freezes.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: |
+          pip install -e ".[dev]" pyinstaller
+          python -m venv .venv --system-site-packages
+      - name: Fetch Godot (macOS editor + export templates)
+        run: |
+          curl -sSL -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_macos.universal.zip
+          unzip -q godot.zip
+          echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+          curl -sSL -o templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          unzip -q templates.tpz
+          DEST="$HOME/Library/Application Support/Godot/export_templates/4.7.1.stable"
+          mkdir -p "$DEST"
+          mv templates/* "$DEST"/
+      - name: Import project
+        run: |
+          cd game
+          "$GODOT" --headless --import --path . || true
+      - name: Package and verify (plays the bundle)
+        run: ./scripts/package_game.sh macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rttransportflow-macos-arm64
+          path: build/dist/rttransportflow-*-macos-arm64.zip
+          if-no-files-found: error
