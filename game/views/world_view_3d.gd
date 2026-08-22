@@ -923,23 +923,44 @@ func _sync_notes() -> void:
 			lift += (absi(key.hash()) % 3) * 0.075 * _zoom
 		n.position = Vector3(a.x, ground_y(tile) + lift, a.y)
 		if mode == "tag":
-			(n as Label3D).pixel_size = _zoom * 0.00034
+			_scale_tag(n, _zoom)
 		else:
 			(n as SiteNote).apply_zoom(_zoom)
 			if fresh or block_changed:
 				(n as SiteNote).refresh()
 
 
-## The far-zoom orientation tag: name (city) or kind + id (plant), tinted
-## by the source palette, constant screen size via pixel_size in the sync.
-func _make_tag(key: String, e: Dictionary) -> Label3D:
+## Location-pin colors: one glance separates a city from a plant.
+const PIN_CITY := Color(0.55, 0.82, 1.0)   # ice blue, the HUD accent family
+const PIN_PLANT := Color(1.0, 0.66, 0.22)  # amber
+const PIN_TEXTURE := preload("res://assets/icons/location_pin.svg")
+const PIN_TEX_H := 328.0  # texture height in px (icons/location_pin.svg)
+
+
+## The far-zoom orientation tag: the openclipart location pin (CC0,
+## assets/icons) with its tip on the site, category-tinted, the name
+## floating above. Constant screen size via _scale_tag in the sync.
+func _make_tag(key: String, e: Dictionary) -> Node3D:
+	var tag := Node3D.new()
+	var pin := Sprite3D.new()
+	pin.name = "pin"
+	pin.texture = PIN_TEXTURE
+	pin.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	pin.no_depth_test = true
+	pin.shaded = false
+	pin.render_priority = 17
+	# centered sprite, shifted half a height up: the TIP marks the site
+	pin.offset = Vector2(0, PIN_TEX_H / 2.0)
+	tag.add_child(pin)
 	var label := Label3D.new()
+	label.name = "tag_name"
 	if key.begins_with("z:"):
 		var zone := str(e["z"])
 		label.text = str((World.load_centers[zone] as Dictionary) \
 			.get("name", zone))
 		label.modulate = Color(0.96, 0.97, 1.0)
 		label.font_size = 64
+		pin.modulate = PIN_CITY
 	else:
 		var kind := str(e["kind"])
 		label.text = "%s\n%s" % [str(ZoneChart.KIND_LABELS.get(kind, kind)),
@@ -948,12 +969,25 @@ func _make_tag(key: String, e: Dictionary) -> Label3D:
 		label.modulate = (ZoneChart.GROUP_COLORS.get(group,
 			Color(0.9, 0.92, 0.95)) as Color).lightened(0.45)
 		label.font_size = 44
+		pin.modulate = PIN_PLANT
 	label.outline_size = 16
 	label.outline_modulate = Color(0.05, 0.07, 0.10, 0.9)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.render_priority = 18
-	return label
+	tag.add_child(label)
+	return tag
+
+
+## Constant screen size for a tag: pin ~26 px tall, name floating just
+## above its head, both scaled from the ortho zoom every sync.
+func _scale_tag(tag: Node3D, zoom: float) -> void:
+	var pin := tag.get_node("pin") as Sprite3D
+	var label := tag.get_node("tag_name") as Label3D
+	pin.pixel_size = zoom * 0.0001
+	label.pixel_size = zoom * 0.00034
+	label.position.y = PIN_TEX_H * pin.pixel_size \
+		+ 40.0 * label.pixel_size
 
 
 func _anchor_of(zone: String) -> Vector2:

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Location pin from openclipart.org/detail/305298 (public domain / CC0).
+     Cleaned for the game: the off-canvas house sketch removed, body fill
+     set to white so the engine's modulate tints it per category, hole and
+     outline set dark so they survive any tint. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="328"
+   viewBox="41 5 55 82" version="1.1">
+  <g transform="matrix(0.49031525,0,0,0.49031525,-35.655976,-309.26250)">
+    <path
+       d="m 186.64387,756.49047 c -27.51512,-55.54651 -26.40746,-52.89907 -26.475,-63.27942 -0.056,-8.62007 1.46032,-14.84851 5.43363,-22.31749 12.76581,-23.99731 43.75754,-34.35979 69.24677,-23.15373 11.62417,5.1104 21.55731,15.3883 25.55814,26.44509 2.31845,6.40739 2.94227,10.51765 2.67229,17.60753 -0.16611,4.36222 -0.53905,7.34314 -1.23961,9.90818 -0.73154,2.67854 -6.73726,15.25769 -22.24879,46.60082 -11.68571,23.61254 -22.88735,46.20192 -24.89253,50.19854 l -3.64579,7.26664 -24.40911,-49.27616 z"
+       style="fill:#ffffff;fill-opacity:1;stroke:#14161c;stroke-width:4.8;stroke-miterlimit:4;stroke-opacity:1" />
+    <ellipse cx="212.13203" cy="688.70728" rx="25.253813" ry="26.263966"
+       style="fill:#14161c;fill-opacity:1;stroke:none" />
+  </g>
+</svg>

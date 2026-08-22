@@ -1,0 +1,7 @@
+location_pin.svg
+Source: https://openclipart.org/detail/305298/location
+License: Public Domain / CC0 (all Openclipart content carries the
+Creative Commons Zero 1.0 Public Domain Dedication).
+Modifications: the off-canvas house sketch was removed; the pin body
+fill was set to white (tinted at runtime via modulate) and the hole and
+outline set dark; tight viewBox.
