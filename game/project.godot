@@ -41,6 +41,8 @@ window/size/viewport_height=800
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
+
 ; Forward+ for the infrastruct look: SSAO, soft shadows, filmic tonemap,
 ; sky ambient. Mobile falls back to the compatibility renderer.
 renderer/rendering_method="forward_plus"
