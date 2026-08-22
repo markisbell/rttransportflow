@@ -214,8 +214,15 @@ func _restore_start_world(arm_campaign: bool) -> void:
 func _boot_async(campaign: bool = false) -> void:
 	SidecarManager.configure(SidecarManager.GAME_PORT)
 	SidecarManager.start_all()
+	var waited := 0.0
 	while not SidecarManager.all_healthy():
 		await get_tree().create_timer(0.5).timeout
+		waited += 0.5
+		if fmod(waited, 30.0) == 0.0:
+			# an infinite silent wait wedged a boot for five minutes with
+			# ZERO log evidence — the wait may be long (cold backend), but
+			# it must never be mute
+			print("BOOT waiting for sidecar health (%.0f s)" % waited)
 	# Only NOW build the opening world. Building first meant rebuild_now()
 	# called _register_async against a backend that did not exist yet, which
 	# then raced the debounce timer's second rebuild — two registrations

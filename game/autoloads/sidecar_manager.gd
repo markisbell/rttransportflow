@@ -183,6 +183,10 @@ func _kill(id: String) -> void:
 func _set_state(id: String, state: State) -> void:
 	if _sidecars[id]["state"] == state:
 		return
+	# low-volume, permanent: the 2026-08-22 boot wedge had ZERO log
+	# evidence precisely because state transitions were silent
+	print("SIDECAR %s: %s -> %s" % [id, State.keys()[_sidecars[id]["state"]],
+		State.keys()[state]])
 	_sidecars[id]["state"] = state
 	state_changed.emit(id, state)
 
@@ -205,8 +209,15 @@ func _poll() -> void:
 			State.DOWN:
 				_schedule_restart(id, now)
 				continue
-		if not s["in_flight"]:
-			_check_health(id)
+		if s["in_flight"]:
+			# belt over the 4 s probe timeout: a probe whose completion
+			# signal was lost (backend killed mid-probe) must never gag
+			# the poller forever — a stuck in_flight silently wedged a
+			# whole boot in the health wait (2026-08-22)
+			if now - float(s.get("in_flight_since", now)) > 10.0:
+				s["in_flight"] = false
+			continue
+		_check_health(id)
 
 
 func _schedule_restart(id: String, now: float) -> void:
@@ -221,14 +232,28 @@ func _schedule_restart(id: String, now: float) -> void:
 func _check_health(id: String) -> void:
 	var s: Dictionary = _sidecars[id]
 	var http: HTTPRequest = s["http"]
-	http.timeout = 4.0  # a hung probe must not silence the poller forever
+	# 8 s, not 4: HTTPRequest pumps in _process, so a probe needs FRAMES,
+	# not just wall time — a present-blocked (occluded) or hitching loop
+	# timed out EVERY probe against a 5 ms /health and the manager killed
+	# healthy backends at the STARTING deadline forever (2026-08-22).
+	# vsync_mode=0 + max_fps removed the present-block; this is the belt.
+	http.timeout = 8.0
 	var url := "http://127.0.0.1:%d/health" % port_of(id)
-	if http.request(url) != OK:
+	var err := http.request(url)
+	if err != OK:
+		print("SIDECAR %s: health request refused (err %d)" % [id, err])
+		http.cancel_request()  # unstick a node wedged in a lost request
 		return
 	s["in_flight"] = true
+	s["in_flight_since"] = Time.get_ticks_msec() / 1000.0
 	var result: Array = await http.request_completed
 	s["in_flight"] = false
 	var ok: bool = result[0] == HTTPRequest.RESULT_SUCCESS and result[1] == 200
+	if not ok:
+		s["probe_fails"] = int(s.get("probe_fails", 0)) + 1
+		if int(s["probe_fails"]) % 10 == 1:
+			print("SIDECAR %s: probe failed (result %d, http %d, fail #%d)"
+				% [id, result[0], result[1], s["probe_fails"]])
 	if ok:
 		s["backoff_i"] = 0
 		s["health_misses"] = 0
