@@ -457,6 +457,11 @@ docs/GAME_DESIGN.md.
     (corridor kind with real cable charging — the shunt machinery is
     ready for it).
 
+48. **License: Apache-2.0** (owner decision, 2026-08-23): LICENSE
+    (canonical text) + NOTICE (copyright + bundled-data attributions)
+    landed; pyproject had declared Apache-2.0 since P0; README badge and
+    License section updated. Closes §7 question 1.
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
@@ -1347,8 +1352,7 @@ the REGISTER FAILED prints will name any recurrence directly.
 Recommended defaults are in force until overridden; each override gets a
 ledger entry:
 
-1. **License** — Apache-2.0 proposed (family preference not recorded in the
-   digests).
+1. ~~License~~ — **RESOLVED 2026-08-23 (ledger 48): Apache-2.0.**
 2. **UI language** — family is German-first (de → en parity). Same here, or
    English-first for this title?
 3. **CO2 policy** — campaign ratchet 30→250 €/t as scripted eras (chosen);

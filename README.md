@@ -1,5 +1,6 @@
 # rttransportflow — a Europe-scale power transmission game with real grid physics
 
+![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![AI-generated](https://img.shields.io/badge/source-AI--generated-8A2BE2)
 ![validated](https://img.shields.io/badge/physics-analytically%20validated-brightgreen)
 ![platforms](https://img.shields.io/badge/plays%20on-Linux%20%7C%20macOS%20%7C%20Windows-blue)
@@ -283,9 +284,8 @@ converter losses and Q capability — no DC-side load flow or droop control.
 
 ## License & data
 
-The **code has no license yet** — the choice (Apache-2.0 proposed) is an
-open owner decision tracked in [CLAUDE.md](CLAUDE.md) §7; until a LICENSE
-file lands, default copyright applies.
+The code and documentation are licensed under the
+[Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)).
 
 The shipped **data** is deliberately license-clean:
 
