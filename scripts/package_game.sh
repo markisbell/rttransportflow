@@ -88,6 +88,10 @@ else
     cp -r data "$BUNDLE/data"
     DEST_ROOT="$BUNDLE"
 fi
+# Apache-2.0 §4: the license and the NOTICE attributions travel with every
+# redistribution (NOTICE carries the CC-BY credit for the WRI GPPD data
+# that ships inside data/). The v0.0.1-pre bundles were cut without them.
+cp LICENSE NOTICE "$DEST_ROOT/"
 [ "$PLATFORM" = "windows" ] && BACKEND_EXE="$BACKEND_EXE.exe"
 # TRANSFORM the checked-in sidecar config rather than re-typing it: the env
 # block has exactly one author (orchestration/sidecars.json) — a new env var
