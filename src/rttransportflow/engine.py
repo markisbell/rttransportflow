@@ -15,10 +15,13 @@ increments.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 
 from .simulator import StepResult
 from .state import StateStore
+
+log = logging.getLogger(__name__)
 
 
 class ExternalClockConflict(RuntimeError):
@@ -104,7 +107,10 @@ class RealtimeEngine:
             try:
                 await self._advance_once()
             except Exception:  # noqa: BLE001 — never let one step kill the loop
-                pass
+                # The simulators catch their own faults into degraded frames,
+                # so anything arriving here is the unexpected class — the kind
+                # that MUST leave a trace (it used to pass silently).
+                log.exception("internal tick failed; loop continues")
             elapsed = time.perf_counter() - t0
             await asyncio.sleep(max(0.0, self.step_interval_seconds - elapsed))
 
