@@ -24,19 +24,20 @@ divergence-is-data, Docker/Grafana stack.
 
 ## 2. State
 
-**P0–P10 complete; refactoring campaign landed (2026-08-20);
-strategic-zoom arc merged (2026-08-22)** — the real-grid look, the
-freeze campaign and the site-note weekly graphs; see the last §6 entry.
-Ten commits on `refactor/campaign` restructured tests, smokes, constants,
-the API seam, the simulator file, and the game model layer with every
-behavior pin held; ledger 45 records the one deliberate re-baseline (map
-projection) and its open balancing item. Previously: The backend, the
-contract, the game, the 5 km Europe map, the economy and the protection layer
-are in and their gates are green; P9's determinism gate (`save_load_replay`)
-passes and the campaign gate is the open item; P10 has export presets, a
-packaging script that plays the bundle it builds, and the release checklist
-in §8. Per-phase evidence is in §6 — read the last entry before touching
-anything.
+**v0.0.1-pre RELEASED (2026-08-22): three OS bundles on GitHub Releases,
+each verified by playing a day inside the bundle.** P0–P10 complete;
+refactoring campaign landed (2026-08-20); strategic-zoom arc merged
+(2026-08-22) — the real-grid look, the freeze campaign, the site-note
+weekly graphs. Three post-merge arcs followed (last §6 entries): look
+polish + the boot-wedge root cause, the owner-directed North Sea
+build-out + 2025 renewable base (ledger 49), and the macOS/Windows
+installer pipelines that fed the release. The campaign gate is green
+(★★★, zero UFLS on the realistic world); every phase's evidence is in
+§6 — read the last entries before touching anything. Open at the
+2026-08-24 housekeeping pass: the full §8 sweep against the
+re-baselined world, and the campaign beyond milestone 1 (authored and
+implemented but never executed; milestones 5–7 lack player paths — the
+chosen next arc).
 
 Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
 docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2.md →
@@ -461,6 +462,21 @@ docs/GAME_DESIGN.md.
     (canonical text) + NOTICE (copyright + bundled-data attributions)
     landed; pyproject had declared Apache-2.0 since P0; README badge and
     License section updated. Closes §7 question 1.
+
+49. **North Sea cable doctrine** (2ccaefe build-out, recorded 2026-08-24):
+    authored AC offshore exports cap at **80 km**, not §1.16's 150 —
+    the authored world lays AC exports as submarine `cable_400`, and
+    charging eats a cable's ampacity with distance; past ~80 km the
+    export is DC territory, which is why platforms exist. §1.16's
+    150 km cap and cost breakeven stand for PLAYER builds (a costing
+    rule); the authoring pass simply stops choosing AC beyond 80.
+    Companions from the same arc: far-shore farm→platform binding is by
+    CONNECTIVITY, not depth (the Bight is shallow end to end — depth was
+    a proxy for distance); only ≤ 20 km urban approaches are cabled
+    (`CITY_CABLE_KM` — 56 km of 12-circuit cable injects ~7 GVAr of
+    charging, and twenty such feeds blacked out the boot); cables size
+    with CABLE ratings (400 kV XLPE ~1.2 GVA/circuit, single-circuit
+    radial exports, never the overhead min-4 clamp).
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -1347,6 +1363,124 @@ candidate). Freezes #1/#2 were never conclusively attributed — the
 fixed mechanisms cover every found candidate, and the heartbeat plus
 the REGISTER FAILED prints will name any recurrence directly.
 
+### Look polish + the boot wedge named (2026-08-22)
+
+**Built:** seven commits of player-driven polish after the merge: urban
+ground (the relief sidecar predated the urban layer — `urban_b64` was a
+silent no-op; regenerated, Berlin measures 0.89; a red-canary render
+proved the footprint perfect and the contrast dead, so built-up ground
+is a warm satellite brown-grey that survives the filmic tonemap + fog),
+far-zoom orientation tags (city name / plant kind+id Label3D tags with
+CC0 location pins, openclipart 305298, tinted per class), REAL plant
+names everywhere (GPPD station names, DC-project converter names,
+metro+kind+number synthetic names; one KIND_LABELS source;
+start_2025.json re-baselined with all 184 plants named), click-to-open
+weekly charts (billboards have no collision — screen-space hit test; two
+alignment rounds from player reports), the quantized infrastruct sun
+(0.75° steps on a real east→south→west arc — a creeping light re-fits
+the shadow map every frame and the edges crawl), and the sweep's
+economy-windows re-pin (fuel/CO2/VOM drift 0.014 %).
+
+**The boot wedge (b4bcf09):** a game window booted BEHIND other windows
+never came up — the NVIDIA Vulkan swapchain blocks on present for an
+occluded window, throttling the main loop to seconds per frame;
+HTTPRequest pumps in `_process`, so every health probe timed out against
+a 5 ms `/health` (curl answered instantly all along) and the sidecar
+manager killed its own HEALTHY backends at the STARTING deadline
+forever — also the source of the orphaned backends squatting 8030.
+Fixed: `vsync_mode=0` + `max_fps=60` (CPU-paced frames,
+occlusion-immune), probe timeout 8 s, stuck-in_flight unstick, and every
+sidecar state transition PRINTS now. Verified by booting unfocused:
+STARTING → HEALTHY instantly. This mechanism plausibly closes the
+previous entry's unattributed freezes #1/#2 — the same
+silent-probe-starvation class the heartbeat was built to name.
+
+**Tests/acceptance:** GdUnit 43/43 through the arc; ui_boot,
+sidecar_crash, build_and_supply green; author_start golden byte-stable;
+campaign ★★★ zero UFLS; save_load bit-identical; probe shots reviewed
+at zooms 110/45/16/14.
+
+### North Sea for real + the 2025 renewable base (owner-directed, 2026-08-22)
+
+**Built:** ledger 49's arc, two commits. 2ccaefe: the German Bight
+exports over the BorWin pattern — Gemini, BARD Offshore 1, Global
+Tech I and Borkum Riffgrund I bind to the platform and the DC lands at
+Diele; near-shore AC parks doubled (DanTysk, Butendiek, Amrumbank West,
+Gode Wind), UK-side parks excluded (the capacity-only pick had wired
+London Array to Belgium); offshore 6 GW, was 2. Sea corridors render as
+buoy-traced submarine cables — never pylons marching across the sea;
+night glow dims to the zone's supplied fraction (UFLS visibly dims a
+city, a blackout switches it dark). Cable physics from a boot blackout
+(ledger 49): ≤ 20 km urban approaches only, cable ratings, 80 km
+authored AC-export cap. bdae36f: the GPPD extraction keeps Solar +
+onshore Wind; the big REAL parks the continental web can reach land
+web-adjacent (UW Bertikow ×2, Reussenkoege, Havelland; Meuro, Templin,
+Jocksdorf), PHS to five continental stations behind the same reach
+fence (the capacity-only pick had put Cruachan in Scotland with no grid
+to join). Owner decision: the renewable BASE is inherited 2025 reality;
+the FLEX journey — batteries, electrolysis, caverns — stays the
+player's.
+
+**Engine/game truth found on the way:** the orchestrator's step timeout
+now SCALES with dt (`max(15 s, dt × 0.05)`) — the flat 15 s cap sat
+exactly on a 900 s step's legitimate first-block settle, and a
+timed-out step DISCARDS its scheduled_events, which is how the
+campaign's scripted trip vanished from a flaking save_load run. A
+timeout that can eat scheduled events is a determinism trap, not a
+tuning knob.
+
+**Tests/acceptance:** GdUnit 43/43; author_start golden regenerated
+byte-stable both times; campaign ★★★ with the scripted trip fired and
+zero UFLS; save_load bit-identical; dispatch_day, north_sea_hub 7/7,
+ui_boot green; 120 s stability probe on a throwaway backend (139 buses,
+one island, vm 1.010–1.053, zero events).
+
+**Deviations/open:** only the targeted gates ran — the full §8 sweep
+against the re-baselined world is the 2026-08-24 housekeeping item.
+Renewable share is flagship-level (~7 GW ≈ 5 % of capacity), not the
+~50 % statistical 2025 reality — the GPPD ≥ 100/150 MW pick thresholds
+structurally exclude the distributed bulk; whether and how to model it
+is an owner call. Real ratings flatten to the fixed unit sizes (§7 Q4:
+Grand Maison's 1.8 GW arrives as one 300 MW unit). The commit message's
+"six" PHS stations shipped as five — the sixth failed the fence.
+
+### Installers for three OSes + release v0.0.1-pre (2026-08-22/23)
+
+**Built:** macOS pipeline (156a773 + five fix commits): the manual
+`macos-bundle` CI job (macos-14, arm64 — the project's only Mac; 10×
+runner minutes, hence manual) freezes the backend ON the Mac
+(PyInstaller cannot cross-compile), exports with the macOS preset,
+injects backend/data/orchestration INSIDE
+`rttransportflow.app/Contents/MacOS`, ad-hoc signs AFTER injection, and
+verifies by PLAYING boot_and_day inside the bundle; along the way: the
+game binary goes universal (official 4.7.1 templates carry no
+arm64-only slice; the backend stays arm64 and the bundle is honestly
+named `-arm64`), ETC2/ASTC imports enabled (the Linux preset's `false`
+had been copied over), Mach-Os signed individually (`codesign --deep`
+reads PyInstaller directories as malformed nested bundles), and numba's
+optional threading layer allowlisted in its macOS spelling `libomp` —
+Windows later added the third spelling `tbb12.dll`. Windows pipeline
+(1da67c0 + 2): freeze under git-bash (Scripts/python.exe venv layout,
+PyInstaller's `;` separator, `pwd -W` native path — MSYS
+backslash-flips a POSIX path instead of translating it once `;` defeats
+its converter), the console wrapper ships in release exports (a
+windowed exe has NO stdout — the in-bundle play verdict reads through
+`rttransportflow.console.exe`), `windows-bundle` CI job same shape.
+README merged with the family style, installers linked per OS.
+**Release v0.0.1-pre published 2026-08-22**: tag at 252f700, all six CI
+jobs green (run 32597582131), three bundles attached — the in-bundle
+play gate passed on every OS with boot_and_day 80/80 converged, t_sim
+exactly 7200 s, numerically identical to the Linux reference.
+
+**Known-open at publish:** binaries unsigned/not notarized (SmartScreen
+"Run anyway"; macOS one-time `xattr -cr` documented in the README);
+Intel Macs unsupported; no human has run the Windows/macOS bundles on
+physical hardware — the CI play gate covers boot + physics, not
+rendering/input. The archives were cut two commits before
+LICENSE/NOTICE landed and `package_game.sh` did not copy them into
+bundles — fixed in the 2026-08-24 housekeeping pass (bundles carry
+both; assets re-cut).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -1390,6 +1524,10 @@ Run in order; every step is a gate, not a suggestion.
 5. `scripts/package_game.sh linux` — assembles the bundle AND plays it
    (`boot_and_day` inside the bundle). A bundle that assembles but cannot
    boot its own backend is worthless, so the play step is the real gate.
+   macOS/Windows bundles: `gh workflow run ci.yml` — the manual
+   `macos-bundle` / `windows-bundle` jobs freeze on their own OS, play
+   the bundle on the runner, and upload the artifact. Every bundle must
+   carry LICENSE + NOTICE (Apache-2.0 §4; the script copies them).
 6. `--smoke=soak` — 24 in-game hours: step budget held, memory flat, zero
    leaked processes. Reference: RSS 331 -> 333 MB, step 3.5 -> 4.6 s (no
    drift). NEVER `pkill -f smoke=...` to clean up between runs: the pattern
