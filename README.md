@@ -88,8 +88,8 @@ Docker, clock — no imports from `game/`.
   forcing), and hand-editable scenario recipes.
 - **Ships on three platforms.** Self-contained bundles (frozen backend, no
   Python on the player's machine) for Linux, macOS (Apple Silicon) and
-  Windows — each verified in CI by *playing a simulated day inside the
-  bundle*.
+  Windows — each verified by *playing a simulated day inside the bundle*
+  (macOS/Windows in CI, Linux by the packaging script itself).
 
 ---
 
@@ -117,8 +117,8 @@ acceptance evidence: [CLAUDE.md](CLAUDE.md) §6.
 Download the bundle for your OS from the
 [**Releases**](https://github.com/markisbell/rttransportflow/releases) page
 — each is fully self-contained (game, frozen physics backend, map and
-campaign data) and was verified in CI by *playing a simulated day inside
-the bundle*:
+campaign data) and was verified by *playing a simulated day inside the
+bundle* (macOS/Windows in CI, Linux by the packaging script itself):
 
 | OS | Download | Install |
 |---|---|---|

@@ -2,8 +2,10 @@
 
 Status: accepted · Phase: P0 · Date: 2026-08-10
 Measured on: Linux x86_64, 20 cores, Python 3.12.13 —
-`scripts/validate_core.py` (re-run it after environment changes; CI asserts
-the budget at a relaxed multiplier from P2 on).
+`scripts/validate_core.py` (re-run it after environment changes; CI carries
+hang-guard timeouts only — the once-planned relaxed-multiplier budget
+assertion never landed, and the working perf gates are the measured soak and
+per-step numbers in CLAUDE.md §6).
 
 Versions: pandapower 3.5.4 · numba 0.66.0 · numpy 2.4.6
 

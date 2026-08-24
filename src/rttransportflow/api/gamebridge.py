@@ -184,7 +184,9 @@ async def net_patch(request: Request) -> dict:
                                                {op["id"]: op.get("params", {})})
             results.append({"applied": not notes, "error": "; ".join(notes) or None})
         else:
-            # add/remove_device land in P5/P7 — rejected loudly, never ignored.
+            # add/remove_device were planned for P5/P7 and deliberately never
+            # landed: every topology edit goes through the full debounced
+            # reset instead (P5 §6). Rejected loudly, never ignored.
             results.append({"applied": False, "error": f"unsupported op {kind!r} in P4"})
     return {"results": results}
 

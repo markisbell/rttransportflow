@@ -42,10 +42,13 @@ const CONTINENTAL_CORE: Array[String] = [
 ## seed, every core metro fed from its real stations, the adequacy fleet
 ## laddered at those stations — the meshed real topology is also what
 ## retired the L116/L108 evening-peak duty trips (the ledger-45 pocket).
-## No pre-placed wind or batteries: they shift mesh flows and pushed a
-## nuclear export spur past the 120 % duty threshold within the first
-## block (found by four event-log hunts) — renewables arrive through their
-## unlock years instead.
+## The renewable BASE is inherited 2025 reality (owner decision, bdae36f):
+## named GPPD wind/solar parks placed WEB-ADJACENT, PHS behind the reach
+## fence — the flex journey (batteries, electrolysis, caverns) stays the
+## player's. The earlier no-pre-placed-renewables rule existed because
+## scattered parks shifted mesh flows past a 120 % duty threshold (four
+## event-log hunts); web-adjacent placement plus the campaign smoke's
+## day-2 guard retired it.
 static func build_inherited_world(world: Node) -> bool:
 	return GridPlan.author_start(world)
 const BLOCK_DAYS := 1.0 / 96.0

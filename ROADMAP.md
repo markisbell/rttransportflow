@@ -263,10 +263,11 @@ every balancing constant has rationale + a regenerating smoke.
 since P4); install.sh / start-stop polish; GHCR image matrix (test-gated);
 24-in-game-hour soak at max speed (budget held, zero leaked processes, memory
 flat); docs (README quickstart, physics honesty final pass, CLAUDE.md
-verified-state section). Stretch (explicitly out of gate): OSM 220/400 kV
-Overpass import as a "real Europe" scenario seed (gridedit `osm.py` *pattern*,
-reimplemented — no AGPL code); deliberate multi-area frequency + HVDC-coupled
-areas; grid-forming island-survival gameplay.
+verified-state section). Stretch (explicitly out of gate): a "real Europe"
+scenario seed — DELIVERED license-clean instead of the OSM/Overpass sketch
+(Natural Earth map + curated European plan + WRI GPPD fleet, ledgers
+38/46/47; OSM stays excluded as ODbL); deliberate multi-area frequency +
+HVDC-coupled areas; grid-forming island-survival gameplay.
 *Done when:* fresh-machine install → playing a campaign start within 10 min;
 soak green; all smokes + suites green in the release CI matrix.
 *Proof:* soak verdict line; release checklist in CLAUDE.md.

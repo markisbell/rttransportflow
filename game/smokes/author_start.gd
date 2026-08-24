@@ -2,9 +2,10 @@ extends SmokeBase
 ## --smoke=author_start: PROGRAMMATIC author of the campaign's inherited-2025
 ## world (golden-style: writes data/campaign/start_2025.json only when the
 ## file is absent; delete it to re-baseline, then commit both). The build is
-## fully deterministic: the trio auto-build plus a wind ring, one pilot
-## battery (rationale in campaign_v1.json) and corridors — the salt-cavern
-## H2 sites stay EMPTY (the cavern unlock is 2029).
+## fully deterministic: GridPlan.author_start — the European-plan seed with
+## the GPPD fleet, the 2025 renewable base and the North Sea build-out
+## (ledgers 46/47, bdae36f/2ccaefe) — the salt-cavern H2 sites stay EMPTY
+## (the cavern unlock is 2029).
 
 const TAG := "SMOKE_AUTHOR_START"
 

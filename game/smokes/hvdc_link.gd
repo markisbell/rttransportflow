@@ -324,7 +324,9 @@ func _build() -> Dictionary:
 	# Converters off the direct axis (~100 km south, ~50 km to the side), each
 	# spurred into its city's AC network.
 	#
-	# KNOWN LIMITATION, and the reason `ac_relieved` is red: that spur is
+	# KNOWN LIMITATION (`ac_relieved` has PASSED since the corrected-demand
+	# re-baseline — 23.2 vs the 4.0 threshold, twice — but the margin exists
+	# despite, not because of, the delivery point): that spur is
 	# routed with `stop_at_existing`, which ends at the FIRST corridor tile it
 	# meets — for conv_b that is the southern mesh route, not Berlin. So the
 	# bipole delivers its 772 MW halfway down the corridor instead of at the

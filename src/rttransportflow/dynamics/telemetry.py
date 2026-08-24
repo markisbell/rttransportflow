@@ -3,7 +3,9 @@
 The fine ring backs RoCoF windowing and (later) /gb/telemetry/ring and the
 replay UI. The trajectory buffer collects the samples of one advance() call
 and emits a stride-decimated array (<= max_samples, event instants kept).
-The coarse 24 h ring and the rolling snapshot ring join in P4/P8.
+The rolling snapshot ring landed in P8 (snapshot.py); the once-planned
+coarse 24 h ring never did — the game-side ZoneHistory 7-day ring covers
+that use.
 """
 
 from __future__ import annotations
