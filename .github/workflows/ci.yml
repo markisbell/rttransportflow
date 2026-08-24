@@ -63,12 +63,14 @@ jobs:
           pip install -e ".[dev]"
           python -m venv .venv --system-site-packages
       - name: Fetch Godot
+        # the version pin has ONE home: GODOT_PIN in scripts/find_godot.sh
         run: |
+          GODOT_PIN=$(grep -m1 '^GODOT_PIN=' scripts/find_godot.sh | cut -d'"' -f2)
           curl -sSL -o godot.zip \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+            "https://github.com/godotengine/godot/releases/download/${GODOT_PIN}-stable/Godot_v${GODOT_PIN}-stable_linux.x86_64.zip"
           unzip -q godot.zip
-          chmod +x Godot_v4.7.1-stable_linux.x86_64
-          echo "GODOT_BIN=$PWD/Godot_v4.7.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "Godot_v${GODOT_PIN}-stable_linux.x86_64"
+          echo "GODOT_BIN=$PWD/Godot_v${GODOT_PIN}-stable_linux.x86_64" >> "$GITHUB_ENV"
       - name: Import project
         # first headless open builds .godot/ (script class cache, imports);
         # without it the first real run fails to resolve class_names
@@ -147,15 +149,17 @@ jobs:
           pip install -e ".[dev]" pyinstaller
           python -m venv .venv --system-site-packages
       - name: Fetch Godot (macOS editor + export templates)
+        # the version pin has ONE home: GODOT_PIN in scripts/find_godot.sh
         run: |
+          GODOT_PIN=$(grep -m1 '^GODOT_PIN=' scripts/find_godot.sh | cut -d'"' -f2)
           curl -sSL -o godot.zip \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_macos.universal.zip
+            "https://github.com/godotengine/godot/releases/download/${GODOT_PIN}-stable/Godot_v${GODOT_PIN}-stable_macos.universal.zip"
           unzip -q godot.zip
           echo "GODOT=$PWD/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
           curl -sSL -o templates.tpz \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+            "https://github.com/godotengine/godot/releases/download/${GODOT_PIN}-stable/Godot_v${GODOT_PIN}-stable_export_templates.tpz"
           unzip -q templates.tpz
-          DEST="$HOME/Library/Application Support/Godot/export_templates/4.7.1.stable"
+          DEST="$HOME/Library/Application Support/Godot/export_templates/${GODOT_PIN}.stable"
           mkdir -p "$DEST"
           mv templates/* "$DEST"/
       - name: Import project
@@ -190,15 +194,17 @@ jobs:
           pip install -e ".[dev]" pyinstaller
           python -m venv .venv --system-site-packages
       - name: Fetch Godot (Windows editor + export templates)
+        # the version pin has ONE home: GODOT_PIN in scripts/find_godot.sh
         run: |
+          GODOT_PIN=$(grep -m1 '^GODOT_PIN=' scripts/find_godot.sh | cut -d'"' -f2)
           curl -sSL -o godot.zip \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip
+            "https://github.com/godotengine/godot/releases/download/${GODOT_PIN}-stable/Godot_v${GODOT_PIN}-stable_win64.exe.zip"
           unzip -q godot.zip
-          echo "GODOT=$PWD/Godot_v4.7.1-stable_win64.exe" >> "$GITHUB_ENV"
+          echo "GODOT=$PWD/Godot_v${GODOT_PIN}-stable_win64.exe" >> "$GITHUB_ENV"
           curl -sSL -o templates.tpz \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+            "https://github.com/godotengine/godot/releases/download/${GODOT_PIN}-stable/Godot_v${GODOT_PIN}-stable_export_templates.tpz"
           unzip -q templates.tpz
-          DEST="$APPDATA/Godot/export_templates/4.7.1.stable"
+          DEST="$APPDATA/Godot/export_templates/${GODOT_PIN}.stable"
           mkdir -p "$DEST"
           mv templates/* "$DEST"/
       - name: Import project
