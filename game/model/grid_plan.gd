@@ -514,14 +514,15 @@ static func _city_cable_pass(world: Node) -> void:
 ## 12-circuit cable injects ~7 GVAr of charging, and twenty such feeds
 ## diverged the PF outright and blacked the world out at boot (found
 ## live). Longer feeds keep their overhead line.
-const CITY_CABLE_MAX_TILES := 4  # <= 20 km underground approach
+const CITY_CABLE_KM := 20.0  # a distance, not a tile count (ledger 38)
 
 
 static func _cable_entry(world: Node, entry: Vector2i) -> void:
+	var max_tiles: int = world.tiles_for_km(CITY_CABLE_KM)
 	var path: Array[Vector2i] = []
 	var prev := Vector2i(-99999, -99999)
 	var current := entry
-	for _i in CITY_CABLE_MAX_TILES + 1:
+	for _i in max_tiles + 1:
 		if world.substations.has(current) or world.diag_fillers.has(current):
 			break  # substation = the transition bus; fillers stay overhead
 		var degree := 0
@@ -539,7 +540,7 @@ static func _cable_entry(world: Node, entry: Vector2i) -> void:
 			break
 		prev = current
 		current = next
-	if path.size() > CITY_CABLE_MAX_TILES:
+	if path.size() > max_tiles:
 		return  # a long feed stays overhead — cable is the exception
 	# walk must have ENDED on a bus-forming tile (substation or junction);
 	# a dead-end break converts a stub whose far end is mid-corridor and
@@ -774,10 +775,12 @@ static func _hub_pass(world: Node, candidates: Array,
 
 
 ## Near-shore AC parks: the biggest CONTINENTALLY REACHABLE parks export
-## over a submarine cable to the web — capped at the §1.16 150 km AC
-## limit, so a UK park can never end up wired to Belgium by sea pylons
-## (which is exactly what the capacity-only pick did). Intermittent
-## capacity — deliberately NOT counted toward any metro's firm need.
+## over a submarine cable to the web — capped at 80 km (ledger 49: the
+## authored builds lay AC exports as cable, and charging eats a cable's
+## ampacity long before the §1.16 150 km costing cap), so a UK park can
+## never end up wired to Belgium by sea pylons (which is exactly what the
+## capacity-only pick did). Intermittent capacity — deliberately NOT
+## counted toward any metro's firm need.
 static func _offshore_pass(world: Node, candidates: Array) -> void:
 	var placed := 0
 	# 80 km, not the §1.16 150: charging eats an AC cable's ampacity with
