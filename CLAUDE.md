@@ -33,11 +33,13 @@ polish + the boot-wedge root cause, the owner-directed North Sea
 build-out + 2025 renewable base (ledger 49), and the macOS/Windows
 installer pipelines that fed the release. The campaign gate is green
 (★★★, zero UFLS on the realistic world); every phase's evidence is in
-§6 — read the last entries before touching anything. Open at the
-2026-08-24 housekeeping pass: the full §8 sweep against the
-re-baselined world, and the campaign beyond milestone 1 (authored and
-implemented but never executed; milestones 5–7 lack player paths — the
-chosen next arc).
+§6 — read the last entries before touching anything. The 2026-08-24
+housekeeping pass swept the full §8 matrix green against the
+re-baselined world (21/21) and re-cut the release assets with
+LICENSE/NOTICE. Next arc (owner-chosen): **campaign playability** —
+milestones 2–7 are authored and implemented but never executed, and
+5–7 lack player paths; the C1–C10 plan lives in the published arc-plan
+artifact (see the last §6 entry).
 
 Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
 docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2.md →
@@ -1480,6 +1482,57 @@ rendering/input. The archives were cut two commits before
 LICENSE/NOTICE landed and `package_game.sh` did not copy them into
 bundles — fixed in the 2026-08-24 housekeeping pass (bundles carry
 both; assets re-cut).
+
+### Post-release housekeeping + the campaign-arc plan (2026-08-24)
+
+**Built:** the settle-in batch after a 7-reader survey mapped the true
+state — six commits. LICENSE + NOTICE ship in every bundle
+(`package_game.sh`, the one assembly path all three OSes share —
+Apache-2.0 §4; NOTICE carries the GPPD CC-BY credit that travels with
+`data/`). ONE Godot pin (`GODOT_PIN` in find_godot.sh; ci.yml's three
+fetch steps grep it — a bump edits one line). `CITY_CABLE_KM` replaces
+the tile count (ledger 38's seventh instance, this time caught before
+it bit). The engine logs what it used to swallow: the internal loop's
+silent except-pass now `log.exception`s and `main()` bootstraps root
+logging — the backend had ZERO logging, so a standalone/Docker failure
+was fully invisible. Eight stale doc/comment claims reconciled to
+shipped state (ADR-004's phantom CI budget, README's Linux
+"verified in CI", ROADMAP's OSM stretch item, telemetry's 24 h-ring
+promise, gamebridge's "land in P5/P7", campaign.gd + author_start
+docstrings, hvdc_link's "ac_relieved is red"). §2/§6/§8 caught up;
+ledger 49 recorded.
+
+**Tests/acceptance — the full §8 sweep against the re-baselined world,
+its first since ledgers 46–49: 21/21 green in 48 min.** Backend 152,
+GdUnit 43/43. Campaign ★★★ / zero UFLS / scripted trip fired;
+save_load bit-identical; dispatch_day green; economy avg
+34.4496 €/MWh with economy_windows.csv BYTE-IDENTICAL — the
+pre-re-baseline pin HOLDS under the North Sea + renewable-base world;
+calm_week dark-day f_min 49.816, no blackout; hydrogen_chain round
+trip 0.3681; hvdc_link 9/9 (third consecutive full pass);
+north_sea_hub losses match §1.16; soak 96 blocks / 0 PF failures /
+RSS 329.4 → 329.7 MB / step 2408 → 2657 ms (ratio 1.10).
+**Release assets re-cut** from this batch: all three bundles rebuilt
+(Linux locally with its play gate; macOS/Windows via the CI jobs, run
+32749188090, every in-bundle play green), verified to carry
+LICENSE/NOTICE, uploaded over the v0.0.1-pre assets with provenance in
+the release notes. The tag stays at 252f700 — moving it needs a
+force-push, which is the owner's call; the notes name the asset
+commit.
+
+**Next arc (owner decision, 2026-08-24): campaign playability.** The
+survey found the campaign 1/7-executed: milestone 7's inverter-share
+criterion is a literal `pass`, unlock years are never enforced, and no
+player path exists to retire coal, convert to H2, or build GFM/syncon —
+milestones 5–7 cannot be played as designed, and campaign mode is
+reachable only via the `--campaign` CLI flag. The plan — ten thin
+milestone slices C1–C10, ~21–30 sessions, a gate on every phase,
+owner decisions D1–D9 with recommended defaults in force — lives in
+the published arc-plan artifact. C1 is "rails & rubric truth": the
+counting/formula fixes (window-blind failure trackers, UFLS
+per-incident, the §4.7 cost axis, the truthful two-component finale
+exam, unlock enforcement, mid-campaign recipes, autosave) that must
+precede any pin.
 
 ## 7. Open questions for the project owner
 
