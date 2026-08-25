@@ -65,7 +65,7 @@ docs/GAME_DESIGN.md.
 - **Ports**: backend 8003 / InfluxDB 8089 / Grafana 3003 (no web UI in v1 —
   ledger 25; 5176/8083 reserved-unused); game 8030 / acceptance smokes 8031
   (sequential by design) / contract tests 8032 / freeze smoke 8033 /
-  backend-driving smokes 8034–8043, ONE port per smoke — the registry is
+  backend-driving smokes 8034–8051, ONE port per smoke — the registry is
   `SMOKE_PORTS` in `game/main.gd` (kept off 8031 so smoke runs can overlap;
   four smokes silently sharing 8034 was the adopt-a-stale-backend failure).
   NEVER 8000–8002 (user dev instances), 8010–8016
@@ -479,6 +479,48 @@ docs/GAME_DESIGN.md.
     charging, and twenty such feeds blacked out the boot); cables size
     with CABLE ratings (400 kV XLPE ~1.2 GVA/circuit, single-circuit
     radial exports, never the overhead min-4 clamp).
+
+50. **UFLS and blackouts count INCIDENTS, not pickups** (C1/D1,
+    2026-08-25): one UFLS incident per island per 15-min block (a single
+    excursion walks several stages in seconds; §5's "events" language
+    counts incidents — per-stage counting bit ~5× harder than designed),
+    and one blackout incident per block (a split cascade birthing three
+    dead pockets is ONE grid event, not three dismissals). The dedup key
+    derives from GAME time via the step-local offset
+    (clock_now − (t_sim_end − event.t_sim)) — NEVER raw wire t_sim: the
+    engine clock restarts at 0 on every rebuild-triggered net/reset, so
+    engine-relative keys collide across registrations and silently drop
+    real incidents (the C1 review's blocking find; pinned by
+    `test_ufls_incidents_survive_backend_rebuild`). The same engine-vs-
+    game-clock trap sat pre-existing in the economy's `_on_step` —
+    revenue priced demand at ENGINE days and the daily FOM counter
+    stalled forever after the player's first rebuild; economy books now
+    run on GameClock (identical in rebuild-free runs — dispatch_day and
+    economy pins held to the cent/byte).
+
+51. **The §4.7 cost axis is complete** (C1/D2, 2026-08-25): the campaign
+    cost window bills annualized capex (6 %/25 a annuity ≈ 0.0782/a,
+    `capex_annuity` in economy.json, accrued daily beside FOM as a KPI —
+    capex is PAID on placement, never charged twice), loan interest
+    (`loan_eur` delta) and regulatory penalties (`Economy.book_penalty`,
+    a books category — the coal fine no longer debits treasury raw).
+    "Building nothing" is no longer cost-free in the grade. The global
+    `avg_cost_eur_per_mwh` KPI is untouched; M2's cost tiers re-derive
+    under this formula at C2 as the arc's one sanctioned re-baseline.
+    Missing keys in a pre-D2 cost snapshot default to CURRENT values so
+    an absent axis contributes zero — a 0.0 default would bill the whole
+    campaign's interest into one window.
+
+52. **The finale exam is only real with both components** (C1/D3,
+    2026-08-25): `double_contingency` records `dc_hub_fired`/
+    `dc_unit_fired`, and `double_contingency_survived` is UNMET when
+    either is missing — an under-built world (no hub, no online unit)
+    must not pass its own finale by degrading the exam to a single trip.
+    Pre-D3 saves grandfather the old all-or-nothing semantics on load.
+    Companion D7 default: failed milestones stay non-blocking (stars
+    lost, rank records it); the window-open autosave is the retry point
+    (`Campaign.retry_from_milestone()`), persisted via `autosave_done`
+    so a mid-window manual load cannot migrate the retry point forward.
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -1533,6 +1575,57 @@ counting/formula fixes (window-blind failure trackers, UFLS
 per-incident, the §4.7 cost axis, the truthful two-component finale
 exam, unlock enforcement, mid-campaign recipes, autosave) that must
 precede any pin.
+
+### C1 — Rails & rubric truth (campaign arc, 2026-08-25)
+
+**Built:** the campaign-playability arc opens (plan in the arc-plan
+artifact; owner confirmed the D1–D9 defaults). Every counting/formula
+defect that would poison a milestone pin, fixed before anything is
+pinned: the failure trackers hoisted above the milestone window guard
+(a day-8 blackout now reaches the dismissal ladder — they were
+window-blind); UFLS + blackouts counted as INCIDENTS in GAME time
+(ledger 50); the §4.7 cost axis in full (ledger 51); the finale exam
+truthful per component (ledger 52); unlock years enforced at the TOOL
+layer — build_menu greys with "unlocks YYYY" on the new `year_changed`
+signal and world-view ghosts refuse, never `WorldModel` (authoring and
+smokes place freely, §5.4); mid-campaign scenario recipes (`start_day`
++ campaign overrides + treasury; `merit_order_2026.json` is the first;
+the clock is ALWAYS set so a recipe can't inherit its predecessor's
+day, and billing re-anchors via `Economy.sync_billing_day()`); the
+§5.3/D7 window-open autosave (quiesce-refusal retries next block,
+loudly; `retry_from_milestone()`; `autosave_done` persists so a
+mid-window manual load can't migrate the retry point; a doomed state
+never overwrites it; smokes redirect `autosave_path`); a SaveLoad
+reentrancy latch + `bridge_override` test seam; and the backend's
+`/gb/snapshot` now takes the step lock — the game's
+wait-for-in-flight→GET gap could serialize a half-advanced engine.
+
+**Tests:** GdUnit 43 → 54 — the failure states' first-ever execution
+(insolvency + both dismissals), incident coalescing + the
+cross-rebuild pin, the exam-truth matrix, the cost fixture, the
+unlock matrix, autosave refusal and success paths (FakeSnapBridge).
+Backend 152 (the snapshot lock is transparent to the suite).
+
+**Acceptance evidence:** an adversarial 3-lens diff review (22 agents)
+confirmed 15 findings before the gate — three of them the same
+BLOCKING one: the incident dedup was keyed on wire t_sim, which is the
+ENGINE clock and restarts at 0 on every rebuild-triggered net/reset,
+so post-rebuild incidents silently vanished from both the rubric and
+the dismissal ladder; the same engine-clock trap sat PRE-EXISTING in
+economy_books (revenue priced demand at engine days; the daily
+FOM/annuity counter stalled forever after the player's first build).
+All 15 fixed, then every gate re-run green: scenarios (the
+mid-campaign recipe loads twice to identical state),
+campaign_take_the_reins **★★★ / zero UFLS — the pin held** through
+D1 and the autosave, save_load_replay bit-identical, dispatch_day
+prices to the cent (53.8333/63.1186), economy avg 34.4496 €/MWh with
+economy_windows.csv BYTE-identical — the game-time billing change is
+invisible in rebuild-free runs, exactly as intended.
+
+**Next:** C2 — slice M2 (The Merit Order): the boot menu, the
+mode-only inspector, the milestone summary panel, smoke
+`campaign_merit_order` (port 8044), and the sanctioned cost-tier
+re-baseline under the D2 formula.
 
 ## 7. Open questions for the project owner
 
