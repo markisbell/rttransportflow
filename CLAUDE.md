@@ -522,6 +522,33 @@ docs/GAME_DESIGN.md.
     (`Campaign.retry_from_milestone()`), persisted via `autosave_done`
     so a mid-window manual load cannot migrate the retry point forward.
 
+53. **The startup profile is anchored at NOW, not at floor(day)**
+    (C2, 2026-08-25): the engine's step counter restarts at 0 on every
+    registration and indexes the native profile from there, so
+    profile[0] must be the demand of the FIRST wire block.
+    `BuildSession._rebuild`'s sampler anchored at midnight of the
+    current day — a day-11.9 EVENING registration cold-started the
+    fleet on a MIDNIGHT operating point, and the multi-GW gap shed two
+    UFLS stages before the first dispatch could ramp (merit runs 1/2;
+    the mid-play-rebuild sibling of P6 discovery 3). At a t = 0 boot
+    the two anchors coincide, so every golden and boot smoke is
+    byte-identical.
+
+54. **UFLS restoration is AUTOMATIC above the floor** (C2, 2026-08-25):
+    a UFLS-class shed (w ≥ 1 − UFLS_CUM_SHED = 0.55) restores itself
+    through the existing 5-min-healthy gate and 1 %/10 s ramp — the
+    §2.2 design text always read this way, but the implementation was
+    game-commanded only (`request_restore`), and the game's command
+    channel doesn't exist until C5: one organic stage-1 shed parked as
+    a PERMANENT 7.5 % brownout billing VoLL for the rest of the
+    campaign (merit run 3: window cost 49.8 → 120.7 €/MWh over two sim
+    days, engine in permanent ALERT, 7× wall slowdown). Below the
+    floor — the post-black-start reload regime — nothing restores
+    automatically: reloading a freshly re-energized island un-staged
+    collapses it again (ledger 34 stands, pinned by
+    `test_deep_shed_stays_manual`). C5's scope shrinks to black-start
+    manual restoration.
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
@@ -1626,6 +1653,84 @@ invisible in rebuild-free runs, exactly as intended.
 mode-only inspector, the milestone summary panel, smoke
 `campaign_merit_order` (port 8044), and the sanctioned cost-tier
 re-baseline under the D2 formula.
+
+### C2 — Slice M2: The Merit Order (campaign arc, 2026-08-25)
+
+**Built:** milestone 2 playable and pinned, plus the presentation shell
+every later slice reuses, plus two owner additions. THE SHELL: a boot
+main menu (Continue / New campaign / Sandbox / the scenario list —
+`--campaign` and every smoke bypass it; `_boot_shell` +
+`_boot_continue`/`_boot_scenario` join `_boot_game` over one sidecar
+wait; `BuildSession.enabled` stays FALSE until the boot's own
+registration lands, closing the debounce-interleave window the old
+flow documented and the menu tripled); the mode-only plant inspector
+(bare click on a plant; writes `Dispatch.plant_mode` — the §3.3
+surface that never had a writer; stale-pid-proof across loads); the
+milestone summary panel + era toast (the CO2 ratchet is VISIBLE;
+Retry loads the failed milestone's own autosave slot). OWNER
+ADDITIONS: bird-zoom zone charts (the pin hit box now derives from
+projected geometry — the fixed ±16/−40 px box was 1080p-only and made
+charts feel unclickable; charts grow to 1.7× above the model band) and
+ANIMATED POWER FLOW at strategic zoom — the topology walk records
+each line's tile path (`interpretation.line_paths`, native doc
+untouched, goldens byte-stable), and the repo's first shader scrolls
+backing + halo + core dashes along every corridor from a per-line
+flow texture (direction = sign of the wire's `p_from_mw`,
+speed/brightness = loading, absent line = dark, zoom-adaptive dash
+length, gentle night dim — power keeps shining); the flow data was
+ALREADY on the wire every step (`pf.latest.lines`), no backend change.
+THE SMOKE: `campaign_merit_order` (8044) drives the merit_order_2026
+recipe days 11.9 → 24.03 (coarse 900 s, then 3×300 s across the
+graded span), asserts the ratchet reprices, the thermal flip, the D2
+window cost, the UFLS ceiling, the autosave landing, and the PINNED
+stars.
+
+**Three engine-adjacent finds, each measured before it was believed:**
+(1) `asyncio.Lock` BARGES — under a smoke's back-to-back stepping a
+/gb/snapshot reader starved 35 s (CosimBridge times out at 30), so
+every smoke-era window-open autosave since C1 had silently failed;
+a fairness gate now fronts the step channel (the C1 fake-bridge test
+could not see the live path — the smoke asserts the file lands now).
+(2) The startup profile anchored at floor(day) — ledger 53: an
+evening mid-campaign registration cold-started the fleet on a
+midnight operating point and shed UFLS inside the graded window.
+(3) UFLS restoration was game-commanded while the game's command
+channel doesn't exist until C5 — ledger 54: one organic shed became a
+permanent 7.5 % brownout (window cost 49.8 → 120.7 €/MWh, permanent
+ALERT, 7× wall slowdown, a timed-out run); UFLS-class sheds
+auto-restore now, the black-start regime stays manual. Also fixed
+from the adversarial 3-lens review (10 confirmed): per-milestone
+autosave slots (contiguous windows clobbered the retry point one
+block after a failure), the Continue-fallback world leak, the
+SaveLoad reentrancy latch, smoke failure observability, and a
+probe-clobber + a multi-varying shader quirk found by the magenta
+bisection.
+
+**Tests/acceptance:** backend 153 (auto-restore re-pin + the
+ledger-34 floor guard); GdUnit 61 (flow texel mapping, line-path↔bus
+contract, pin-hit/chart-scale invariants, C2 panel logic);
+ride_through + cascade_low_inertia green under auto-restore;
+scenarios + ui_boot green. **Milestone 2 measured (run 4, the first
+full pass): ★5 of 6** — cost ★★★ at 52.76 €/MWh window average
+(pass < 90, ★★★ ≤ 72: the AUTHORED tiers hold under the D2 formula —
+the sanctioned re-baseline is a confirmation, tiers unchanged;
+annuity ≈ 0 on the inherited fleet since inherited assets carry no
+booked capex, a deliberate policy) + reliability ★★ (2 UFLS
+incidents, exactly the pass ceiling, both restored within minutes);
+the ratchet flips coal's thermal share 0.972 → 0.328 across day 18 —
+the merit order visibly swaps, which is the milestone's whole lesson.
+Confirmation run + final triad green (see the gate lines below the
+star pin in the smoke).
+
+**Deviations (deliberate):** the recipe starts at day 11.9 — an
+UNGRADED cold-start settle stretch (the M1 pattern; a recipe start is
+a legal cold start and its transient is not part of M2's exam);
+menu/inspector/panels are functional-first (D9 — the look pass is a
+separate arc); the smoke stays local (~100 min).
+
+**Next:** C3 — slice M3 (First Green Gigawatts): `author_era`
+world + recipe, smoke `campaign_green_gigawatts` (8045), the day-36
+HVDC unlock flip as G2's end-to-end proof, the congestion staircase.
 
 ## 7. Open questions for the project owner
 
