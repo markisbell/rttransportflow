@@ -77,6 +77,23 @@ func _ready() -> void:
 	var replay := preload("res://views/replay_panel.gd").new()
 	add_child(replay)
 
+	# C2: milestone summary + era toast (self-wires to Campaign signals)
+	add_child(preload("res://views/milestone_panel.gd").new())
+	# C2: mode-only plant inspector — opens on a bare click (no tool armed)
+	# on a plant tile; pin clicks never reach tile_clicked, so charts and
+	# the inspector cannot fight over one click
+	var inspector: Variant = preload("res://views/plant_inspector.gd").new()
+	add_child(inspector)
+	if view != null:
+		view.tile_clicked.connect(func(tile: Vector2i) -> void:
+			if view.tool_id != "":
+				return
+			var pid: String = World.plant_at(tile)
+			if pid != "":
+				inspector.open(pid)
+			else:
+				inspector.close_panel())
+
 	Orchestrator.events_received.connect(_on_events)
 	Orchestrator.supply_event.connect(_on_supply_event)
 	Orchestrator.step_completed.connect(_on_step_completed)

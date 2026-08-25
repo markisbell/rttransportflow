@@ -24,6 +24,7 @@ const SMOKES := {
 	"replay_panel": "res://smokes/replay_panel.gd",
 	"author_start": "res://smokes/author_start.gd",
 	"campaign_take_the_reins": "res://smokes/campaign_take_the_reins.gd",
+	"campaign_merit_order": "res://smokes/campaign_merit_order.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",
 	"soak": "res://smokes/soak.gd",
@@ -78,8 +79,35 @@ func _ready() -> void:
 		_run_smoke(smoke)
 	elif _screenshot_path != "":
 		_take_screenshot()
+	elif campaign:
+		_boot_game(true)  # CLI boots stay menu-free and deterministic
 	else:
-		_boot_game(campaign)
+		_show_menu()
+
+
+## The boot menu (C2). Every choice frees the menu, then boots its path;
+## smokes and --campaign never reach this.
+func _show_menu() -> void:
+	# preload by path (the sandbox_panel lesson): a fresh class_name is not
+	# in the global class cache until re-import and kills headless boots.
+	# Untyped on purpose — the analyzer cannot see `chosen` on the base.
+	var menu: Variant = preload("res://views/main_menu.gd").new()
+	add_child(menu)
+	menu.chosen.connect(func(action: String, arg: String) -> void:
+		menu.queue_free()
+		_on_menu_choice(action, arg))
+
+
+func _on_menu_choice(action: String, arg: String) -> void:
+	match action:
+		"campaign":
+			_boot_game(true)
+		"sandbox":
+			_boot_game(false)
+		"continue":
+			_boot_continue()
+		"scenario":
+			_boot_scenario(arg)
 
 
 ## Look probe (the sibling's --screenshot pattern): builds the demo grid on
@@ -120,6 +148,10 @@ func _take_screenshot() -> void:
 				(native["grid"]["buses"] as Array).size(),
 				(native["lines"]["lines"] as Array).size(),
 				(topo.get("warnings", []) as Array).size()])
+			if OS.get_environment("SHOT_FLOW") != "":
+				# C2 look harness: synthetic flows on the real topology
+				view.probe_flow((topo["interpretation"] as Dictionary)
+					.get("line_paths", {}))
 		else:
 			print("TOPOLOGY refused: ", topo.get("error", "?"))
 	else:
@@ -144,6 +176,11 @@ func _take_screenshot() -> void:
 		focus = Vector2i(int(parts[0]), int(parts[1]))
 	view.focus_tile(focus, float(OS.get_environment("SHOT_ZOOM")) \
 		if OS.get_environment("SHOT_ZOOM") != "" else 17.0)
+	if OS.get_environment("SHOT_CHART") != "":
+		# open zone charts by id ("berlin,hamburg") — the C2 bird-zoom
+		# validation shot: pin + chart at strategic zoom, no clicks needed
+		for z: String in OS.get_environment("SHOT_CHART").split(","):
+			view._chart_open["z:" + z.strip_edges()] = true
 	print("PROBE focus=", focus, " view_focus=", view._focus, " zoom=", view._zoom)
 	await get_tree().create_timer(1.5).timeout
 	if OS.get_environment("SHOT_ZOOM2") != "":  # birdview->zoom-in repro
@@ -180,12 +217,24 @@ func _run_smoke(smoke_name: String) -> void:
 
 
 func _boot_game(campaign: bool = false) -> void:
+	if not _boot_shell():
+		return
+	_boot_async(campaign)
+
+
+## The shared boot prologue: map, models, view, HUD — identical for every
+## menu path; what differs is only which world/save arrives afterwards.
+func _boot_shell() -> bool:
 	# P5 build mode: the player builds the grid; stepping starts after the
 	# first successful (debounced) build+register in BuildSession.
 	if not BuildSession.load_map():
 		push_error("map load failed — cannot boot")
-		return
-	BuildSession.enabled = true
+		return false
+	# enabled stays FALSE until the boot's own registration is done: the
+	# sidecar wait can run minutes, and a player edit in that window would
+	# arm the debounce and interleave a second registration with the
+	# boot's (the exact race _boot_async documents; C2 review)
+	BuildSession.enabled = false
 	# GridCo models (P6): seeded deterministically; the catalogs are the
 	# single source of truth for every constant.
 	GridcoBoot.setup_models()
@@ -195,7 +244,56 @@ func _boot_game(campaign: bool = false) -> void:
 	var hud := preload("res://views/hud.gd").new()
 	hud.view = view
 	add_child(hud)
-	_boot_async(campaign)
+	return true
+
+
+## Menu "Continue": the default savegame instead of the start world.
+## SaveLoad.load_game owns the whole restore (rebuild, register, adopt,
+## speed); a failed load falls back to the ordinary sandbox boot rather
+## than a dead screen.
+func _boot_continue() -> void:
+	if not _boot_shell():
+		return
+	_boot_continue_async()
+
+
+func _boot_continue_async() -> void:
+	await _await_sidecars()
+	var res: Dictionary = await SaveLoad.load_game(SaveLoad.DEFAULT_PATH)
+	if not bool(res.get("ok", false)):
+		# a failed load leaves the SAVED world half-restored — clear it or
+		# the fallback re-registers the save while claiming a fresh boot
+		# (C2 review); model state residue from the partial restore is
+		# accepted, the grid itself boots clean
+		push_error("Continue failed (%s) — falling back to a fresh sandbox boot"
+			% str(res.get("reason", "")))
+		World.clear_build()
+		Campaign.active = false
+		GameClock.t_sim = 0.0
+		_restore_start_world(false)
+		await BuildSession.build_status
+		GameClock.speed = 60.0
+	BuildSession.enabled = true
+
+
+## Menu scenario pick: the recipe builds world+campaign+clock backend-free
+## (scenario.gd), then registration follows the explicit _boot_async rule.
+func _boot_scenario(id: String) -> void:
+	if not _boot_shell():
+		return
+	_boot_scenario_async(id)
+
+
+func _boot_scenario_async(id: String) -> void:
+	await _await_sidecars()
+	if not Scenario.load_scenario(id):
+		push_error("scenario %s failed — sandbox boot" % id)
+		_restore_start_world(false)
+	else:
+		BuildSession.rebuild_now()
+	await BuildSession.build_status
+	BuildSession.enabled = true
+	GameClock.speed = 60.0
 
 
 ## Boot the opening world from the ONE authored start state
@@ -221,7 +319,7 @@ func _restore_start_world(arm_campaign: bool) -> void:
 		Campaign.start_campaign()
 
 
-func _boot_async(campaign: bool = false) -> void:
+func _await_sidecars() -> void:
 	SidecarManager.configure(SidecarManager.GAME_PORT)
 	SidecarManager.start_all()
 	var waited := 0.0
@@ -233,6 +331,10 @@ func _boot_async(campaign: bool = false) -> void:
 			# ZERO log evidence — the wait may be long (cold backend), but
 			# it must never be mute
 			print("BOOT waiting for sidecar health (%.0f s)" % waited)
+
+
+func _boot_async(campaign: bool = false) -> void:
+	await _await_sidecars()
 	# Only NOW build the opening world. Building first meant rebuild_now()
 	# called _register_async against a backend that did not exist yet, which
 	# then raced the debounce timer's second rebuild — two registrations

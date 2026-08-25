@@ -140,6 +140,11 @@ var _zone_anchor: Dictionary = {}  # zone id -> Vector2 tile centroid
 var _models_shown := true
 var _strategic: MeshInstance3D
 var _strategic_dirty := false
+var _flow: Variant = null  # flow_layer.gd (untyped: preload-by-path script)
+# starts EQUAL to BuildSession.build_seq's initial 0: the poll must fire
+# only after a real registered build, or the first 0.4 s tick clobbers a
+# probe-built flow mesh with the empty last_build (found by the probe)
+var _flow_build_seq := 0
 var _sky_material: ProceduralSkyMaterial
 var _city_lights: MultiMeshInstance3D
 var _city_lights_material: StandardMaterial3D
@@ -176,6 +181,11 @@ func _ready() -> void:
 	_strategic.material_override = strategic_material
 	_strategic.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_strategic)
+	# C2: animated power-flow dashes over the ribbons (preload by path —
+	# the sandbox_panel headless-cache lesson); rebuilt when a REGISTERED
+	# topology changes (BuildSession.build_seq), not on world edits
+	_flow = preload("res://views/rendering/flow_layer.gd").new()
+	add_child(_flow)
 	World.world_changed.connect(redraw)
 	tile_clicked.connect(_apply_tool)
 	redraw()
@@ -259,6 +269,9 @@ func _apply_camera() -> void:
 		# the countryside pink; the band overlaps the model band slightly
 		# so the handover never shows a gridless frame
 		_strategic.visible = _zoom > 30.0
+		if _flow != null:
+			_flow.visible = _strategic.visible
+			_flow.set_zoom(_zoom)
 	_stream_dirty = true
 
 
@@ -370,6 +383,8 @@ func _apply_daylight(tod: float) -> void:
 		var level := 0.25 + 0.75 * day_f
 		(_strategic.material_override as StandardMaterial3D).albedo_color = \
 			Color(level, level, level)
+		if _flow != null:
+			_flow.set_day_level(level)  # ShaderMaterial: uniform, not albedo
 
 
 ## One emissive quad per lit tile — built once per map. With the urban
@@ -498,6 +513,11 @@ func _process(delta: float) -> void:
 		_note_accum = 0.0
 		_sync_notes()
 		_update_light_supply()
+		# flow ribbons follow the REGISTERED topology (line ids live there)
+		if _flow != null and _flow_build_seq != BuildSession.build_seq:
+			_flow_build_seq = BuildSession.build_seq
+			_flow.build_from((BuildSession.last_build.get("interpretation", {})
+				as Dictionary).get("line_paths", {}), ground_y)
 	_drain_pending_budgeted()
 
 
@@ -979,7 +999,7 @@ func _sync_notes() -> void:
 			var pin := n.get_node("pin") as Sprite3D
 			pin.pixel_size = _zoom * 0.0001
 			var note := n.get_node("note") as SiteNote
-			note.apply_zoom(_zoom)
+			note.apply_zoom(_zoom * chart_scale(_zoom))
 			note.position.y = PIN_TEX_H * pin.pixel_size
 			if fresh or block_changed:
 				note.refresh()
@@ -1025,17 +1045,37 @@ func _make_chart(key: String, e: Dictionary) -> Node3D:
 
 
 ## The pins are the chart TOGGLES: hit-test a click against every visible
-## pin's screen box (billboards have no collision shapes to pick).
+## pin's screen box (billboards have no collision shapes to pick). The box
+## derives from the pin's PROJECTED height — the old fixed ±16/−40 px box
+## was 1080p geometry as constants: on a taller viewport it covered less
+## than half the pin, which read as "charts won't open at bird zoom"
+## (C2 owner report — the mechanism was never zoom-gated, the box was
+## just too small to hit).
 func _pin_hit(mouse: Vector2) -> String:
+	var up := camera.global_transform.basis.y
 	for key: String in _notes:
 		var node := (_notes[key] as Dictionary)["node"] as Node3D
 		if not is_instance_valid(node):
 			continue
+		var pin := node.get_node_or_null("pin") as Sprite3D
+		if pin == null:
+			continue
+		var world_h := PIN_TEX_H * pin.pixel_size
 		var anchor := camera.unproject_position(node.global_position)
-		if absf(mouse.x - anchor.x) < 16.0 \
-				and mouse.y > anchor.y - 40.0 and mouse.y < anchor.y + 6.0:
+		var top := camera.unproject_position(node.global_position + up * world_h)
+		if pin_hit_rect(anchor, top.y).has_point(mouse):
 			return key
 	return ""
+
+
+## The clickable screen box for a pin whose tip projects to `anchor` and
+## whose head projects to `top_y` (top_y < anchor.y on screen). Static and
+## geometry-derived so the test suite can pin its invariants the fog_band
+## way: full pin coverage at any viewport size, never below finger size.
+static func pin_hit_rect(anchor: Vector2, top_y: float) -> Rect2:
+	var h := maxf(anchor.y - top_y, 24.0)  # finger-size floor
+	var w := maxf(h * (220.0 / 328.0), 24.0)  # the pin SVG's aspect
+	return Rect2(anchor.x - w * 0.5 - 4.0, top_y - 6.0, w + 8.0, h + 12.0)
 
 
 func _make_tag(key: String, e: Dictionary) -> Node3D:
@@ -1082,6 +1122,40 @@ func _scale_tag(tag: Node3D, zoom: float) -> void:
 	# bottom-aligned text: its lowest line starts this gap above the pin
 	# head and grows upward — fully clear at any line count
 	label.position.y = PIN_TEX_H * pin.pixel_size + 26.0 * label.pixel_size
+
+
+## Probe-only (SHOT_FLOW): build the flow layer straight from a topology
+## interpretation and feed deterministic synthetic flows, so the LOOK can
+## be reviewed without a backend (alternating directions, spread loadings).
+func probe_flow(line_paths: Dictionary) -> void:
+	if _flow == null:
+		return
+	_flow.build_from(line_paths, ground_y)
+	var flow_mesh: ArrayMesh = _flow.mesh
+	var sample_tile: Vector2i = Vector2i.ZERO
+	if not line_paths.is_empty():
+		sample_tile = (line_paths[line_paths.keys()[0]] as Array)[0]
+	print("PROBE_FLOW lines=%d surfaces=%d visible=%s ground_y(%s)=%.2f" % [
+		line_paths.size(), flow_mesh.get_surface_count() if flow_mesh != null else -1,
+		str(_flow.visible), str(sample_tile), ground_y(sample_tile)])
+	var fake := {}
+	var i := 0
+	for line_id: String in line_paths:
+		fake[line_id] = {"p_from_mw": (1.0 if i % 2 == 0 else -1.0) * 500.0,
+			"loading_percent": float(15 + (i * 13) % 85)}
+		i += 1
+	_flow._on_step(0, {"pf": {"latest": {"lines": fake}}})
+
+
+## Above the model band the zone chart is the STRATEGIC reading surface —
+## grow it toward 1.7× of its constant screen size so the aggregated
+## load/generation curves stay legible from orbit (C2 owner request).
+## Continuous at the band edge; static so the invariants are testable.
+static func chart_scale(zoom: float) -> float:
+	if zoom <= MODEL_DETAIL_MAX_SIZE:
+		return 1.0
+	return minf(1.7, 1.0 + 0.7 * (zoom - MODEL_DETAIL_MAX_SIZE)
+		/ (MAX_ZOOM - MODEL_DETAIL_MAX_SIZE))
 
 
 func _anchor_of(zone: String) -> Vector2:
