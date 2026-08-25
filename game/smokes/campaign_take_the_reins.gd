@@ -31,6 +31,8 @@ func run() -> void:
 	if not Campaign.load_data():
 		_fail(TAG, "campaign_v1.json missing")
 		return
+	# a smoke run must never clobber the player's real retry point
+	Campaign.autosave_path = "user://autosave_milestone_smoke.json"
 	Campaign.start_campaign()
 	Campaign.milestone_passed.connect(func(id: String, stars: int) -> void:
 		print("CAMPAIGN milestone_passed ", id, " stars ", stars)

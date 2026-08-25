@@ -57,6 +57,14 @@ func load_scenario(id: String) -> bool:
 	if not _apply_world():
 		return false
 
+	# Mid-campaign recipes (C1): the clock moves BEFORE the campaign arms,
+	# so start_campaign() applies the era/year the recipe's day implies.
+	# Wire t is a sequence number (ledger 3) — the backend is indifferent.
+	# ALWAYS set (default 0): a recipe without start_day must not inherit
+	# the previous recipe's clock. The billing counter re-anchors with it.
+	GameClock.t_sim = float(recipe.get("start_day", 0.0)) * GameClock.SECONDS_PER_DAY
+	Economy.sync_billing_day()
+
 	# Sandbox/campaign are mutually exclusive framings of the same world.
 	if bool(recipe.get("sandbox", false)):
 		Sandbox.start(str(recipe.get("difficulty", "normal")))
@@ -65,6 +73,12 @@ func load_scenario(id: String) -> bool:
 		Sandbox.set_difficulty(str(recipe.get("difficulty", "normal")))
 		if Campaign.load_data():
 			Campaign.start_campaign()
+			if recipe.has("campaign"):
+				Campaign.apply_recipe_state(recipe["campaign"])
+
+	if (recipe.get("economy", {}) as Dictionary).has("treasury_eur"):
+		Economy.treasury_eur = float(
+			(recipe["economy"] as Dictionary)["treasury_eur"])
 
 	Weather.clear_forces()
 	for force: Dictionary in recipe.get("forces", []):

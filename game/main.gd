@@ -48,6 +48,16 @@ const SMOKE_PORTS := {
 	"save_load_replay": 8041,
 	"campaign_take_the_reins": 8042,
 	"soak": 8043,
+	# campaign-arc smokes (C2-C9) — ports reserved at C1 so the §3 range
+	# is claimed once, not renegotiated per phase
+	"campaign_merit_order": 8044,
+	"campaign_green_gigawatts": 8045,
+	"campaign_dunkelflaute": 8046,
+	"black_start": 8047,
+	"campaign_coal_exit": 8048,
+	"campaign_hydrogen_loop": 8049,
+	"campaign_inverter_grid": 8050,
+	"syncon_inertia": 8051,
 }
 
 

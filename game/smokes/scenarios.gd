@@ -52,4 +52,32 @@ func run() -> void:
 		Scenario.load_scenario(id)
 		forced += (Scenario.recipe.get("forces", []) as Array).size()
 	check("forces_declared_somewhere", forced > 0)
-	_finish(TAG, {"scenarios": summary, "build_recipe": build_id})
+
+	# C1: a MID-CAMPAIGN recipe (start_day + milestone_index + treasury)
+	# loads twice to identical state — the gate for the recipe machinery
+	# every campaign slice starts through.
+	var mid_id := ""
+	for id: String in ids:
+		World.clear_build()
+		if Scenario.load_scenario(id) and Scenario.recipe.has("start_day"):
+			mid_id = id
+			break
+	check("midcampaign_recipe_present", mid_id != "")
+	if mid_id != "":
+		var world_1 := JSON.stringify(World.serialize(), "", false, true)
+		var campaign_1 := JSON.stringify(Campaign.to_dict(), "", false, true)
+		var t_1 := GameClock.t_sim
+		var treasury_1 := Economy.treasury_eur
+		World.clear_build()
+		Scenario.load_scenario(mid_id)
+		check("midcampaign_world_identical",
+			JSON.stringify(World.serialize(), "", false, true) == world_1)
+		check("midcampaign_campaign_identical",
+			JSON.stringify(Campaign.to_dict(), "", false, true) == campaign_1)
+		check("midcampaign_clock_set", GameClock.t_sim == t_1 and t_1 > 0.0)
+		check("midcampaign_milestone", Campaign.milestone_index == 1)
+		check("midcampaign_treasury", Economy.treasury_eur == treasury_1)
+	Campaign.active = false  # leave the process in sandbox mode
+
+	_finish(TAG, {"scenarios": summary, "build_recipe": build_id,
+		"midcampaign_recipe": mid_id})

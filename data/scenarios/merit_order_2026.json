@@ -1,0 +1,19 @@
+{
+  "id": "merit_order_2026",
+  "title": "The Merit Order (2026)",
+  "description": "Start at milestone 2, one game-year in: the CO2 price jumps to 60 €/t mid-year and the coal/gas merit order flips under you. Hold the cost line without shedding load.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "world": "data/campaign/start_2025.json",
+  "start_day": 12,
+  "campaign": {
+    "milestone_index": 1
+  },
+  "economy": {
+    "treasury_eur": 2000000000.0,
+    "_rationale": "C1 fixture value: enough to operate, not enough to ignore the cost axis — C2's balancing pass re-derives it with the milestone's cost tiers."
+  },
+  "_why_start_day": "The first mid-campaign recipe (C1): start_day 12 is milestone 2's window open; the day-18 first_ratchet era boundary lands inside the window. The clock moves before the campaign arms, so the era script applies at the recipe's day.",
+  "forces": []
+}

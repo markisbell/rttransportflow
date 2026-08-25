@@ -380,15 +380,20 @@ def result_latest(request: Request) -> dict:
 
 
 @router.get("/snapshot")
-def snapshot(request: Request) -> dict:
+async def snapshot(request: Request) -> dict:
     gb = _gb(request)
-    return {
-        "t": gb.last_t,
-        "t_sim": gb.sim.integrator.t_us / US,
-        "model_hash": gb.model_hash,
-        "version": SIM_SNAPSHOT_VERSION,
-        "blob": gb.sim.state_blob(),  # repr floats — bit-exact (v2: + topology)
-    }
+    # Serialize with the step channel: the game's SaveLoad waits for its
+    # own in-flight step, but between that check and this GET a new step
+    # can start — an unlocked read would serialize a half-advanced engine
+    # into the save (C1 review).
+    async with gb.lock:
+        return {
+            "t": gb.last_t,
+            "t_sim": gb.sim.integrator.t_us / US,
+            "model_hash": gb.model_hash,
+            "version": SIM_SNAPSHOT_VERSION,
+            "blob": gb.sim.state_blob(),  # repr floats — bit-exact (v2: + topology)
+        }
 
 
 @router.post("/replay")

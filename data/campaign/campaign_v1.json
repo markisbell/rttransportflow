@@ -1,6 +1,7 @@
 {
     "version": 1,
     "_authority": "docs/GAME_DESIGN.md §5 (premise, milestones, failure states) + §3.4 (tariff script) + §4.3 (unlock years). Family rule: every number carries a rationale. Star convention (noted per §4.7 'thresholds authored in the campaign script'): where §5 gives a single pass number, ★★ = pass, ★★★ = pass with ~20 % margin, ★ = near-miss within ~10 % — encoded explicitly per milestone below.",
+    "_ufls_counting": "D1 (ledger 50): every UFLS threshold in this file counts INCIDENTS — one per island per 15-min block, stages coalesced (campaign.gd keys on the wire event's own t_sim). A single excursion walks several stages in seconds; counting pickups would make the §5 thresholds bite ~5× harder than the design's 'events' language intends.",
     "calendar": {
         "start_year": 2025,
         "days_per_year": 12,
@@ -344,7 +345,7 @@
         "dismissed_ufls": {
             "count": 12,
             "within_days": 12,
-            "_rationale": "§5.3: > 12 UFLS events in a year."
+            "_rationale": "§5.3: > 12 UFLS events in a year — events = incidents per the top-level _ufls_counting note (D1, ledger 50)."
         },
         "coal_deadline": {
             "day": 120,

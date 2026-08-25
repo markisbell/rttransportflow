@@ -20,6 +20,12 @@ var capex_spent := 0.0
 var voll_penalty := 0.0
 var reserve_income := 0.0
 var redispatch_cost := 0.0
+var penalty_cost := 0.0
+## §4.7 cost axis (D2, ledger 51): the annuity is a KPI accumulator, NOT a
+## treasury debit — capex was already paid in full on placement; charging
+## the annuity to the treasury would pay twice. The campaign's cost window
+## bills its time-share of this number.
+var capex_annuity_eur := 0.0
 ## KPI accumulators
 var delivered_mwh := 0.0
 var unserved_mwh := 0.0
@@ -38,6 +44,14 @@ func setup(economy: Dictionary) -> void:
 	World.corridor_placed.connect(_on_corridor_placed)
 	World.substation_placed.connect(_on_substation_placed)
 	Orchestrator.step_completed.connect(_on_step)
+
+
+## Re-anchor the daily-billing counter to the CURRENT game day — called
+## when a recipe moves the clock (start_day). Without it the first step
+## after a day-12 recipe start would back-bill twelve days of FOM and
+## annuity in one lump.
+func sync_billing_day() -> void:
+	_fom_billed_days = int(GameClock.t_sim / GameClock.SECONDS_PER_DAY)
 
 
 func set_fleet(plants: Array, devices: Array = []) -> void:
@@ -102,13 +116,28 @@ func _spend_capex(eur: float) -> void:
 	books_updated.emit()
 
 
+## Regulatory fines (§4.7 penalties axis — D2, ledger 51): a books
+## category, not a raw treasury debit, so the campaign's cost window and
+## the KPI panel can see them.
+func book_penalty(eur: float) -> void:
+	penalty_cost += eur
+	treasury_eur -= eur
+	books_updated.emit()
+
+
 # --- per-step operating books --------------------------------------------
 
 func _on_step(_t: int, result: Dictionary) -> void:
 	var dt_h := float(result.get("dt_done_s", 0.0)) / 3600.0
 	if dt_h <= 0.0:
 		return
-	var t_days := float(result.get("t_sim_end", 0.0)) / 86400.0
+	# GAME time, not the wire's t_sim_end: the ENGINE clock restarts at 0
+	# on every rebuild-triggered net/reset, so engine days would price the
+	# wrong demand day for revenue and stall the daily FOM/annuity counter
+	# forever after the player's first build (C1 review). GameClock has
+	# already advanced to the step's end when step_completed fires — in a
+	# rebuild-free run the two clocks are identical.
+	var t_days := GameClock.t_sim / GameClock.SECONDS_PER_DAY
 	var tariff := float(cfg.get("tariff_eur_per_mwh", 95.0))
 	# unserved energy is priced by the difficulty knob (§5.3): the physics
 	# of a blackout never changes, only what it costs GridCo
@@ -183,10 +212,23 @@ func _bill_fom(days: int) -> void:
 		daily += (cfg["fom_eur_per_kw_a"] as Dictionary).get(kind, 0.0) * p_max * 1000.0 / 365.0
 	fom_cost += daily * days
 	treasury_eur -= daily * days
+	# same daily convention as FOM (/365 of the annual figure per sim-day)
+	capex_annuity_eur += capex_spent * _annuity_factor() / 365.0 * days
 	if treasury_eur < 0.0:
 		var interest: float = -treasury_eur * float(cfg.get("loan_rate_per_a", 0.04)) / 365.0 * days
 		loan_eur += interest
 		treasury_eur -= interest
+
+
+## Annuity factor r/(1-(1+r)^-n) from economy.json's capex_annuity block
+## (D2 default 6 %/25 a → ≈ 0.0782/a).
+func _annuity_factor() -> float:
+	var block: Dictionary = cfg.get("capex_annuity", {})
+	var r := float(block.get("rate_per_a", 0.06))
+	var n := float(block.get("years", 25))
+	if r <= 0.0:
+		return 1.0 / maxf(n, 1.0)
+	return r / (1.0 - pow(1.0 + r, -n))
 
 
 func avg_cost_eur_per_mwh() -> float:
@@ -212,6 +254,7 @@ func to_dict() -> Dictionary:
 		"voll_penalty": voll_penalty, "reserve_income": reserve_income,
 		"redispatch_cost": redispatch_cost, "delivered_mwh": delivered_mwh,
 		"unserved_mwh": unserved_mwh, "co2_t": co2_t,
+		"penalty_cost": penalty_cost, "capex_annuity_eur": capex_annuity_eur,
 		"fom_billed_days": _fom_billed_days,
 		"last_redispatch_seen": _last_redispatch_seen,
 	}
@@ -232,5 +275,7 @@ func from_dict(state: Dictionary) -> void:
 	delivered_mwh = float(state.get("delivered_mwh", 0.0))
 	unserved_mwh = float(state.get("unserved_mwh", 0.0))
 	co2_t = float(state.get("co2_t", 0.0))
+	penalty_cost = float(state.get("penalty_cost", 0.0))
+	capex_annuity_eur = float(state.get("capex_annuity_eur", 0.0))
 	_fom_billed_days = int(state.get("fom_billed_days", 0))
 	_last_redispatch_seen = float(state.get("last_redispatch_seen", 0.0))

@@ -17,6 +17,7 @@ signal milestone_passed(id: String, stars: int)
 signal milestone_failed(id: String, reason: String)
 signal campaign_failed(reason: String)
 signal era_changed(era: Dictionary)
+signal year_changed(y: int)
 
 const CAMPAIGN_PATH := "data/campaign/campaign_v1.json"
 const START_STATE_PATH := "data/campaign/start_2025.json"
@@ -53,6 +54,11 @@ static func build_inherited_world(world: Node) -> bool:
 	return GridPlan.author_start(world)
 const BLOCK_DAYS := 1.0 / 96.0
 
+## §5.3/D7: the retry point — saved when a milestone window opens.
+## A var, not a const: smokes redirect it so a test run never clobbers
+## the player's real retry point.
+var autosave_path := "user://autosave_milestone.json"
+
 var active := false
 var data: Dictionary = {}
 var era_index := -1
@@ -65,11 +71,24 @@ var failed_reason := ""
 var acc := {}
 ## failure-state trackers
 var insolvent_since_day := -1.0
-var blackout_days: Array = []  # sim-day stamps of blackout events
+var blackout_days: Array = []  # sim-day stamps of blackout INCIDENTS
 var ufls_days: Array = []
 var coal_fine_months_billed := 0
+## D1 (ledger 50): protection events coalesce into INCIDENTS — UFLS one
+## per island per 15-min block, blackouts one per block (a split cascade
+## birthing three dead pockets is ONE grid event, not three dismissals).
+## Keys derive from GAME time via the step-local offset, never from the
+## wire's t_sim directly: the ENGINE clock restarts at 0 on every
+## rebuild-triggered net/reset, so raw engine blocks collide across
+## registrations and would silently drop real incidents (C1 review).
+## Persisted: a save mid-block must not let the replayed continuation
+## count the same incident twice.
+var _incident_seen: Dictionary = {}  # "ufls|island:N|B" / "blackout|B" -> true
 
 var _last_eval_block := -1
+var _last_year := -1
+var _autosave_done := false   # for the CURRENT milestone's window
+var _autosave_block := -1     # retry cadence: one attempt per block
 
 
 func _ready() -> void:
@@ -97,6 +116,10 @@ func start_campaign() -> void:
 	blackout_days = []
 	ufls_days = []
 	coal_fine_months_billed = 0
+	_incident_seen = {}
+	_last_year = -1
+	_autosave_done = false
+	_autosave_block = -1
 	_reset_acc()
 	_apply_era(day_now())
 
@@ -171,9 +194,16 @@ func _on_step(_t: int, result: Dictionary) -> void:
 		return
 	var day := day_now()
 	_apply_era(day)
+	# unlock years do not align with era boundaries — the build palette
+	# re-greys on the year signal, not on era_changed
+	var y := year(day)
+	if y != _last_year:
+		_last_year = y
+		year_changed.emit(y)
 	_fire_scripted(day)
 	_accumulate(result, day)
 	_check_failures(day)
+	_maybe_autosave(day)
 	# evaluate once per 15-min block (steps can be shorter during events)
 	var block := int(day / BLOCK_DAYS)
 	if block != _last_eval_block:
@@ -235,7 +265,13 @@ func _fire_event(ev: Dictionary, day: float) -> void:
 					"kind": "trip", "element": unit})
 			if not events.is_empty():
 				Orchestrator.inject(events)
-				acc["double_contingency_fired"] = true
+			# D3 (ledger 52): record what ACTUALLY fired, per component —
+			# the exam is only real with both; a hub-less world must not
+			# pass its own finale by under-building (it degraded silently
+			# to a single trip before this).
+			acc["double_contingency_fired"] = true
+			acc["dc_hub_fired"] = hub != ""
+			acc["dc_unit_fired"] = unit != ""
 
 
 ## Entry AND exit staircased: instant λ steps relay out wind fleets (the
@@ -285,6 +321,7 @@ func _reset_acc() -> void:
 		"episode_saidi_min": 0.0, "final_year_ufls": 0, "final_year_blackouts": 0,
 		"trip_f_min": 100.0, "scripted_trip_pending": false,
 		"scripted_trip_seen": false, "double_contingency_fired": false,
+		"dc_hub_fired": false, "dc_unit_fired": false,
 		"double_contingency_blackout": false,
 		"cost_window_start": {}, "redispatch_window_start_eur": -1.0,
 	}
@@ -293,25 +330,50 @@ func _reset_acc() -> void:
 func _accumulate(result: Dictionary, day: float) -> void:
 	var milestone := current_milestone()
 	var window: Array = milestone.get("window_days", [0, 0])
-	if day < float(window[0]):
-		return
+	# The failure trackers (ufls_days / blackout_days) see EVERY step — a
+	# day-8 blackout must reach _check_failures even though milestone 2's
+	# window opens at day 12. Only the milestone accumulators are
+	# window-guarded. (The guard used to sit above the whole scan, so the
+	# dismissal ladder was blind between windows.)
+	var in_window := day >= float(window[0])
 	for event: Dictionary in result.get("events", []):
 		var kind := str(event.get("kind", ""))
 		if kind == "ufls_stage":
-			acc["ufls_events"] = int(acc["ufls_events"]) + 1
+			# D1 (ledger 50): a single excursion walks several stages in
+			# seconds; §5's thresholds ("≤ 2 UFLS events", "> 12 a year")
+			# count INCIDENTS — one per island per 15-min block.
+			var key := "ufls|%s|%d" % [str(event.get("element", "")),
+				_event_game_block(event, result, day)]
+			if _incident_seen.has(key):
+				continue
+			_incident_seen[key] = true
 			ufls_days.append(day)
-			if _in_span(day, milestone.get("final_year_days", [])):
-				acc["final_year_ufls"] = int(acc["final_year_ufls"]) + 1
+			if in_window:
+				acc["ufls_events"] = int(acc["ufls_events"]) + 1
+				if _in_span(day, milestone.get("final_year_days", [])):
+					acc["final_year_ufls"] = int(acc["final_year_ufls"]) + 1
 		elif kind == "blackout":
-			acc["blackouts"] = int(acc["blackouts"]) + 1
-			blackout_days.append(day)
-			if _in_span(day, milestone.get("final_year_days", [])):
-				acc["final_year_blackouts"] = int(acc["final_year_blackouts"]) + 1
+			# exam truth first — never behind the incident dedup (D3)
 			if bool(acc.get("double_contingency_fired", false)):
 				acc["double_contingency_blackout"] = true
+			# D1: a split cascade birthing several dead pockets in one
+			# block is ONE incident for the §5.3 dismissal ladder — the
+			# hoisted trackers made raw per-island counting instantly
+			# fatal (3 pockets = dismissed), which no design text asks.
+			var key := "blackout|%d" % _event_game_block(event, result, day)
+			if _incident_seen.has(key):
+				continue
+			_incident_seen[key] = true
+			blackout_days.append(day)
+			if in_window:
+				acc["blackouts"] = int(acc["blackouts"]) + 1
+				if _in_span(day, milestone.get("final_year_days", [])):
+					acc["final_year_blackouts"] = int(acc["final_year_blackouts"]) + 1
 		elif kind == "trip" and bool(acc.get("scripted_trip_pending", false)):
 			acc["scripted_trip_pending"] = false
 			acc["scripted_trip_seen"] = true
+	if not in_window:
+		return
 	# nadir tracking while the scripted trip's aftermath settles
 	if bool(acc.get("scripted_trip_seen", false)):
 		for island_id: String in result.get("islands", {}):
@@ -338,10 +400,17 @@ func _accumulate(result: Dictionary, day: float) -> void:
 		acc["redispatch_window_start_eur"] = Economy.redispatch_cost
 
 
+## D2 (ledger 51): the §4.7 cost axis in FULL — annualized capex, loan
+## interest and regulatory penalties join the operating books, so "build
+## nothing" is no longer cost-free in the grade. The new keys read with
+## .get defaults: a snapshot saved before D2 stays loadable.
 func _books_snapshot() -> Dictionary:
 	return {"fuel": Economy.fuel_cost, "co2": Economy.co2_cost,
 		"vom": Economy.vom_cost, "fom": Economy.fom_cost,
 		"voll": Economy.voll_penalty, "redispatch": Economy.redispatch_cost,
+		"capex_annuity": Economy.capex_annuity_eur,
+		"interest": Economy.loan_eur,
+		"penalties": Economy.penalty_cost,
 		"delivered": Economy.delivered_mwh}
 
 
@@ -357,8 +426,26 @@ func _window_avg_cost() -> float:
 		+ (Economy.vom_cost - float(start["vom"])) \
 		+ (Economy.fom_cost - float(start["fom"])) \
 		+ (Economy.voll_penalty - float(start["voll"])) \
-		+ (Economy.redispatch_cost - float(start["redispatch"]))
+		+ (Economy.redispatch_cost - float(start["redispatch"])) \
+		+ (Economy.capex_annuity_eur - float(start.get("capex_annuity", Economy.capex_annuity_eur))) \
+		+ (Economy.loan_eur - float(start.get("interest", Economy.loan_eur))) \
+		+ (Economy.penalty_cost - float(start.get("penalties", Economy.penalty_cost)))
+	# missing keys (a pre-D2 snapshot) default to the CURRENT value so an
+	# absent axis contributes zero — a 0.0 default would bill the whole
+	# campaign's loan interest into one window (C1 review)
 	return cost / delivered
+
+
+## The event's 15-min block in GAME time. The wire's t_sim is the ENGINE
+## clock, which restarts at 0 on every rebuild-triggered net/reset — raw
+## engine blocks collide across registrations. The step-local offset is
+## exact: GameClock has already advanced to the step's end when
+## step_completed fires, so game_t = clock_now − (t_sim_end − event.t_sim).
+func _event_game_block(event: Dictionary, result: Dictionary, day: float) -> int:
+	var t_end := float(result.get("t_sim_end", 0.0))
+	var t_ev := float(event.get("t_sim", t_end))
+	var game_t := day * GameClock.SECONDS_PER_DAY - (t_end - t_ev)
+	return int(game_t / (BLOCK_DAYS * GameClock.SECONDS_PER_DAY))
 
 
 static func _in_span(day: float, span: Array) -> bool:
@@ -447,6 +534,7 @@ func _evaluate_milestone(day: float) -> void:
 		milestone_failed.emit(str(milestone["id"]), reason)
 	milestone_index += 1
 	_reset_acc()
+	_autosave_done = false  # the next milestone saves at ITS window open
 	_last_eval_block = int(day / BLOCK_DAYS)
 
 
@@ -505,11 +593,16 @@ func _first_unmet(criteria: Dictionary) -> String:
 				if h2_converted_mw() < float(v):
 					return key
 			"inverter_share_at_least":
-				pass  # tracked game-side post-v1: energy-share meter (P10)
+				pass  # C9 lands the measured energy-share accumulator
 			"gco2_per_kwh_below":
 				if Economy.g_co2_per_kwh() >= float(v):
 					return key
 			"double_contingency_survived":
+				# D3 (ledger 52): unmet when the exam could not fire as
+				# authored — both components, or no pass
+				if not (bool(acc.get("dc_hub_fired", false))
+						and bool(acc.get("dc_unit_fired", false))):
+					return key
 				if bool(acc.get("double_contingency_blackout", false)):
 					return key
 	return ""
@@ -533,6 +626,22 @@ func _stars(milestone: Dictionary) -> int:
 
 func notify_replay_viewed() -> void:
 	replay_viewed = true
+
+
+## Mid-campaign recipe overrides (C1): a scenario may start at milestone N
+## with pre-seeded state. Called AFTER start_campaign() — the clock is
+## already at the recipe's start_day, so eras/year are correct; this only
+## repositions the tracker.
+func apply_recipe_state(c: Dictionary) -> void:
+	milestone_index = int(c.get("milestone_index", milestone_index))
+	for ev_id: Variant in c.get("fired_events", []):
+		fired_events[str(ev_id)] = true
+	var seed_acc: Dictionary = c.get("acc", {})
+	for key: String in seed_acc:
+		acc[key] = seed_acc[key]
+	# no stale evaluation of skipped milestones: the next eval happens on
+	# the first block boundary at the CURRENT day
+	_last_eval_block = int(day_now() / BLOCK_DAYS)
 
 
 # ---------------------------------------------------------------- failure states
@@ -559,13 +668,15 @@ func _check_failures(day: float) -> void:
 		func(d: float) -> bool: return day - d < float(by_ufls.get("within_days", 12)))
 	if ufls_days.size() > int(by_ufls.get("count", 12)):
 		_fail("dismissed_ufls")
-	# coal deadline: monthly fines past the hard date
+	# coal deadline: monthly fines past the hard date — booked through the
+	# penalties category (D2/ledger 51), never a raw treasury debit, so the
+	# cost window sees them
 	var deadline: Dictionary = fails.get("coal_deadline", {})
 	if coal_mw() > 0.0 and day >= float(deadline.get("day", 120)):
 		var months_over := int(day - float(deadline.get("day", 120))) + 1
 		while coal_fine_months_billed < months_over:
 			coal_fine_months_billed += 1
-			Economy.treasury_eur -= float(deadline.get("fine_eur_per_month", 1e8))
+			Economy.book_penalty(float(deadline.get("fine_eur_per_month", 1e8)))
 
 
 func _fail(reason: String) -> void:
@@ -573,6 +684,45 @@ func _fail(reason: String) -> void:
 		return
 	failed_reason = reason
 	campaign_failed.emit(reason)
+
+
+# ---------------------------------------------------------------- autosave (§5.3/D7)
+
+## One save when the current milestone's window opens; a refused quiesce
+## (or an in-flight snapshot) retries next block, honestly logged. The
+## autosave flags are transient by design: after loading, re-saving the
+## same window start is a no-op in effect.
+func _maybe_autosave(day: float) -> void:
+	if _autosave_done or failed_reason != "":
+		return  # never overwrite the retry point with a doomed state
+	var window: Array = current_milestone().get("window_days", [0, 0])
+	if day < float(window[0]) or day >= float(window[1]):
+		return
+	var block := int(day / BLOCK_DAYS)
+	if block == _autosave_block:
+		return  # one attempt per block
+	_autosave_block = block
+	_do_autosave()
+
+
+func _do_autosave() -> void:
+	var res: Dictionary = await SaveLoad.save_game(autosave_path)
+	if bool(res.get("ok", false)):
+		_autosave_done = true
+		print("CAMPAIGN autosave: milestone %d window open -> %s"
+			% [milestone_index, autosave_path])
+	else:
+		print("CAMPAIGN autosave deferred (%s) — retry next block"
+			% str(res.get("reason", "")))
+
+
+## D7 (ledger 50-52 arc): failure offers a retry from the window-open
+## autosave; progression itself stays non-blocking (stars lost, rank
+## records it). Returns SaveLoad's result dictionary.
+func retry_from_milestone() -> Dictionary:
+	if not FileAccess.file_exists(autosave_path):
+		return {"ok": false, "reason": "no_autosave"}
+	return await SaveLoad.load_game(autosave_path)
 
 
 # ---------------------------------------------------------------- save/load
@@ -588,8 +738,10 @@ func to_dict() -> Dictionary:
 		"insolvent_since_day": insolvent_since_day,
 		"blackout_days": blackout_days.duplicate(),
 		"ufls_days": ufls_days.duplicate(),
+		"incident_seen": _incident_seen.keys(),
 		"coal_fine_months_billed": coal_fine_months_billed,
 		"last_eval_block": _last_eval_block,
+		"autosave_done": _autosave_done,
 	}
 
 
@@ -609,10 +761,24 @@ func from_dict(state: Dictionary) -> void:
 	var saved_acc: Dictionary = state.get("acc", {})
 	for key: String in saved_acc:
 		acc[key] = saved_acc[key]
+	# pre-D3 saves fired the exam without per-component flags — grandfather
+	# the old all-or-nothing semantics rather than making it unpassable
+	if bool(acc.get("double_contingency_fired", false)) \
+			and not saved_acc.has("dc_hub_fired"):
+		acc["dc_hub_fired"] = true
+		acc["dc_unit_fired"] = true
 	insolvent_since_day = float(state.get("insolvent_since_day", -1.0))
 	blackout_days = (state.get("blackout_days", []) as Array).duplicate()
 	ufls_days = (state.get("ufls_days", []) as Array).duplicate()
+	_incident_seen = {}
+	for key: Variant in state.get("incident_seen", []):
+		_incident_seen[str(key)] = true
 	coal_fine_months_billed = int(state.get("coal_fine_months_billed", 0))
 	_last_eval_block = int(state.get("last_eval_block", -1))
+	_last_year = -1
+	# persisted: a mid-window manual save must NOT re-arm the autosave and
+	# silently migrate the D7 retry point forward (C1 review)
+	_autosave_done = bool(state.get("autosave_done", false))
+	_autosave_block = -1
 	if active:
 		_apply_era(day_now())

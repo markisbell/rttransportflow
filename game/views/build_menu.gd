@@ -69,6 +69,7 @@ const ITEMS := [
 var _tab_rows := {}      # cat -> HBoxContainer
 var _tab_buttons := {}   # cat -> Button
 var _tool_buttons := {}  # tool_id -> Button
+var _tool_tips := {}     # tool_id -> base tooltip (locked state appends)
 var _tool_group := ButtonGroup.new()
 var _tab_group := ButtonGroup.new()
 var _active_tool := ""
@@ -126,6 +127,28 @@ func _ready() -> void:
 	show_category(probe if _tab_rows.has(probe) else str(ITEMS[0]["cat"]))
 	_render_thumbnails.call_deferred()
 
+	# Unlock-year gating (C1): the palette greys locked tools and re-greys
+	# on the year signal (unlock years do not align with era boundaries).
+	Campaign.year_changed.connect(func(_y: int) -> void: refresh_locks())
+	refresh_locks()
+
+
+## The TOOL layer enforces unlocks, never WorldModel.can_place_plant —
+## authoring, recipes and smokes place freely (§5.4 "sandbox is also where
+## smokes run"); the player's palette is what the campaign gates.
+func refresh_locks() -> void:
+	for tool_id: String in _tool_buttons:
+		var button: Button = _tool_buttons[tool_id]
+		var open := Campaign.unlocked(tool_id)
+		button.disabled = not open
+		if open:
+			button.tooltip_text = str(_tool_tips.get(tool_id, ""))
+		else:
+			button.tooltip_text = "%s\n[locked — unlocks %d]" \
+				% [_tool_tips.get(tool_id, ""), Campaign.unlock_year(tool_id)]
+			if _active_tool == tool_id:
+				button.button_pressed = false  # toggled(false) clears the tool
+
 
 func show_category(cat: String) -> void:
 	for name: String in _tab_rows:
@@ -154,6 +177,7 @@ func _make_tile(item: Dictionary) -> Button:
 	button.focus_mode = Control.FOCUS_NONE
 	button.text = str(item["label"]).substr(0, 1)  # until the 3D icon lands
 	button.tooltip_text = "%s\n%s" % [item["label"], item["desc"]]
+	_tool_tips[tool_id] = button.tooltip_text
 
 	# neutral slate so the 3D thumbnail carries the identity; the network
 	# colour survives as a slim bottom accent

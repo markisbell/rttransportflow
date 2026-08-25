@@ -20,6 +20,10 @@ const QUIESCE_DF_HZ := 0.2
 signal save_completed(ok: bool, reason: String)
 signal load_completed(ok: bool, reason: String)
 
+## Named test seam (the Orchestrator.bridge_override pattern): GdUnit runs
+## the save path against a fake snapshot bridge, no backend required.
+var bridge_override: Object = null
+
 
 func quiesced() -> bool:
 	var islands: Dictionary = Orchestrator.latest().get("islands", {})
@@ -34,17 +38,28 @@ func quiesced() -> bool:
 	return true
 
 
+var _busy := false
+
+
 func save_game(path: String = DEFAULT_PATH, force: bool = false) -> Dictionary:
+	if _busy:
+		# reentrancy latch: an autosave racing the HUD's manual save would
+		# leave the LAST completer's speed restore standing (speed 0 if it
+		# captured mid-pause) — one save at a time, the loser reports
+		return {"ok": false, "reason": "save_in_progress"}
 	if not force and not quiesced():
 		save_completed.emit(false, "not_quiesced")
 		return {"ok": false, "reason": "not_quiesced"}
+	_busy = true
 	var prev_speed := GameClock.speed
 	GameClock.pause()
 	while Orchestrator.in_flight:  # quiesce: no half-applied step in the save
 		await get_tree().create_timer(0.05).timeout
-	var snap: Dictionary = await CosimBridge.snapshot(Orchestrator.ID)
+	var bridge: Object = bridge_override if bridge_override != null else CosimBridge
+	var snap: Dictionary = await bridge.snapshot(Orchestrator.ID)
 	if snap.get("_status", 0) != 200:
 		GameClock.speed = prev_speed
+		_busy = false
 		save_completed.emit(false, "snapshot_failed")
 		return {"ok": false, "reason": "snapshot_failed"}
 	var envelope := {
@@ -64,11 +79,13 @@ func save_game(path: String = DEFAULT_PATH, force: bool = false) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		GameClock.speed = prev_speed
+		_busy = false
 		save_completed.emit(false, "write_failed")
 		return {"ok": false, "reason": "write_failed"}
 	file.store_string(JSON.stringify(envelope, "", false, true))
 	file.close()
 	GameClock.speed = prev_speed
+	_busy = false
 	save_completed.emit(true, "")
 	return {"ok": true, "reason": "", "path": path}
 

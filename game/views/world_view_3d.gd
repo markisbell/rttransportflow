@@ -1208,6 +1208,8 @@ func _tint(node: Node, color: Color) -> void:
 func valid_here(tile: Vector2i) -> bool:
 	if tool_id == "":
 		return false
+	if not Campaign.unlocked(tool_id):
+		return false  # unlock years gate the TOOLS, never the model (C1)
 	if tool_id.begins_with("corridor_"):
 		return World.can_place_corridor(tile, _corridor_kind())
 	if tool_id == "substation":
