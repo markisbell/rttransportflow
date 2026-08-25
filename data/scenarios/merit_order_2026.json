@@ -6,7 +6,7 @@
   "sandbox": false,
   "difficulty": "normal",
   "world": "data/campaign/start_2025.json",
-  "start_day": 12,
+  "start_day": 11.9,
   "campaign": {
     "milestone_index": 1
   },
@@ -14,6 +14,6 @@
     "treasury_eur": 2000000000.0,
     "_rationale": "C1 fixture value: enough to operate, not enough to ignore the cost axis — C2's balancing pass re-derives it with the milestone's cost tiers."
   },
-  "_why_start_day": "The first mid-campaign recipe (C1): start_day 12 is milestone 2's window open; the day-18 first_ratchet era boundary lands inside the window. The clock moves before the campaign arms, so the era script applies at the recipe's day.",
+  "_why_start_day": "The first mid-campaign recipe (C1/C2): 11.9 gives 0.1 day (~2.4 h) of UNGRADED settle before milestone 2's window opens at 12 — a recipe start is a legal COLD start (the engine boots on the authored startup profile against day-11.9 evening demand), and the settle transient sheds UFLS stage 1 on the way in (measured, C2 run 1); the M1 pattern (ungraded free-play before the graded exam) applies. The day-18 first_ratchet era boundary lands inside the window; the clock moves before the campaign arms, so the era script applies at the recipe's day.",
   "forces": []
 }

@@ -13,6 +13,44 @@ const WorldViewScript := preload("res://views/world_view_3d.gd")
 const ZOOMS: Array[float] = [5.0, 17.0, 44.0, 70.0, 120.0]
 
 
+## C2: the pin hit box derives from projected geometry, never fixed pixels
+## (the ±16/−40 px box was 1080p-only and made bird-zoom charts feel
+## unclickable on larger viewports). Invariants at representative pin
+## screen heights: full pin coverage with padding, finger-size floor.
+func test_pin_hit_rect_invariants() -> void:
+	for pin_h: float in [8.0, 24.0, 35.0, 47.0, 71.0, 140.0]:
+		var anchor := Vector2(500.0, 400.0)
+		var rect: Rect2 = WorldViewScript.pin_hit_rect(anchor, anchor.y - pin_h)
+		var ctx := "pin_h %.0f" % pin_h
+		# the whole pin, tip to head, is inside the box
+		assert_bool(rect.has_point(anchor)).override_failure_message(
+			"%s: tip not clickable" % ctx).is_true()
+		assert_bool(rect.has_point(Vector2(anchor.x, anchor.y - pin_h))) \
+			.override_failure_message("%s: head not clickable" % ctx).is_true()
+		# never below finger size, in either axis
+		assert_bool(rect.size.x >= 24.0 and rect.size.y >= 24.0) \
+			.override_failure_message("%s: below finger size" % ctx).is_true()
+		# horizontally centred on the pin
+		assert_float(rect.get_center().x).is_equal_approx(anchor.x, 0.001)
+
+
+## C2: the strategic chart scale is 1.0 through the model band, grows
+## continuously above it, and caps at 1.7 at MAX_ZOOM.
+func test_chart_scale_band() -> void:
+	assert_float(WorldViewScript.chart_scale(17.0)).is_equal(1.0)
+	assert_float(WorldViewScript.chart_scale(
+		WorldViewScript.MODEL_DETAIL_MAX_SIZE)).is_equal(1.0)
+	# continuity at the band edge
+	assert_float(WorldViewScript.chart_scale(
+		WorldViewScript.MODEL_DETAIL_MAX_SIZE + 0.01)).is_equal_approx(1.0, 0.001)
+	var mid: float = WorldViewScript.chart_scale(70.0)
+	assert_bool(mid > 1.0 and mid < 1.7).is_true()
+	assert_float(WorldViewScript.chart_scale(WorldViewScript.MAX_ZOOM)) \
+		.is_equal_approx(1.7, 0.001)
+	# monotone above the band
+	assert_bool(WorldViewScript.chart_scale(110.0) > mid).is_true()
+
+
 func test_fog_band_invariants() -> void:
 	for zoom: float in ZOOMS:
 		var band: Vector2 = WorldViewScript.fog_band(zoom)
