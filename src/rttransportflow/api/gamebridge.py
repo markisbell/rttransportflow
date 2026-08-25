@@ -52,6 +52,13 @@ class GbState:
         self.last_t: int | None = None
         self.last_result: dict[str, Any] | None = None
         self.lock = asyncio.Lock()  # strictly sequential step channel
+        # Fairness gate for readers (snapshot): asyncio.Lock BARGES — a
+        # back-to-back stepper re-acquires before a woken waiter runs, and
+        # a snapshot request measured 35 s of starvation under a smoke's
+        # tight loop (C2). Steps touch the gate briefly BEFORE taking the
+        # step lock; a reader holds it across its read, so at most one
+        # in-flight step stands between a reader and the lock.
+        self.gate = asyncio.Lock()
         # reset ingredients — /gb/replay rebuilds a THROWAWAY sim from these
         self.data: Any = None
         self.wire_devices: list[dict] = []
@@ -341,6 +348,8 @@ async def step_http(request: Request):
 
     gb = _gb(request)
     body = await request.json()
+    async with gb.gate:
+        pass  # yield to a waiting snapshot reader (see GbState.gate)
     async with gb.lock:
         result, error = await asyncio.to_thread(_handle_step, gb, body)
     if error is not None:
@@ -361,6 +370,8 @@ async def step_ws(websocket: WebSocket) -> None:
                 await websocket.send_json({"error": "no_network"})
                 continue
             try:
+                async with gb.gate:
+                    pass  # yield to a waiting snapshot reader
                 async with gb.lock:
                     result, error = await asyncio.to_thread(_handle_step, gb, body)
             except Exception as exc:  # noqa: BLE001 — a raise must not deafen the WS
@@ -385,8 +396,10 @@ async def snapshot(request: Request) -> dict:
     # Serialize with the step channel: the game's SaveLoad waits for its
     # own in-flight step, but between that check and this GET a new step
     # can start — an unlocked read would serialize a half-advanced engine
-    # into the save (C1 review).
-    async with gb.lock:
+    # into the save (C1 review). The gate is held across the read so a
+    # tight-loop stepper cannot barge the reader into starvation (C2:
+    # 35 s measured; every smoke-era autosave was silently timing out).
+    async with gb.gate, gb.lock:
         return {
             "t": gb.last_t,
             "t_sim": gb.sim.integrator.t_us / US,

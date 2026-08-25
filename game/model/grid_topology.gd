@@ -190,14 +190,20 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 					seen_edges[key_adj] = true
 					branches.append({"from": from_bus, "to": to_bus_adj,
 						"steps": 1, "kind": corridors[tile],
+						"path": [tile, next] as Array[Vector2i],
 						"authored": maxi(
 							int(world.corridor_circuits.get(tile, 0)),
 							int(world.corridor_circuits.get(next, 0)))})
 				continue
-			# walk the simple path until the next bus tile
+			# walk the simple path until the next bus tile — RECORDING the
+			# tile path (C2: the strategic flow animation maps line ids to
+			# corridor geometry; the walk always visited every tile, it just
+			# threw the list away). Path order runs from_bus → to_bus, so a
+			# positive wire p_from_mw flows path-FORWARD.
 			var prev := tile
 			var current := next
 			var steps := 1
+			var path: Array[Vector2i] = [tile, next]
 			var authored: int = maxi(int(world.corridor_circuits.get(tile, 0)),
 				int(world.corridor_circuits.get(next, 0)))
 			var dead_end := false
@@ -212,6 +218,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 					break
 				prev = current
 				current = forward[0]
+				path.append(current)
 				authored = maxi(authored, int(world.corridor_circuits.get(current, 0)))
 				steps += 1
 			if dead_end:
@@ -226,7 +233,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 				continue
 			seen_edges[edge_key] = true
 			branches.append({"from": from_bus, "to": to_bus, "steps": steps,
-				"kind": corridors[next], "authored": authored})
+				"kind": corridors[next], "path": path, "authored": authored})
 
 	# --- 4. attach plants and load centers to buses ---------------------
 	var plant_bus := {}  # pid -> bus index
@@ -356,6 +363,8 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	var needs := _branch_needs(kept_branches, gen_mva, load_mva)
 
 	var lines := {"lines": []}
+	var line_paths := {}  # "L%d" -> Array[Vector2i] (interpretation-only:
+	# the native doc is golden-pinned and the backend has no use for tiles)
 	var line_seq := 0
 	for branch: Dictionary in kept_branches:
 		# authored upgrades win where the local flow estimate cannot see
@@ -396,6 +405,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 			entry["c_nf_per_km"] = 230.0
 			entry["max_i_ka"] = 1.8
 		lines["lines"].append(entry)
+		line_paths[str(entry["id"])] = branch.get("path", [])
 		line_seq += 1
 	if lines["lines"].is_empty():
 		return {"ok": false, "error": "no branches between buses", "warnings": warnings}
@@ -459,6 +469,7 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 			"dropped_zones": dropped_zones,
 			"plant_bus": plant_bus,
 			"device_bus": device_bus,
+			"line_paths": line_paths,
 		},
 		"warnings": warnings,
 	}

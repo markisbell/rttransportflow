@@ -54,10 +54,26 @@ static func build_inherited_world(world: Node) -> bool:
 	return GridPlan.author_start(world)
 const BLOCK_DAYS := 1.0 / 96.0
 
-## §5.3/D7: the retry point — saved when a milestone window opens.
-## A var, not a const: smokes redirect it so a test run never clobbers
-## the player's real retry point.
+## §5.3/D7: the retry point — saved when a milestone window opens. ONE
+## FILE PER MILESTONE (autosave_file): the windows are contiguous, so the
+## next milestone's window-open save lands one block after a failure and
+## a single shared file would clobber the failed milestone's retry point
+## before the player can click Retry (C2 review, blocking). A var, not a
+## const: smokes redirect the BASE so a test run never clobbers the
+## player's real retry points.
 var autosave_path := "user://autosave_milestone.json"
+
+
+func autosave_file(index: int) -> String:
+	return autosave_path.replace(".json", "_m%d.json" % index)
+
+
+func index_of(milestone_id: String) -> int:
+	var milestones: Array = data.get("milestones", [])
+	for i in range(milestones.size()):
+		if str((milestones[i] as Dictionary).get("id", "")) == milestone_id:
+			return i
+	return -1
 
 var active := false
 var data: Dictionary = {}
@@ -706,23 +722,26 @@ func _maybe_autosave(day: float) -> void:
 
 
 func _do_autosave() -> void:
-	var res: Dictionary = await SaveLoad.save_game(autosave_path)
+	var path := autosave_file(milestone_index)
+	var res: Dictionary = await SaveLoad.save_game(path)
 	if bool(res.get("ok", false)):
 		_autosave_done = true
 		print("CAMPAIGN autosave: milestone %d window open -> %s"
-			% [milestone_index, autosave_path])
+			% [milestone_index, path])
 	else:
 		print("CAMPAIGN autosave deferred (%s) — retry next block"
 			% str(res.get("reason", "")))
 
 
-## D7 (ledger 50-52 arc): failure offers a retry from the window-open
-## autosave; progression itself stays non-blocking (stars lost, rank
-## records it). Returns SaveLoad's result dictionary.
-func retry_from_milestone() -> Dictionary:
-	if not FileAccess.file_exists(autosave_path):
+## D7 (ledger 50-52 arc): failure offers a retry from THAT milestone's
+## window-open autosave (default: the current one); progression itself
+## stays non-blocking (stars lost, rank records it). Returns SaveLoad's
+## result dictionary.
+func retry_from_milestone(index: int = -1) -> Dictionary:
+	var path := autosave_file(index if index >= 0 else milestone_index)
+	if not FileAccess.file_exists(path):
 		return {"ok": false, "reason": "no_autosave"}
-	return await SaveLoad.load_game(autosave_path)
+	return await SaveLoad.load_game(path)
 
 
 # ---------------------------------------------------------------- save/load

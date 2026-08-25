@@ -19,6 +19,10 @@ var enabled := false
 ## turns this on once the models are seeded; profile-based smokes leave it off.
 var use_gridco := false
 var last_build: Dictionary = {}
+## Bumped on every successful topology build — consumers that key work on
+## the REGISTERED topology (the flow layer's line-id mesh) poll this
+## instead of world_changed, which fires per edit before ids exist.
+var build_seq := 0
 var registered := false
 var _timer: Timer
 var _map_doc: Dictionary = {}
@@ -108,14 +112,24 @@ func _emit_status(ok: bool, message: String, warnings: Array) -> void:
 func _rebuild() -> void:
 	var sampler := Callable()
 	if use_gridco:
-		var day0 := floorf(GameClock.t_sim / 86400.0)
+		# Anchor the startup profile at NOW, not at floor(day): the engine's
+		# step counter restarts at 0 on every registration and indexes the
+		# profile from there, so profile[0] must be the demand of the first
+		# wire block. floor() left a day-11.9 EVENING registration cold-
+		# starting on a MIDNIGHT operating point — the multi-GW gap shed two
+		# UFLS stages before the first dispatch could ramp (C2, merit run 2;
+		# the mid-play-rebuild version of P6 discovery 3). At a t=0 boot
+		# t0 == floor(day) == 0, so every golden and boot smoke is
+		# byte-identical.
+		var t0 := GameClock.t_sim / 86400.0
 		sampler = func(lc_id: String, step: int) -> float:
-			return Demand.zone_mw_forecast(lc_id, day0 + step / 96.0)
+			return Demand.zone_mw_forecast(lc_id, t0 + step / 96.0)
 	var built := GridTopology.build(World, sampler)
 	last_build = built
 	if not built["ok"]:
 		_emit_status(false, str(built["error"]), built["warnings"])
 		return
+	build_seq += 1  # consumers keyed on the REGISTERED topology (flow layer)
 	Boundary.set_native(built["native"], built.get("devices", []),
 		built.get("hub_farms", {}))
 	_register_async(built)

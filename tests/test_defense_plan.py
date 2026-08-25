@@ -65,6 +65,11 @@ def test_ufls_stages_fire_and_arrest() -> None:
 
 
 def test_restoration_ramp_and_rearm() -> None:
+    ## C2 semantics: a UFLS-class shed restores ITSELF once the island
+    ## holds healthy through the 5-min gate — no game command needed (the
+    ## §2.2 ramp was always automatic in the design text; the old
+    ## request-only behavior parked one organic stage-1 shed as a
+    ## permanent 7.5 % brownout billing VoLL — found by the merit run).
     integ = worked_example_island()
     integ.advance(s_to_us(65.0), interrupt_on_event=False)
     assert integ.islands.w[0] == pytest.approx(0.925)
@@ -72,20 +77,39 @@ def test_restoration_ramp_and_rearm() -> None:
     # back to the 49.8 boundary and the ramp honestly stalls — verified)
     integ.queue.schedule(Event(integ.t_us + s_to_us(1.0), "load_step", "import",
                                {"island": 0, "delta_mw": -3000.0}))
-    # give it the 5-min healthy hold, then restore blocks
+    # ride through the 5-min healthy hold and past it: the ramp starts ON
+    # ITS OWN inside this advance — the new pin
     integ.advance(s_to_us(RESTORE_F_OK_US / 1e6 + 30.0), interrupt_on_event=False)
     assert float(integ.islands.f[0]) > 49.8
-    integ.defense.request_restore(0, 0.10)  # one 10 % block covers the 7.5 %
-    res = integ.advance(s_to_us(60.0), interrupt_on_event=False)
-    # 1 %/10 s: 60 s of ramp ≈ +6 %
-    assert 0.975 < float(integ.islands.w[0]) < 0.995
-    # the pickup transient dips f under 49.8 for a moment — the ramp
-    # correctly PAUSES for a fresh 5-min healthy hold before finishing
-    res = integ.advance(s_to_us(420.0), interrupt_on_event=False)
+    assert float(integ.islands.w[0]) > 0.925  # restoring without any request
+    # pickup transients may dip f under 49.8 and honestly re-gate the ramp
+    # for fresh 5-min holds — give it room, assert the OUTCOME
+    res = integ.advance(s_to_us(900.0), interrupt_on_event=False)
     assert float(integ.islands.w[0]) == pytest.approx(1.0)
     restored = [e for e in res.events if e.kind == "load_restored"]
     assert restored
     assert bool(integ.defense.stage_armed[0, 0])  # re-armed for the next event
+
+
+def test_deep_shed_stays_manual() -> None:
+    ## The ledger-34 boundary: below the UFLS floor (w < 0.55 — the
+    ## post-black-start reload regime) NOTHING restores automatically;
+    ## the game's staged restore_load blocks own it, because reloading a
+    ## freshly re-energized island un-staged collapses it again.
+    sync = [{"id": "g", "island": 0, "s_n": 10_000.0, "h": 4.0, "r": 0.05,
+             "db": 0.010, "fcr_band": 200.0, "p_max": np.inf, "p_min": 0.0,
+             "t_g": 0.5, "t_ch": 1e-3, "t_rh": 1e9, "f_hp": 1.0,
+             "ramp_mw_s": np.inf, "p_set": 4000.0}]
+    fleet = make_fleet(sync)
+    fleet.init_steady_state()
+    islands = make_island(8000.0, f_hz=50.0)
+    integ = Integrator(fleet, islands)
+    integ.islands.w[0] = 0.5  # deeper than 1 − UFLS_CUM_SHED = 0.55
+    integ.defense.restore_target_w[0] = 0.5
+    integ.advance(s_to_us(RESTORE_F_OK_US / 1e6 + 120.0),
+                  interrupt_on_event=False)
+    assert float(integ.islands.f[0]) > 49.8  # healthy the whole hold
+    assert float(integ.islands.w[0]) == pytest.approx(0.5)  # untouched
 
 
 def test_electrolyzer_interruptible_tier() -> None:

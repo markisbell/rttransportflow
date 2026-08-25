@@ -121,6 +121,20 @@ class DefensePlan:
         self.restore_target_w[island] = float(np.clip(
             self.restore_target_w[island] + fraction, 0.0, 1.0))
 
+    def _auto_restore_targets(self, islands, held: np.ndarray) -> None:
+        """UFLS-class sheds restore THEMSELVES once the 5-min-healthy gate
+        holds — the §2.2 ramp was always automatic in the design text; the
+        game's `restore_load` blocks remain the ONLY path for deeper
+        states (post-black-start reload, ledger 34: a black-started island
+        re-energizes near w = 0 and reloading it un-staged collapses it
+        again), hence the UFLS floor guard. Found by C2's merit run: with
+        restoration game-commanded and the game's command channel unbuilt
+        until C5, one organic stage-1 shed became a permanent 7.5 %
+        brownout billing VoLL for the rest of the campaign."""
+        auto = held & (islands.w >= 1.0 - UFLS_CUM_SHED) & (islands.w < 1.0)
+        if auto.any():
+            self.restore_target_w = np.where(auto, 1.0, self.restore_target_w)
+
     def tick(self, fleet, islands, t_us: int, dt_us: int,
              rocof_windowed: np.ndarray
              ) -> tuple[list[tuple[str, dict]], list[tuple[str, str, dict]]]:
@@ -144,6 +158,12 @@ class DefensePlan:
             self.f_ok_since_us = np.where(
                 f_ok, np.where(self.f_ok_since_us < 0, t_us,
                                self.f_ok_since_us), -1)
+            # the fast path is exactly where a post-shed island PARKS
+            # (healthy f, nothing latched, target == w) — the auto-raise
+            # must run here or a shed island never re-enters the main path
+            held = f_ok & (self.f_ok_since_us >= 0) \
+                & (t_us - self.f_ok_since_us >= RESTORE_F_OK_US)
+            self._auto_restore_targets(islands, held)
             return trips, events
 
         # --- automatic load relief: PHS pumping trips at 49.7 -------------
@@ -215,6 +235,7 @@ class DefensePlan:
             f_ok, np.where(self.f_ok_since_us < 0, t_us, self.f_ok_since_us), -1)
         held = f_ok & (self.f_ok_since_us >= 0) \
             & (t_us - self.f_ok_since_us >= RESTORE_F_OK_US)
+        self._auto_restore_targets(islands, held)  # mirror of the fast path
         for island in np.nonzero(held & (self.restore_target_w > islands.w))[0]:
             step = RESTORE_RAMP_PER_S * dt_s
             islands.w[island] = min(islands.w[island] + step,
