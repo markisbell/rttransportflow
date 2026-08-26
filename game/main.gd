@@ -25,6 +25,7 @@ const SMOKES := {
 	"author_start": "res://smokes/author_start.gd",
 	"campaign_take_the_reins": "res://smokes/campaign_take_the_reins.gd",
 	"campaign_merit_order": "res://smokes/campaign_merit_order.gd",
+	"campaign_green_gigawatts": "res://smokes/campaign_green_gigawatts.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",
 	"soak": "res://smokes/soak.gd",

@@ -1,0 +1,19 @@
+{
+  "id": "green_gigawatts_2027",
+  "title": "First Green Gigawatts (2027)",
+  "description": "Start at milestone 3, four days into its window: build 20+ GW of renewables and commit the North Sea hub program — HVDC unlocks mid-window in 2028 — while the scripted congestion day tests your corridors and zero UFLS is the bar.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "world": "data/campaign/start_2025.json",
+  "start_day": 28,
+  "campaign": {
+    "milestone_index": 2
+  },
+  "economy": {
+    "treasury_eur": 40000000000.0,
+    "_rationale": "C3 fixture: sized for the reference ★-tier build program (~10 GW onshore wind + ~5 GW solar + 3 GW offshore + a platform + batteries + spur corridors ≈ 30 B€ capex) with operating headroom; the arc's balancing pass may trim it."
+  },
+  "_why_start_day": "Day 28 sits four days inside milestone 3's window [24,48] — battery and no-longer-locked kinds are 2027-open, the HVDC/platform unlock (2028 = day 36) flips MID-RUN, which is exactly what the smoke must prove end to end (C1's year_changed enforcement live). Day 28 is 00:00 on a representative day, and ledger 53's now-anchored startup profile makes the cold start balanced.",
+  "forces": []
+}
