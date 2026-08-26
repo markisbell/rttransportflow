@@ -296,6 +296,55 @@ static func _free_flank(world: Node, site: Vector2i) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+## A tile a NEW, isolated DC cable may occupy: free, hvdc-legal, and not
+## 4-adjacent to any FOREIGN hvdc tile. The wire emitter forms links and
+## hubs from isolated exactly-2-station DC components — a hub cable laid
+## beside a project trench FUSES into a multi-station component and the
+## emitter drops the whole thing. The shipped start_2025 seed carried
+## exactly that: the BorWin export fused with the Suedlink-class overlay
+## near Diele into a 104-tile 5-station component — a DEAD hub with six
+## idle farms (~3 GW of the "2025 renewable base"), invisible to every
+## gate until C3's measured-hub assertion (ledger 44 for build programs).
+static func _hvdc_isolated(world: Node, tile: Vector2i) -> bool:
+	# crossing an AC line is LEGAL (the dc_overlay mechanism — a sea-to-
+	# inland cable must cross the coastal web); only hvdc-carrying tiles
+	# and their 4-neighbourhood are walls, because ADJACENCY fuses DC
+	# components in the emitter's flood fill
+	if str(world.corridors.get(tile, "")) == "hvdc" \
+			or world.dc_overlay.has(tile) \
+			or not world.can_place_corridor(tile, "hvdc"):
+		return false
+	for offset: Vector2i in GridTopology.NEIGHBORS:
+		var n := tile + offset
+		if str(world.corridors.get(n, "")) == "hvdc" \
+				or world.dc_overlay.has(n):
+			return false
+	return true
+
+
+static func _isolated_flank(world: Node, site: Vector2i) -> Vector2i:
+	for offset: Vector2i in GridTopology.NEIGHBORS:
+		var n := site + offset
+		if _hvdc_isolated(world, n):
+			return n
+	return Vector2i(-1, -1)
+
+
+## Lay an ISOLATED hvdc cable (DemoBuild.route BFS — flood-capped — with
+## the isolation predicate), so the component the emitter sees is exactly
+## this cable and its two stations.
+static func _lay_isolated_hvdc(world: Node, from_tile: Vector2i,
+		to_tile: Vector2i) -> bool:
+	var path := DemoBuild.route(world, from_tile, to_tile, false, {},
+		func(t: Vector2i) -> bool: return _hvdc_isolated(world, t))
+	if path.is_empty():
+		return false
+	for tile: Vector2i in path:
+		if not world.place_corridor(tile, "hvdc"):
+			return false
+	return true
+
+
 # ─── the campaign start world (inherited 2025) ────────────────────────
 
 ## Ladder rungs copied from the demo author's measured tuning: ~45 %
@@ -736,24 +785,40 @@ static func _hub_pass(world: Node, candidates: Array,
 			bight.append(p)
 			centroid += Vector2(t)
 	if bight.size() < 2:
+		print("hub pass BAIL: bight cluster ", bight.size())
 		return used  # no cluster, no platform
 	centroid /= bight.size()
 	var plat_site := DemoBuild.find_site(world, "offshore_platform",
 		Vector2i(int(centroid.x), int(centroid.y)), 8)
 	var diele: Vector2i = sub_tiles.get("diele", Vector2i(-1, -1))
 	if plat_site == Vector2i(-1, -1) or diele == Vector2i(-1, -1):
+		print("hub pass BAIL: plat_site=", plat_site, " diele=", diele)
 		return used
-	var conv_site := DemoBuild.find_site(world, "hvdc_converter", diele, 6)
+	# The converter WANTS Diele (TenneT's real landing) but the project
+	# trenches crowd it — an isolated flank is mandatory (see
+	# _hvdc_isolated: the fused hub was DEAD in the shipped seed), so the
+	# site steps outward ring by ring until the cable can land clean.
+	var conv_site := Vector2i(-1, -1)
+	var banned := {}
+	for _try in range(120):
+		var cand := DemoBuild.find_site(world, "hvdc_converter", diele, 30, banned)
+		if cand == Vector2i(-1, -1):
+			break
+		if _isolated_flank(world, cand) != Vector2i(-1, -1):
+			conv_site = cand
+			break
+		banned[cand] = true
 	if conv_site == Vector2i(-1, -1):
+		print("hub pass BAIL: no isolated converter site within 150 km of diele")
 		return used
 	var plat_pid: String = world.place_plant("offshore_platform", plat_site)
 	var conv_pid: String = world.place_plant("hvdc_converter", conv_site)
 	world.plants[plat_pid]["name"] = "BorWin platform"
 	world.plants[conv_pid]["name"] = "BorWin · Diele"
-	var flank_a := _free_flank(world, plat_site)
-	var flank_b := _free_flank(world, conv_site)
+	var flank_a := _isolated_flank(world, plat_site)
+	var flank_b := _isolated_flank(world, conv_site)
 	if flank_a == Vector2i(-1, -1) or flank_b == Vector2i(-1, -1) \
-			or not _lay(world, flank_a, flank_b, "hvdc"):
+			or not _lay_isolated_hvdc(world, flank_a, flank_b):
 		world.remove_plant(plat_pid)
 		world.remove_plant(conv_pid)
 		return used
