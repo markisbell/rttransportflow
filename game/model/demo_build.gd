@@ -37,6 +37,14 @@ static func route(world: Node, from_tile: Vector2i, to_tile: Vector2i,
 	# a continental-scale search (tens of thousands of tiles) goes quadratic
 	var came := {from_tile: from_tile}
 	while head < queue.size():
+		# Flood cap (ledger 29 made structural): a doomed or walled-off
+		# search otherwise floods the full 771 840-tile map — minutes of
+		# interpreted BFS that reads as a frozen game (C3: a
+		# corridor-excluding DC route from the open sea hung two full
+		# smoke runs at the same block). 60 k tiles ≈ a 275-tile-radius
+		# disc — any route worth laying is found long before this.
+		if came.size() > 60000:
+			return []
 		var current: Vector2i = queue[head]
 		head += 1
 		# stop_kinds narrows what counts as "existing": an AC plant spur
