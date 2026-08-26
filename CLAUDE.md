@@ -117,7 +117,8 @@ docs/GAME_DESIGN.md.
     read-only, off the step path) — physics implemented exactly once; the game
     never re-implements the swing model.
 13. **Tile = 50 km**, map 96×80, hard cap ≤ 150 buses / ≤ 300 branches
-    (infrastruct's ≤300-node budget lesson made binding).
+    (infrastruct's ≤300-node budget lesson made binding). **Re-opened by
+    ledger 55: now ≤ 180 / ≤ 360.**
 14. **Weather/demand/dispatch/economics game-side; physics/protection/meters
     backend-side** (family split). Wind/PV availability arrives as `avail_mw`.
 15. **Calendar**: 12 representative epoch-days per year + episode expansion
@@ -548,6 +549,17 @@ docs/GAME_DESIGN.md.
     collapses it again (ledger 34 stands, pinned by
     `test_deep_shed_stays_manual`). C5's scope shrinks to black-start
     manual restoration.
+
+55. **Node budget raised to ≤ 180 buses / ≤ 360 branches** (owner
+    decision re-opening ledger 13, 2026-08-26): the 145-bus realistic
+    world (ledgers 46/47) left milestone 3's designed 20 GW build-out
+    FIVE buses of headroom — C3's smoke measured the wall twice (234
+    buses scattered, 151 packed against existing substations): the
+    milestone was unplayable, and the later milestones build more.
+    Evidence for the raise: ADR-004's measured 300-bus warm NR at
+    5.16 ms; the C3 smoke's own runtime is the perf gate at the new
+    scale, and the §8 soak re-verifies. Warn threshold 150. Ledger 13's
+    discrete-unit pedagogy and the never-crash rules are untouched.
 
 ## 5. Key reference paths (sibling repos, same parent folder)
 
@@ -1731,6 +1743,102 @@ separate arc); the smoke stays local (~100 min).
 **Next:** C3 — slice M3 (First Green Gigawatts): `author_era`
 world + recipe, smoke `campaign_green_gigawatts` (8045), the day-36
 HVDC unlock flip as G2's end-to-end proof, the congestion staircase.
+
+### C3 — Slice M3: First Green Gigawatts (campaign arc, 2026-08-26)
+
+**Built:** milestone 3 playable and pinned. The smoke IS the reference
+play: `campaign_green_gigawatts` (8045) drives the
+green_gigawatts_2027 recipe days 28 → 48.03 and BUILDS the transition
+through the same World calls the UI makes, in two registration waves —
+day 28 (a three-pass program: units packed on existing substations'
+free sides, then ≤ 20 bounded park taps on the trunk, then adequacy
+batteries) and day 36+ (the hub program: one more 2 GW Bight platform
++ 3 far-shore farms + DC export + shore converter, gated on the LIVE
+unlock flip — G2's end-to-end proof, with `year_changed` observed
+mid-window). Coarse 900 s stepping except a fine 3×300 s band across
+the scripted congestion staircase. The recipe world is start_2025
+itself — the smoke's build IS the era progression, so `author_era`
+correctly debuts in C4 where a pre-built era world is first needed
+(plan deviation, documented).
+
+**The design collision (ledger 55):** the milestone was UNPLAYABLE as
+inherited — the 145-bus realistic world left FIVE buses of headroom
+under ledger 13's 150 cap. Run 1 measured the naive answer (scattered
+singles: 234 buses, one tap bus each — ledger 47 re-learned in four
+minutes); run 2 measured the packed answer still failing by ONE (151)
+with the substation ring too scarce for the program (~12 GW of free
+sides — the adequacy fleet already rings the real stations). Owner
+decision: the cap rises to ≤ 180 buses / ≤ 360 branches on ADR-004's
+measured evidence (300-bus warm NR at 5.16 ms); warn 150; the refusal
+test re-pins at a 200-tap comb; the C3 smoke's own 2400-block run is
+the perf evidence at the new scale.
+
+**The review earned its keep again (10 confirmed, 0 refuted):** run
+3's green verdict hid a POTEMKIN HUB — the DC cable claimed the shore
+converter's own tile, the refused `place_plant` went unchecked, the
+emitter dropped the one-station component, and the free-routing cable
+had FUSED with the inherited BorWin export ("touches N stations" in
+the run log) — a silently dead 4 GW "commitment" behind green
+placement checks: the ledger-44 commanded-not-measured shape applied
+to a BUILD PROGRAM, and the ★6 verdict survived because ledger 28
+legitimately grades commitment. Fixed with the north_sea_hub pattern
+(converter FIRST beside an AC tile, `_hvdc_free` routing,
+return-checked placement) plus MEASURED hub assertions: both
+platforms must register as `offshore_hub` devices and DELIVER in
+phase B. Also from the review: the year-flip check was vacuous (the
+boot's 2027 emission satisfied it — now pinned to the 2028 flip),
+loading now reads the step's `pf.window_extremes` (intra-step peaks,
+not last instants), cap exhaustion fails loudly, and the cost axis is
+documented as non-discriminative on the authored corridors
+(redispatch 0 — it states the ledgers-46/47 grid carries M3's
+congestion, not that the player managed it). The FIX itself then hung
+two full runs at day 36.00: the corridor-excluding DC route from the
+open sea walled the inland converter behind the corridor maze and the
+BFS flooded toward all 771 840 tiles — ledger 29's "a doomed site's
+BFS floods the full map" at 5 km scale, isolated in a 30-second
+harness after two 45-minute kills. Two fixes, both structural: the
+converter goes COASTAL (sorted by distance to the platform — Diele's
+real shape; the DC route measured 15 tiles in 0 ms), and
+`DemoBuild.route` gains a 60 k-tile flood cap so no caller can ever
+freeze the game on a doomed search again.
+
+**The measured-hub gate then found a SHIPPED-WORLD bug:** the
+inherited BorWin hub had been electrically DEAD in start_2025.json
+since ledger 46 — its export cable fused with the Suedlink-class
+project overlay near Diele into a 104-tile FIVE-station component,
+which the emitter's exactly-2-station rule drops whole: six bound
+farms (~3 GW of the "2025 renewable base") idled through every green
+gate, because north_sea_hub builds its own world and nothing ever
+asserted the seed's hub as a DEVICE. Fix in the author: hvdc hub
+cables lay ISOLATED (`_hvdc_isolated` — no tile 4-adjacent to foreign
+DC, because adjacency fuses components; crossing AC stays legal, the
+dc_overlay mechanism — the first isolation predicate walled the whole
+coast and silently authored a world with NO platform at all, caught
+by component analysis in seconds), with a ringed converter search
+that still lands at the real Diele. start_2025.json regenerated: the
+hub is a clean 40-tile 2-station component, 13 offshore farms, 203
+plants. FILED as an owner-directed follow-up: the seed's
+multi-station DC-project components (Suedlink-class, 3–5 stations
+fused via shared trenches) register nothing and always have — three
+2-station projects DO work; reviving the rest re-routes trenches and
+shifts flows continent-wide, a realism pass of its own. The
+re-baseline cascade (campaign ★★★, save_load, dispatch/economy
+prices, then the C3 gate) re-measures everything against the revived
+world — any price drift is the bug-fix re-baseline, landed with it.
+
+**Tests/acceptance:** GdUnit 61 (budget re-pin included; topology
+golden untouched — the constants only gate, never shape). **Milestone
+3 measured ★6 of 6** — RE 26 750 MW (clean ★★★ ≥ 24 000 with margin),
+hub 4 000 MW committed AND both hubs registered + delivering
+(post-fix run), zero UFLS and zero relay-outs across all twenty days,
+no blackouts, the staircase bites (window-extreme loading
+102.2 → 107.6) with redispatch 0 €. The battery pass placed 900 of
+its 3 000 MW quota (real substation-ring scarcity) and the window
+held zero-UFLS regardless. Regression triad green.
+
+**Next:** C4 — slice M4 (The Dunkelflaute): `author_era("green_push")`
+debuts, the §3.3 battery policy control, episode SAIDI's first
+execution, smoke `campaign_dunkelflaute` (8046).
 
 ## 7. Open questions for the project owner
 
