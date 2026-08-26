@@ -278,7 +278,7 @@ soak green; all smokes + suites green in the release CI matrix.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Python too slow for sub-stepped dynamics | Medium | High | P0 spike measures BEFORE the engine lands; struct-of-arrays NumPy + exact-lag integrator (6.9 µs/tick measured in planning); ALERT/CALM dual rate; PF is the dominant cost → `pf_interval_calm` knob; game hard cap ≤150 buses / ≤300 branches (ledger 13), perf budget measured with headroom at the 300-bus/150-device reference size (SPEC §5.7); budget asserted in CI |
+| Python too slow for sub-stepped dynamics | Medium | High | P0 spike measures BEFORE the engine lands; struct-of-arrays NumPy + exact-lag integrator (6.9 µs/tick measured in planning); ALERT/CALM dual rate; PF is the dominant cost → `pf_interval_calm` knob; game hard cap ≤180 buses / ≤360 branches (ledger 13, raised by ledger 55), perf budget measured with headroom at the 300-bus/150-device reference size (SPEC §5.7) |
 | Godot↔backend rate mismatch / frame stalls | Medium | High | scheduler unchanged from infrastruct (one-step lag, skip-never-stall); variable `dt_s` + early return keeps worst cases bounded; trajectory ≤512 samples |
 | Realism scope creep (rotor angles, EMT, OPF, market agents…) | High | Medium | honesty section pins modeled-vs-approximated; GAME_DESIGN §7 scope guards; every physics addition needs an analytic test first; ADRs record deliberate omissions |
 | Balancing difficulty (economics × physics coupled) | High | Medium | physics pinned (P2–P3) *before* economics (P6); constants with rationale + regenerating smokes; window assertions, never instants |

@@ -70,19 +70,19 @@ func test_unconnected_load_center_is_dropped_with_warning() -> void:
 
 
 func test_node_budget_refusal() -> void:
-	# Synthetic 320-wide plain: a trunk with 160 SPACED plant taps (spaced so
-	# the bus tiles cannot collapse) exceeds the 150-bus hard cap.
+	# Synthetic 400-wide plain: a trunk with 200 SPACED plant taps (spaced so
+	# the bus tiles cannot collapse) exceeds the 180-bus hard cap (ledger 55).
 	BuildSession.enabled = false
 	var rows: Array = []
 	for _y in range(5):
-		rows.append("p".repeat(320))
-	var doc := {"version": 1, "width": 320, "height": 5, "tile_km": 50.0,
+		rows.append("p".repeat(400))
+	var doc := {"version": 1, "width": 400, "height": 5, "tile_km": 50.0,
 		"terrain_rows": rows, "resources": [], "load_centers": []}
 	assert_bool(World.load_map(doc)).is_true()
 	World.clear_build()
-	for x in range(320):
+	for x in range(400):
 		World.place_corridor(Vector2i(x, 1))
-	for i in range(160):
+	for i in range(200):
 		assert_str(World.place_plant("gas_ocgt", Vector2i(i * 2, 2))).is_not_empty()
 	var built := GridTopology.build(World)
 	assert_bool(built["ok"]).is_false()

@@ -14,8 +14,13 @@ extends RefCounted
 ## the reference island (multi-island operation arrives with P8 protection).
 
 const SINUOSITY := 1.12
-const BUS_WARN := 120
-const BUS_REFUSE := 150
+## Ledger 55 (owner decision, 2026-08-26): raised from 120/150 — the
+## 145-bus realistic world (ledgers 46/47) left milestone 3's 20 GW
+## build-out FIVE buses of headroom, an unplayable wall. ADR-004
+## measured a 300-bus warm NR at 5.16 ms, so the physics has room; the
+## C3 smoke's own runtime is the perf evidence at the new scale.
+const BUS_WARN := 150
+const BUS_REFUSE := 180
 ## Circuits per corridor. A 400 kV right-of-way carries four circuits in
 ## practice (~2.5 GVA); two circuits (~1.26 GVA) cannot even evacuate a
 ## single 1.6 GW nuclear unit, which is how the first 5 km build tripped
