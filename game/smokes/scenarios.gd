@@ -75,7 +75,14 @@ func run() -> void:
 		check("midcampaign_campaign_identical",
 			JSON.stringify(Campaign.to_dict(), "", false, true) == campaign_1)
 		check("midcampaign_clock_set", GameClock.t_sim == t_1 and t_1 > 0.0)
-		check("midcampaign_milestone", Campaign.milestone_index == 1)
+		# assert against the RECIPE's own milestone, not a hardcoded one —
+		# the block picks the first start_day recipe alphabetically, and a
+		# new era recipe shifting that pick turned CI red while every local
+		# gate was green (C4: dunkelflaute_2029 sorted ahead of
+		# merit_order_2026 and carries milestone 3, not 1)
+		var expect_index := int((Scenario.recipe.get("campaign", {})
+			as Dictionary).get("milestone_index", 0))
+		check("midcampaign_milestone", Campaign.milestone_index == expect_index)
 		check("midcampaign_treasury", Economy.treasury_eur == treasury_1)
 	Campaign.active = false  # leave the process in sandbox mode
 
