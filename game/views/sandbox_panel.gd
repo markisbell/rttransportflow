@@ -71,6 +71,22 @@ func _build() -> void:
 		_say("weather forces cleared"))
 	column.add_child(clear)
 
+	# §3.3 battery policy (C4): the fleet's one global stance — the same
+	# Dispatch surface the campaign player uses via the inspector
+	var policy_row := HBoxContainer.new()
+	column.add_child(policy_row)
+	var policy_label := Label.new()
+	policy_label.text = "Batteries"
+	policy_row.add_child(policy_label)
+	for policy: String in Dispatch.BATTERY_POLICIES:
+		var button := Button.new()
+		button.text = policy
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(func() -> void:
+			Dispatch.set_battery_policy(policy)
+			_say("battery policy: %s" % policy))
+		policy_row.add_child(button)
+
 	var money := HBoxContainer.new()
 	column.add_child(money)
 	for amount: float in [1000.0, 10000.0]:

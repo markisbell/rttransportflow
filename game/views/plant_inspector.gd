@@ -15,6 +15,8 @@ var pid := ""
 var _title: Label
 var _state: Label
 var _mode: OptionButton
+var _policy: OptionButton
+var _policy_row: HBoxContainer
 
 
 func _ready() -> void:
@@ -53,6 +55,24 @@ func _ready() -> void:
 		_mode.add_item(m)
 	_mode.item_selected.connect(_on_mode)
 	row.add_child(_mode)
+	# §3.3 battery policy (C4): GLOBAL fleet stance, shown only when a
+	# battery is inspected — the campaign player's path to it
+	_policy_row = HBoxContainer.new()
+	_policy_row.add_theme_constant_override("separation", 6)
+	var policy_label := Label.new()
+	policy_label.text = "Fleet policy"
+	policy_label.add_theme_font_size_override("font_size", 12)
+	_policy_row.add_child(policy_label)
+	_policy = OptionButton.new()
+	_policy.focus_mode = Control.FOCUS_NONE
+	for policy: String in Dispatch.BATTERY_POLICIES:
+		_policy.add_item(policy)
+	_policy.item_selected.connect(func(index: int) -> void:
+		Dispatch.set_battery_policy(Dispatch.BATTERY_POLICIES[index])
+		print("INSPECTOR battery policy -> %s" % Dispatch.battery_policy))
+	_policy_row.add_child(_policy)
+	stack.add_child(_policy_row)
+
 	var close := Button.new()
 	close.text = "Close"
 	close.focus_mode = Control.FOCUS_NONE
@@ -74,6 +94,9 @@ func open(plant_id: String) -> void:
 	_title.text = str(plant.get("name", pid))
 	var kind := str(plant.get("kind", ""))
 	_mode.selected = MODES.find(str(Dispatch.plant_mode.get(pid, "auto")))
+	_policy_row.visible = kind in ["battery", "grid_forming"]
+	if _policy_row.visible:
+		_policy.selected = Dispatch.BATTERY_POLICIES.find(Dispatch.battery_policy)
 	_refresh_state()
 	tooltip_text = "%s — %.0f MW" % [
 		str(World.KIND_LABELS.get(kind, kind)), float(plant.get("p_max_mw", 0.0))]

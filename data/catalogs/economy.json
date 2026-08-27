@@ -114,7 +114,9 @@
         "battery_charge_price_off_eur_per_mwh": 15.0,
         "battery_charge_frac": 0.5,
         "ely_price_on_eur_per_mwh": 80.0,
-        "ely_price_off_eur_per_mwh": 20.001
+        "ely_price_off_eur_per_mwh": 20.001,
+        "battery_reserve_soc_floor": 0.3,
+        "_battery_policy_rationale": "C4/§3.3: the 'balanced' battery stance schedules no discharge below this SoC — the floor is FFR's, not the market's (a Dunkelflaute evening needs the arrest energy MORE than the arbitrage margin). 0.30 holds ~36 min of full-power FFR per 300 MW/600 MWh unit. 'arbitrage' ignores it (the P7 pin-stable default); 'reserve_ffr' schedules no discharge at all."
     },
     "line_terrain_factor": {
         "_rationale": "GAME_DESIGN §1.5 corridor capex multipliers (billing only — physics does not care what the tower stands on). Route length itself is km × GridTopology.SINUOSITY, shared with the solved line length so the billed kilometre IS the electrical kilometre.",

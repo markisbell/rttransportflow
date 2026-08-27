@@ -39,6 +39,18 @@ var last_block := -1
 var last_commands: Dictionary = {}
 var last_avail: Dictionary = {}
 var last_curtailed_mw := 0.0
+## §3.3 battery POLICY (C4): one global stance for the battery fleet —
+## the trade-off the Dunkelflaute teaches. "arbitrage" is the P7
+## behavior verbatim (and the DEFAULT, so every pre-C4 pin stands);
+## "balanced" arbitrages but never schedules discharge below the
+## reserved SoC floor (some FFR energy always held back); "reserve_ffr"
+## schedules no discharge at all — FFR is engine physics and always
+## armed — and charges opportunistically. Scheduling reads MEASURED SoC
+## (ledger 44), never a commanded estimate.
+const BATTERY_POLICIES: Array[String] = ["arbitrage", "balanced", "reserve_ffr"]
+var battery_policy := "arbitrage"
+var bat_reserve_soc_floor := 0.30
+
 ## player strategy (GAME_DESIGN §3.3): pid -> auto|must_run|reserve_only|mothballed
 var plant_mode: Dictionary = {}
 ## P7 wire devices (reset `devices` channel) + hub -> bound-farm map, both
@@ -83,6 +95,7 @@ func setup(economy: Dictionary, catalog: Dictionary) -> void:
 	bat_charge_frac = float(policy.get("battery_charge_frac", 0.5))
 	ely_price_on = float(policy.get("ely_price_on_eur_per_mwh", 80.0))
 	ely_price_off = float(policy.get("ely_price_off_eur_per_mwh", 20.001))
+	bat_reserve_soc_floor = float(policy.get("battery_reserve_soc_floor", 0.30))
 	wire_devices = []
 	hub_farms = {}
 	link_setpoints = {}
@@ -95,12 +108,19 @@ func setup(economy: Dictionary, catalog: Dictionary) -> void:
 ## (SaveLoad used to write these fields directly).
 func to_dict() -> Dictionary:
 	return {"plant_mode": plant_mode.duplicate(true),
-		"link_setpoints": link_setpoints.duplicate(true)}
+		"link_setpoints": link_setpoints.duplicate(true),
+		"battery_policy": battery_policy}
 
 
 func from_dict(state: Dictionary) -> void:
 	plant_mode = (state.get("plant_mode", {}) as Dictionary).duplicate(true)
 	link_setpoints = (state.get("link_setpoints", {}) as Dictionary).duplicate(true)
+	set_battery_policy(str(state.get("battery_policy", "arbitrage")))
+
+
+## Clamped setter — an unknown policy falls back to the pin-stable default.
+func set_battery_policy(policy: String) -> void:
+	battery_policy = policy if policy in BATTERY_POLICIES else "arbitrage"
 
 
 ## Campaign/scenario seam: reprice one economy constant and invalidate the
@@ -330,7 +350,7 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		price = float(economy_cfg["scarcity_price_cap_eur_per_mwh"])
 	wholesale_price = price
 
-	_apply_flexibility(commands, price)
+	_apply_flexibility(commands, price, device_states)
 
 	if OS.get_environment("DISPATCH_DEBUG") != "":
 		var n_online := 0
@@ -504,7 +524,8 @@ func _renewable_availability(plants: Array) -> Dictionary:
 ## The P7 flexibility toolbox: price-signal arbitrage with hysteresis
 ## (batteries scarcity-discharge / cheap-charge, electrolyzers soak cheap
 ## blocks), plus the v1 `manual` HVDC setpoint pass-through. Moved verbatim.
-func _apply_flexibility(commands: Dictionary, price: float) -> void:
+func _apply_flexibility(commands: Dictionary, price: float,
+		device_states: Dictionary = {}) -> void:
 	# batteries discharge into the gas tier and above, charge on cheap
 	# blocks; electrolyzers soak cheap/surplus power into their cavern.
 	# HVDC is `manual` in v1: player/scenario setpoints pass through.
@@ -524,6 +545,15 @@ func _apply_flexibility(commands: Dictionary, price: float) -> void:
 					bat_cmd = bat_discharge_frac * bat_max
 				elif price <= (bat_charge_price_on if was_charging else bat_charge_price_off):
 					bat_cmd = -bat_charge_frac * bat_max  # sticky through the self-bump
+				# §3.3 policy overlay (C4): "arbitrage" leaves the P7 block
+				# untouched; the other stances hold FFR energy back
+				if battery_policy == "reserve_ffr":
+					if bat_cmd > 0.0:
+						bat_cmd = 0.0  # FFR-only: nothing scheduled out
+				elif battery_policy == "balanced" and bat_cmd > 0.0:
+					var soc := Wire.numf(device_states.get(did, {}), "soc", 1.0)
+					if soc <= bat_reserve_soc_floor:
+						bat_cmd = 0.0  # the reserved floor is FFR's, not the market's
 				_bat_charging[did] = bat_cmd < 0.0
 				if bat_cmd < 0.0:
 					flex_next += -bat_cmd  # charging is load next block
