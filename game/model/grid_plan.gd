@@ -287,6 +287,199 @@ static func _nearest_placeable(world: Node, kind: String,
 	return DemoBuild.find_site(world, kind, anchor, 6)
 
 
+# ─── era worlds (campaign arc C4+): the start world progressed ─────────
+
+## The C3 reference build's quotas — ★★★ re_capacity with margin on the
+## ~7.25 GW inherited base (batteries are adequacy, not RE).
+const ERA_WIND_MW := 12000.0
+const ERA_SOLAR_MW := 6000.0
+const ERA_BATTERY_MW := 3000.0
+
+
+## An era-progressed inherited world: author_start plus the plausible
+## player build at that era's day. ONE author for the C3 smoke's waves
+## and every later slice's recipe (a second placement implementation is
+## how worlds drift apart). Deterministic: same era, same world.
+static func author_era(world: Node, era_id: String) -> bool:
+	# reject unknown eras BEFORE mutating the world (the review's nit: a
+	# failed call must not leave a half-built world behind)
+	if era_id != "green_push":
+		push_error("author_era: unknown era %s" % era_id)
+		return false
+	if not author_start(world):
+		return false
+	# the RE program is best-effort by construction (every can_place
+	# refusal shrinks it) — an era world that misses its quotas is the
+	# WRONG WORLD and must fail loudly, not load as success (the review:
+	# ledger 29/38/47-class drift would silently starve the program and
+	# every downstream number would be measured against fiction). 90 %:
+	# placement noise is real, a missing third is not noise.
+	var placed: Dictionary = author_re_program(world)
+	if float(placed.get("wind", 0.0)) < ERA_WIND_MW * 0.9 \
+			or float(placed.get("solar", 0.0)) < ERA_SOLAR_MW * 0.9:
+		push_error("author_era(%s): RE program starved (wind %.0f/%.0f, solar %.0f/%.0f)"
+			% [era_id, placed.get("wind", 0.0), ERA_WIND_MW,
+			placed.get("solar", 0.0), ERA_SOLAR_MW])
+		return false
+	return author_hub_wave(world) != ""
+
+
+## The C3 RE program (moved from the smoke — extraction, not redesign):
+## units pack against EXISTING substations (the ledger-55 wall was found
+## by scattering), then ≤ 20 bounded park taps on the trunk, then
+## adequacy batteries on what the scarce ring still offers. Returns the
+## placed MW per class.
+static func author_re_program(world: Node) -> Dictionary:
+	var split_y := 0.0
+	for lc_id: String in world.load_centers:
+		var tiles: Array = world.load_centers[lc_id]["tiles"]
+		split_y += float((tiles[0] as Vector2i).y)
+	split_y /= maxf(world.load_centers.size(), 1.0)
+	var stations: Array = []
+	for tile: Vector2i in world.substations:
+		stations.append(tile)
+	stations.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var placed := {"wind": 0.0, "solar": 0.0, "battery": 0.0}
+	for per_station in [2, 8]:
+		if placed["wind"] >= ERA_WIND_MW and placed["solar"] >= ERA_SOLAR_MW:
+			break
+		for station: Vector2i in stations:
+			if placed["wind"] >= ERA_WIND_MW and placed["solar"] >= ERA_SOLAR_MW:
+				break
+			var north: bool = float(station.y) < split_y
+			var kind := "wind_onshore" if north else "solar_pv"
+			var key := "wind" if north else "solar"
+			var quota: float = ERA_WIND_MW if north else ERA_SOLAR_MW
+			if placed[key] >= quota:
+				continue
+			var here := 0
+			for offset: Vector2i in GridTopology.NEIGHBORS:
+				if here >= per_station or placed[key] >= quota:
+					break
+				var site := station + offset
+				if world.can_place_plant(kind, site):
+					var pid: String = world.place_plant(kind, site)
+					if pid != "":
+						placed[key] += float(world.plants[pid]["p_max_mw"])
+						here += 1
+	var corridor_tiles: Array = []
+	for tile: Vector2i in world.corridors:
+		if str(world.corridors[tile]) == "line_400":
+			corridor_tiles.append(tile)
+	corridor_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var taps := 0
+	var i := 0
+	while i < corridor_tiles.size() and taps < 20 \
+			and (placed["wind"] < ERA_WIND_MW or placed["solar"] < ERA_SOLAR_MW):
+		var tap: Vector2i = corridor_tiles[i]
+		i += 11
+		var north: bool = float(tap.y) < split_y
+		var kind := "wind_onshore" if north else "solar_pv"
+		var key := "wind" if north else "solar"
+		var quota: float = ERA_WIND_MW if north else ERA_SOLAR_MW
+		if placed[key] >= quota:
+			continue
+		var here := 0
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			if here >= 3 or placed[key] >= quota:
+				break
+			var site := tap + offset
+			if world.can_place_plant(kind, site):
+				var pid: String = world.place_plant(kind, site)
+				if pid != "":
+					placed[key] += float(world.plants[pid]["p_max_mw"])
+					here += 1
+		if here > 0:
+			taps += 1
+	for station: Vector2i in stations:
+		if placed["battery"] >= ERA_BATTERY_MW:
+			break
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			var site := station + offset
+			if world.can_place_plant("battery", site):
+				var pid: String = world.place_plant("battery", site)
+				if pid != "":
+					placed["battery"] += float(world.plants[pid]["p_max_mw"])
+				break
+	return placed
+
+
+## The C3 hub wave (moved from the smoke): one more 2 GW Bight platform,
+## three far-shore farms, a COASTAL converter (nearest AC tile to the
+## platform — an inland converter behind the corridor maze is the
+## ledger-29 flood), the cable laid ISOLATED (a fused component is a
+## dead hub — the shipped-seed lesson). Returns the platform pid, "" on
+## failure.
+static func author_hub_wave(world: Node) -> String:
+	if not world.load_centers.has("hamburg"):
+		return ""
+	var anchor: Vector2i = (world.load_centers["hamburg"]["tiles"] as Array)[0]
+	var platform_tile := Vector2i(-1, -1)
+	var best_d := 1 << 30
+	for y in range(world.height):
+		for x in range(world.width):
+			var tile := Vector2i(x, y)
+			if world.terrain_at(tile) != "S":
+				continue
+			var deep_ring := 0
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					if (dx != 0 or dy != 0) \
+							and world.terrain_at(tile + Vector2i(dx, dy)) == "S":
+						deep_ring += 1
+			if deep_ring < 3:
+				continue
+			var d := absi(tile.x - anchor.x) + absi(tile.y - anchor.y)
+			if d < best_d and world.can_place_plant("offshore_platform", tile):
+				best_d = d
+				platform_tile = tile
+	if platform_tile == Vector2i(-1, -1):
+		return ""
+	var platform: String = world.place_plant("offshore_platform", platform_tile)
+	var farms := 0
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			if farms >= 3 or (dx == 0 and dy == 0):
+				continue
+			var site := platform_tile + Vector2i(dx, dy)
+			if world.terrain_at(site) == "S" \
+					and world.can_place_plant("wind_offshore", site):
+				if world.place_plant("wind_offshore", site) != "":
+					farms += 1
+	if platform == "" or farms < 3:
+		return ""
+	var ac_tiles: Array[Vector2i] = []
+	for tile: Vector2i in world.corridors:
+		if str(world.corridors[tile]) != "hvdc":
+			ac_tiles.append(tile)
+	ac_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var da := absi(a.x - platform_tile.x) + absi(a.y - platform_tile.y)
+		var db := absi(b.x - platform_tile.x) + absi(b.y - platform_tile.y)
+		return da < db or (da == db and (a.y < b.y or (a.y == b.y and a.x < b.x))))
+	var conv_site := Vector2i(-1, -1)
+	for tile: Vector2i in ac_tiles:
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			var cand: Vector2i = tile + offset
+			if not world.can_place_plant("hvdc_converter", cand):
+				continue
+			if _isolated_flank(world, cand) != Vector2i(-1, -1):
+				conv_site = cand
+				break
+		if conv_site != Vector2i(-1, -1):
+			break
+	if conv_site == Vector2i(-1, -1) \
+			or world.place_plant("hvdc_converter", conv_site) == "":
+		return ""
+	var flank_a := _isolated_flank(world, platform_tile)
+	var flank_b := _isolated_flank(world, conv_site)
+	if flank_a == Vector2i(-1, -1) or flank_b == Vector2i(-1, -1) \
+			or not _lay_isolated_hvdc(world, flank_a, flank_b):
+		return ""
+	return platform
+
+
 ## First 4-neighbour of a (future) converter site a corridor may start on.
 static func _free_flank(world: Node, site: Vector2i) -> Vector2i:
 	for offset: Vector2i in GridTopology.NEIGHBORS:

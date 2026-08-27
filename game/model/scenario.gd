@@ -65,6 +65,14 @@ func load_scenario(id: String) -> bool:
 	GameClock.t_sim = float(recipe.get("start_day", 0.0)) * GameClock.SECONDS_PER_DAY
 	Economy.sync_billing_day()
 
+	# The battery policy is a GLOBAL dispatch knob a previous session/recipe
+	# may have moved (the review: reserve_ffr set in one scenario silently
+	# changed the next recipe's pinned behavior — the plant_mode leak class,
+	# which four smokes already clear by hand). A recipe starts from the
+	# pin-stable default; a policy key on the recipe can override later.
+	Dispatch.set_battery_policy(str(recipe.get("battery_policy", "arbitrage")))
+	Dispatch.plant_mode.clear()
+
 	# Sandbox/campaign are mutually exclusive framings of the same world.
 	if bool(recipe.get("sandbox", false)):
 		Sandbox.start(str(recipe.get("difficulty", "normal")))
@@ -88,8 +96,18 @@ func load_scenario(id: String) -> bool:
 	return true
 
 
-## Either restore an authored world, or rebuild one from a build recipe.
+## Either restore an authored world, rebuild one from a build recipe, or
+## GENERATE an era-progressed world (C4: recipes for mid-campaign slices
+## whose worlds are the start world plus the plausible player build —
+## GridPlan.author_era, one author, deterministic).
 func _apply_world() -> bool:
+	var era := str(recipe.get("author_era", ""))
+	if era != "":
+		World.clear_build()
+		if GridPlan.author_era(World, era):
+			return true
+		push_warning("scenario %s: author_era(%s) failed" % [loaded_id, era])
+		return false
 	var world_path := str(recipe.get("world", ""))
 	if world_path != "":
 		var full := AppPaths.root().path_join(world_path)

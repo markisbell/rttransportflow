@@ -37,13 +37,8 @@ const TAG := "SMOKE_GREEN_GIGAWATTS"
 ## cost ★ from redispatch/year. A later drift is a finding.
 const PINNED_STARS := 6
 
-## Program quotas [MW] — sized for ★★★ re_capacity (≥ 24 GW incl. the
-## ~7.25 GW inherited base; batteries are NOT RE) plus adequacy
-## batteries (the P3 FCR lesson: capacity without headroom is how the
-## "fast" fleet sags).
-const WIND_MW := 12000.0
-const SOLAR_MW := 6000.0
-const BATTERY_MW := 3000.0
+## Program quotas live in GridPlan (ERA_WIND_MW/ERA_SOLAR_MW/
+## ERA_BATTERY_MW) since the C4 author_era extraction — one author.
 const FINE_FROM := 29.0  # fine band: staircase baseline + event + exit
 const FINE_TO := 31.5
 
@@ -84,7 +79,7 @@ func run() -> void:
 
 	# ---- wave 1 (day 28): the RE program through the UI's own calls ----
 	var re_before := Campaign.re_capacity_mw()
-	var quotas := _re_program()
+	var quotas: Dictionary = GridPlan.author_re_program(World)
 	print("PROGRAM placed wind=%.0f solar=%.0f battery=%.0f (re before=%.0f after=%.0f)"
 		% [quotas.get("wind", 0.0), quotas.get("solar", 0.0),
 		quotas.get("battery", 0.0), re_before, Campaign.re_capacity_mw()])
@@ -144,7 +139,9 @@ func run() -> void:
 	check("hub_unlocked_after_36", Campaign.unlocked("offshore_platform")
 		and Campaign.unlocked("hvdc_converter") and Campaign.unlocked("corridor_hvdc"))
 	var hub_before := Campaign.hub_offshore_mw()
-	if not _hub_program():
+	_new_platform = GridPlan.author_hub_wave(World)
+	if _new_platform == "":
+		_fail(TAG, "hub wave failed (platform/farms/converter/cable)")
 		return
 	print("PROGRAM hub before=%.0f after=%.0f re=%.0f" % [hub_before,
 		Campaign.hub_offshore_mw(), Campaign.re_capacity_mw()])
@@ -223,197 +220,12 @@ func _step_for(day: float) -> Dictionary:
 	return await p7_step(900.0, TAG)
 
 
-## Units pack against EXISTING SUBSTATIONS so they join existing buses —
-## the ledger-13 node budget has almost no headroom on the 145-bus
-## realistic world, and run 1 re-learned ledger 47 the fast way:
-## stride-scattered singles minted a lone tap bus each (234 buses,
-## build refused). Wind takes the northern half, solar the southern
-## (region CF reality), batteries ring the metros. Deterministic:
-## substations walked in (y, x) order, at most two units per station
-## for geographic spread.
-func _re_program() -> Dictionary:
-	var split_y := 0.0
-	for lc_id: String in World.load_centers:
-		var tiles: Array = World.load_centers[lc_id]["tiles"]
-		split_y += float((tiles[0] as Vector2i).y)
-	split_y /= maxf(World.load_centers.size(), 1.0)
-	var stations: Array = []
-	for tile: Vector2i in World.substations:
-		stations.append(tile)
-	stations.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		return a.y < b.y or (a.y == b.y and a.x < b.x))
-	var placed := {"wind": 0.0, "solar": 0.0, "battery": 0.0}
-	# pass 1: two units per station; pass 2 (if quotas remain): fill up
-	for per_station in [2, 8]:
-		if placed["wind"] >= WIND_MW and placed["solar"] >= SOLAR_MW:
-			break
-		for station: Vector2i in stations:
-			if placed["wind"] >= WIND_MW and placed["solar"] >= SOLAR_MW:
-				break
-			var north: bool = float(station.y) < split_y
-			var kind := "wind_onshore" if north else "solar_pv"
-			var key := "wind" if north else "solar"
-			var quota: float = WIND_MW if north else SOLAR_MW
-			if placed[key] >= quota:
-				continue
-			var here := 0
-			for offset: Vector2i in GridTopology.NEIGHBORS:
-				if here >= per_station or placed[key] >= quota:
-					break
-				var site := station + offset
-				if World.can_place_plant(kind, site):
-					var pid := World.place_plant(kind, site)
-					if pid != "":
-						placed[key] += float(World.plants[pid]["p_max_mw"])
-						here += 1
-	# pass 3: the substation ring is SCARCE (the adequacy fleet already
-	# rings the real stations — run 2 found only ~12 GW of free sides), so
-	# the remainder mints bounded PARK TAPS on the trunk: one bus per tap,
-	# up to 3 units each, hard-capped at 20 taps (~145 + 20 + hub ≈ 170
-	# buses ≤ the ledger-55 180) — packed parks, never the 234-bus scatter
-	var corridor_tiles: Array = []
-	for tile: Vector2i in World.corridors:
-		if str(World.corridors[tile]) == "line_400":
-			corridor_tiles.append(tile)
-	corridor_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		return a.y < b.y or (a.y == b.y and a.x < b.x))
-	var taps := 0
-	var i := 0
-	while i < corridor_tiles.size() and taps < 20 \
-			and (placed["wind"] < WIND_MW or placed["solar"] < SOLAR_MW):
-		var tap: Vector2i = corridor_tiles[i]
-		i += 11  # stride: geographic spread
-		var north: bool = float(tap.y) < split_y
-		var kind := "wind_onshore" if north else "solar_pv"
-		var key := "wind" if north else "solar"
-		var quota: float = WIND_MW if north else SOLAR_MW
-		if placed[key] >= quota:
-			continue
-		var here := 0
-		for offset: Vector2i in GridTopology.NEIGHBORS:
-			if here >= 3 or placed[key] >= quota:
-				break
-			var site := tap + offset
-			if World.can_place_plant(kind, site):
-				var pid := World.place_plant(kind, site)
-				if pid != "":
-					placed[key] += float(World.plants[pid]["p_max_mw"])
-					here += 1
-		if here > 0:
-			taps += 1
-	print("PROGRAM park taps minted: ", taps)
-	# adequacy batteries against metro-adjacent substations (unlock 2027)
-	for station: Vector2i in stations:
-		if placed["battery"] >= BATTERY_MW:
-			break
-		for offset: Vector2i in GridTopology.NEIGHBORS:
-			var site := station + offset
-			if World.can_place_plant("battery", site):
-				var pid := World.place_plant("battery", site)
-				if pid != "":
-					placed["battery"] += float(World.plants[pid]["p_max_mw"])
-				break
-	return placed
-
-
-## One more 2 GW platform beside the German Bight (the inherited BorWin
-## platform carries the other 2 GW), three far-shore farms in its ring,
-## the onshore converter FIRST beside an existing AC tile, then the DC
-## export laid between free endpoints — the north_sea_hub recipe,
-## executed on the campaign world.
-func _hub_program() -> bool:
-	if not World.load_centers.has("hamburg"):
-		_fail(TAG, "map has no hamburg")
-		return false
-	var anchor: Vector2i = (World.load_centers["hamburg"]["tiles"] as Array)[0]
-	var platform_tile := Vector2i(-1, -1)
-	var best_d := 1 << 30
-	for y in range(World.height):
-		for x in range(World.width):
-			var tile := Vector2i(x, y)
-			if World.terrain_at(tile) != "S":
-				continue
-			var deep_ring := 0
-			for dy in range(-2, 3):
-				for dx in range(-2, 3):
-					if (dx != 0 or dy != 0) \
-							and World.terrain_at(tile + Vector2i(dx, dy)) == "S":
-						deep_ring += 1
-			if deep_ring < 3:
-				continue
-			var d := absi(tile.x - anchor.x) + absi(tile.y - anchor.y)
-			if d < best_d and World.can_place_plant("offshore_platform", tile):
-				best_d = d
-				platform_tile = tile
-	if platform_tile == Vector2i(-1, -1):
-		_fail(TAG, "no deep-sea platform site")
-		return false
-	var platform := World.place_plant("offshore_platform", platform_tile)
-	var farms := 0
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
-			if farms >= 3 or (dx == 0 and dy == 0):
-				continue
-			var site := platform_tile + Vector2i(dx, dy)
-			if World.terrain_at(site) == "S" \
-					and World.can_place_plant("wind_offshore", site):
-				if World.place_plant("wind_offshore", site) != "":
-					farms += 1
-	if platform == "" or farms < 3:
-		_fail(TAG, "hub program: platform=%s farms=%d" % [platform, farms])
-		return false
-	# Onshore converter DIRECTLY beside an existing AC corridor tile with a
-	# verified DC exit — the north_sea_hub pattern, converter FIRST: run 3
-	# laid the DC cable onto the converter's own site, the refused
-	# place_plant went unchecked, the emitter dropped the one-station
-	# component, and the free-routing cable had FUSED with the inherited
-	# BorWin export — a silently dead 4 GW "commitment" (the review's
-	# blocking find; the ledger-44 commanded-not-measured shape applied to
-	# a build program). The AC tile becomes the converter's bus: no spur,
-	# nothing to overwrite, and lay_hvdc's _hvdc_free predicate refuses
-	# every existing corridor tile.
-	# COASTAL converter: sorted by distance to the PLATFORM, not the metro
-	# — the DC run stays ~tens of tiles of open sea (Diele's real shape),
-	# and the corridor-excluding route BFS finds it before it can flood
-	# (an inland converter behind the corridor maze hung two full runs:
-	# the ledger-29 flood at 5 km scale, now also capped in route itself)
-	var ac_tiles: Array[Vector2i] = []
-	for tile: Vector2i in World.corridors:
-		if str(World.corridors[tile]) != "hvdc":
-			ac_tiles.append(tile)
-	ac_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := absi(a.x - platform_tile.x) + absi(a.y - platform_tile.y)
-		var db := absi(b.x - platform_tile.x) + absi(b.y - platform_tile.y)
-		return da < db or (da == db and (a.y < b.y or (a.y == b.y and a.x < b.x))))
-	var conv_site := Vector2i(-1, -1)
-	for tile: Vector2i in ac_tiles:
-		for offset: Vector2i in GridTopology.NEIGHBORS:
-			var cand: Vector2i = tile + offset
-			if not World.can_place_plant("hvdc_converter", cand):
-				continue
-			var has_dc_exit := false
-			for o2: Vector2i in GridTopology.NEIGHBORS:
-				if _hvdc_free(cand + o2):
-					has_dc_exit = true
-			if has_dc_exit:
-				conv_site = cand
-				break
-		if conv_site != Vector2i(-1, -1):
-			break
-	if conv_site == Vector2i(-1, -1):
-		_fail(TAG, "no converter site beside the AC grid")
-		return false
-	if World.place_plant("hvdc_converter", conv_site) == "":
-		_fail(TAG, "converter placement refused at %s" % str(conv_site))
-		return false
-	var dc_from := hvdc_neighbor(platform_tile)
-	var dc_to := hvdc_neighbor(conv_site)
-	if dc_from == Vector2i(-1, -1) or dc_to == Vector2i(-1, -1) \
-			or not lay_hvdc(dc_from, dc_to):
-		_fail(TAG, "could not lay the DC export corridor")
-		return false
-	_new_platform = platform
-	return true
+## The build passes live in GridPlan (author_re_program / author_hub_wave)
+## since C4's author_era extraction — ONE author for the smoke's waves
+## and the era recipes, so the worlds cannot drift apart. The smoke keeps
+## its wave structure (the unlock gating is what IT proves); the
+## discovery history (ledger-55 wall, Potemkin hub, isolation) is
+## documented on the GridPlan functions.
 
 
 func _registered_re_mw(registered: Dictionary) -> float:
