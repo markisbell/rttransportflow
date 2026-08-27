@@ -1840,6 +1840,51 @@ held zero-UFLS regardless. Regression triad green.
 debuts, the §3.3 battery policy control, episode SAIDI's first
 execution, smoke `campaign_dunkelflaute` (8046).
 
+### C4 — Slice M4: The Dunkelflaute (campaign arc, 2026-08-26/27)
+
+**Built:** milestone 4 playable and pinned, and the arc's world
+machinery matured. `GridPlan.author_era("green_push")` debuts — the
+C3 build passes EXTRACTED into GridPlan as the one author
+(`author_re_program` / `author_hub_wave`; the C3 smoke delegates to
+them and its ★6 re-gated green, proving the extraction neutral), with
+a loud quota guard: an era world that misses ≥ 90 % of its RE program
+refuses to load (best-effort placement + map drift would otherwise
+measure every downstream number against fiction — the ledger
+29/38/47 drift class, pre-empted). Scenario recipes gain
+`author_era`, and every recipe now RESETS the global dispatch knobs
+(battery policy, plant modes) to pin-stable defaults — the leak class
+four smokes had been hand-clearing, closed at the source. THE §3.3
+BATTERY POLICY: one global fleet stance on Dispatch — `arbitrage`
+(the P7 block verbatim, the default, so every pre-C4 pin stands
+byte-identical), `balanced` (no scheduled discharge below the
+reserved SoC floor — 0.30, economy.json, "the floor is FFR's, not
+the market's"), `reserve_ffr` (nothing scheduled out, FFR physics
+always armed) — reading MEASURED SoC (ledger 44), surfaced in the
+sandbox console and the inspector's battery row, save-persistent.
+
+**Tests/acceptance:** GdUnit 61 → 65 (policy rules at the
+`_apply_flexibility` unit level, clamped setter + round-trip,
+author_era determinism byte-for-byte, unknown-era refusal); the
+2-lens review confirmed 7 findings (quota guard, the policy leak, pin
+procedure notes, error-path precision) — all fixed, 2 refuted.
+**Milestone 4 measured: ★3 of 3 with SAIDI 0.0** — and the
+measurement settled the review's "opposing unmeasured bets" find the
+interesting way: the scripted episode bites PHYSICALLY harder than
+designed (wind fleet 12 532 → 74 MW, a 99.4 % collapse) yet prices
+ZERO scarcity blocks, because the 2029 reference world still carries
+the full 2025 thermal fleet — retirement is M5's job — and a 13 %
+supply event is simply covered. The battery fleet entered the episode
+at measured SoC 0.55 under `reserve_ffr`; the treasury barely moved.
+Pinned as measured (`no_scarcity_on_adequate_fleet`): M4's economic
+bite belongs to post-retirement worlds — a real C-era balancing truth
+for C7+, where the same episode against a retired fleet is the test
+the design intended. Star pin 3 confirmed by first measurement;
+confirmation run + regression triad green.
+
+**Next:** C5 — black start & restoration (scope per ledger 54: the
+`zone_commands` channel and the staged manual reload below the UFLS
+floor), smoke `black_start` (8047).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
