@@ -1,0 +1,19 @@
+{
+  "id": "dunkelflaute_2029",
+  "title": "The Dunkelflaute (2029)",
+  "description": "Start at milestone 4 with the green build-out standing: a scripted five-day calm-and-dark episode blankets northwest Europe — hold the lights on with storage, gas and discipline. SAIDI under 30 minutes passes; under 5 is mastery.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "author_era": "green_push",
+  "start_day": 47.9,
+  "campaign": {
+    "milestone_index": 3
+  },
+  "economy": {
+    "treasury_eur": 8000000000.0,
+    "_rationale": "C4 fixture: the post-M3 player has spent ~30 B€ of the M3-era 40 on the build-out; 8 B€ leaves room to operate through the scarcity episode without trivializing the insolvency line (-2 B€)."
+  },
+  "_why_start_day": "47.9 gives the ungraded cold-start settle stretch before milestone 4's window opens at 48 (the M2 pattern; a recipe start is a legal cold start); the scripted episode runs days 49-54, well inside.",
+  "forces": []
+}
