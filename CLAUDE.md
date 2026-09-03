@@ -1946,6 +1946,69 @@ chains) is recorded in session memory beside the cwd trap.
 backend kind (the arc's only backend phase; validate_core P=0 spike
 first), smoke `syncon_inertia` (8051).
 
+### C6 — The inertia portfolio (campaign arc, 2026-09-03)
+
+**Built:** two inertia buildables and the arc's only backend phase.
+THE SPIKE FIRST (binding §3): a P=0 PV gen with an S_n-derived Q band
+and station load is solver-clean — cold + warm converge (4.95 ms
+median), P held at exactly 0, Q pegs at ±0.40·S_n under
+`enforce_q_lims`; preserved as `validate_core` spike (c). THE SYNCON
+(backend kind, §1.15): `"syncon"` joins `_KIND_FAMILY`/`PlantKind`, an
+optional `sn_mva` on PlantSpec (default None keeps the p_max/0.9
+derivation BIT-IDENTICAL — the model hash covers s_n, so every
+existing world's hash is untouched), a model validator refusing a
+syncon without a rating (a 400, never a 500). The catalog `syncon`
+model returns a STEAM spec with `fcr_band 0` (the governor's off
+switch — the chain idles at u = 0, no new fleet branch), `s_n = sn_mva`,
+`p_max 0`, and `aux_mw` = 1 % S_n station service subtracted from
+`p_mech` while ONLINE (a matching PF load row, one catalog fraction).
+Two backend subtleties the recon caught: slack election now prefers a
+`p_max > 0` machine (a P=0 syncon would out-rank a real unit on raw
+S_n and pandapower would source the island's residual from a machine
+with no prime mover), and the island-viability gate no longer counts a
+syncon as a source (a condenser-only island cannot serve load and
+drops out honestly). THE GFM (game-only — the backend `grid_forming`
+device kind ships since P7): a buildable `grid_forming` (the ONE
+string — tool id = world kind = wire kind = unlock key), reserve-biased
+by default (D5: inertia held is inertia present), its OWN fom/vom keys
+(the P5 mapping folded it into battery and under-billed the premium).
+Both buildables: build-menu tiles, procedural models, capex/FOM
+(syncon flat per-UNIT — its p_max is 0), unlock 2031, syncon excluded
+from the merit order and startup profiles (marginal_cost ~0 would
+commit MW it cannot produce), a tripped syncon restarted so its
+inertia is not lost for good.
+
+**Tests/acceptance:** backend 153 → 159 (six syncon pins: inertia
+scaling, governor silence, station draw, the catalog/schema contract,
+snapshot, E_k tracking — bit-identity held); GdUnit 78 → 79 (the
+one-string invariant, placement/native-row shape, device+row emission,
+economy pricing, models, and the sn_mva save round-trip). The 2-lens
+review confirmed 1 BLOCKING + 6 credible finds under an API-overload
+storm that crashed 11 of 14 verifiers (the "refuted" list was
+unverified, so every credible find was hand-checked against the code):
+**`World.serialize/restore` dropped `sn_mva`** — a saved syncon world
+400s on re-register (the native row loses its rating, the validator
+refuses it); the pure-syncon aux-load guard; the viability gate; the
+GFM chart group; the tripped-syncon restart; a dead Q-band catalog
+knob (dropped); a stale unlocks rationale. All fixed.
+
+**Milestone measured (`syncon_inertia`, 8051): the arc's central
+lesson, byte-identical twice.** The SAME infeed loss, three ways:
+bare fleet nadir 48.57 / RoCoF 1.074; + 4 syncons nadir 48.59 /
+RoCoF 0.797; + 4 GFM batteries nadir 49.48 / RoCoF 0.801. INERTIA and
+RESERVE are different services — a syncon cuts RoCoF 26 % as pure
+spinning steel (zero power, measured `p_max 0`) but barely moves the
+nadir (no governor); a grid-forming battery does BOTH (virtual
+inertia AND FFR). "You need inertia AND reserve" — the exact truth
+the C9 finale's survival portfolio rests on, now buildable and pinned.
+Regression triad green (★★★, prices to the cent, save_load
+bit-identical), battery_response unchanged (delta 1.25 Hz).
+
+**Next:** C7 — slice M5 (Coal Exit): inspector Retire + mothball
+economics, `author_era("coal_exit")` recipe, smoke `campaign_coal_exit`
+(8048), the fine/retry loop — the retirement toolkit whose inertia
+replacements C6 just shipped.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
