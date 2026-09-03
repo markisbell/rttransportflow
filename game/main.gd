@@ -27,6 +27,7 @@ const SMOKES := {
 	"campaign_merit_order": "res://smokes/campaign_merit_order.gd",
 	"campaign_green_gigawatts": "res://smokes/campaign_green_gigawatts.gd",
 	"campaign_dunkelflaute": "res://smokes/campaign_dunkelflaute.gd",
+	"black_start": "res://smokes/black_start.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",
 	"soak": "res://smokes/soak.gd",
