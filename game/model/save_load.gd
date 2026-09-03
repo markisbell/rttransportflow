@@ -114,6 +114,9 @@ func load_game(path: String = DEFAULT_PATH) -> Dictionary:
 	Economy.from_dict(envelope.get("economy", {}))
 	Dispatch.from_dict(envelope.get("dispatch", {}))
 	Campaign.from_dict(envelope.get("campaign", {}))
+	# the restoration machine is transient by design (C5): the engine's
+	# own restore state rode the snapshot; the player re-issues the verb
+	Restoration.reset()
 	GameClock.restore(envelope.get("clock", {}))
 	GameClock.pause()  # restore() brings the saved speed; resume explicitly
 

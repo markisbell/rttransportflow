@@ -72,6 +72,7 @@ func load_scenario(id: String) -> bool:
 	# pin-stable default; a policy key on the recipe can override later.
 	Dispatch.set_battery_policy(str(recipe.get("battery_policy", "arbitrage")))
 	Dispatch.plant_mode.clear()
+	Restoration.reset()
 
 	# Sandbox/campaign are mutually exclusive framings of the same world.
 	if bool(recipe.get("sandbox", false)):

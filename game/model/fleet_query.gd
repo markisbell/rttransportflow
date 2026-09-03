@@ -1,5 +1,44 @@
 class_name FleetQuery
 extends RefCounted
+## Black-start candidates for a set of DEAD zones (C5): sync units homed
+## there that can ACTUALLY black-start — fast gas and hydro only (slow
+## steam and nuclear cannot crank a dead island in reality either, and
+## nuclear's 48 h post-trip lockout would silently swallow the command;
+## they return via ordinary starts once the island is alive). Largest
+## first within a class; ties by pid. A unit already parked "starting"
+## (the dispatcher breaker-closes committed units blackout-blind, and
+## the sick-island hold parks them) IS a candidate — the backend accepts
+## black_start on a STARTING row and lifts the hold.
+const START_CLASS_RANK := {
+	"gas_ocgt": 0, "hydro_ps": 1, "gas_ccgt": 2,
+}
+
+
+static func black_start_candidates(devices: Dictionary,
+		dead_zones: Dictionary) -> Array[String]:
+	var scored: Array = []
+	for pid: String in World.plants:
+		var plant: Dictionary = World.plants[pid]
+		if not dead_zones.has(str(Dispatch.home_zone.get(pid, ""))):
+			continue
+		var kind := str(plant.get("kind", ""))
+		if not START_CLASS_RANK.has(kind):
+			continue
+		var state := str((devices.get(pid, {}) as Dictionary).get("state", ""))
+		if state == "online":
+			continue
+		scored.append({"pid": pid, "rank": int(START_CLASS_RANK[kind]),
+			"p": float(plant.get("p_max_mw", 0.0))})
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["rank"]) != int(b["rank"]):
+			return int(a["rank"]) < int(b["rank"])
+		if float(a["p"]) != float(b["p"]):
+			return float(a["p"]) > float(b["p"])
+		return str(a["pid"]) < str(b["pid"]))
+	var out: Array[String] = []
+	for entry: Dictionary in scored:
+		out.append(str(entry["pid"]))
+	return out
 ## Wire-device queries over a result frame's devices block. The
 ## sync-unit-vs-converter convention ("synchronous devices carry
 ## headroom_mw; converters don't") is a wire-contract fact that was encoded

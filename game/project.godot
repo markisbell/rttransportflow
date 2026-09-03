@@ -28,6 +28,7 @@ Sandbox="*res://model/sandbox.gd"
 Scenario="*res://model/scenario.gd"
 SaveLoad="*res://model/save_load.gd"
 ZoneHistory="*res://model/zone_history.gd"
+Restoration="*res://model/restoration.gd"
 
 [editor_plugins]
 

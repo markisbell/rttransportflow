@@ -204,6 +204,11 @@ func step_once(dt_s: float) -> Dictionary:
 	if not pending_events.is_empty():
 		request["scheduled_events"] = pending_events.duplicate()
 		pending_events.clear()
+	# C5: one-shot zone commands (restore_load) ride beside the device
+	# commands; the backend routes each zone to its ACTUAL island
+	if not Boundary.pending_zone_commands.is_empty():
+		request["zone_commands"] = Boundary.pending_zone_commands.duplicate(true)
+		Boundary.pending_zone_commands = {}
 	if not watch.is_empty():
 		request["watch"] = watch.duplicate()
 	var done := [false, {}]

@@ -158,8 +158,27 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	var t_days := t_sim / 86400.0
 	var zone_need := {}  # zone -> MW its own fleet has to cover
 	var demand_now := 0.0
+	var wire_zones: Dictionary = Orchestrator.latest().get("zones", {})
 	for zone_id: String in zone_ids:
 		var mw: float = Demand.zone_mw(zone_id, t_days)
+		# C5 (ledger 34's game side): a BLACK zone's demand is disconnected
+		# — scheduling it anyway over-commits the surviving grid by the
+		# dead zone's MW (the ledger-40 surplus shape), and at
+		# re-energization would allocate full demand onto a w ≈ 0 island
+		# (the mass-restart trap). Black and manually-restoring zones bill
+		# their MEASURED supplied fraction instead (ledger 44), so the
+		# merit order itself stages the reload as w ramps. Ordinary UFLS
+		# (supplied in (0,1), not restoring) keeps FULL need — the pinned
+		# pre-C5 behavior: aFRR absorbs the shed margin.
+		var supplied := Wire.numf(wire_zones.get(zone_id, {}), "supplied", 1.0)
+		if supplied == 0.0 or Restoration.active_zones.has(zone_id):
+			# strictly MEASURED (no look-ahead): an "ambition" margin here
+			# would allocate real MW to the island's few online units
+			# against near-zero load — ledger-34 mode 2 via the dispatcher.
+			# Fleet restarts during a reload are Restoration's own staged
+			# breaker-closes; allocation follows the load that actually
+			# returned.
+			mw *= supplied
 		zone_need[zone_id] = mw
 		demand_now += mw
 	demand_now = _fold_measured_loads(zone_need, demand_now)
@@ -195,7 +214,17 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 		var total := 0.0
 		for zone_id: String in zone_ids:
 			# frozen-state forecast: must not advance the weather timeline
-			total += Demand.zone_mw_forecast(zone_id, t_days + hour / 24.0)
+			var mw_f: float = Demand.zone_mw_forecast(zone_id, t_days + hour / 24.0)
+			# same C5 guard as the need ledger: a black/restoring zone's
+			# demand is disconnected — forecasting it at full MW committed
+			# the whole fleet one block after a blackout, breaker-closed
+			# every candidate into a parked "starting" state, and made the
+			# black-start verb permanently unreachable (the C5 review's
+			# blocking find)
+			var supplied_f := Wire.numf(wire_zones.get(zone_id, {}), "supplied", 1.0)
+			if supplied_f == 0.0 or Restoration.active_zones.has(zone_id):
+				mw_f *= supplied_f
+			total += mw_f
 		forecast_peak = maxf(forecast_peak, total)
 
 	# --- commitment: cheapest-first until peak + reserve ------------------
@@ -530,9 +559,19 @@ func _apply_flexibility(commands: Dictionary, price: float,
 	# blocks; electrolyzers soak cheap/surplus power into their cavern.
 	# HVDC is `manual` in v1: player/scenario setpoints pass through.
 	var flex_next := 0.0
+	var wire_zones: Dictionary = Orchestrator.latest().get("zones", {})
 	for dev: Dictionary in wire_devices:
 		var did := str(dev.get("id", ""))
 		var dev_params: Dictionary = dev.get("params", {})
+		# C5: flexibility is LOAD, and a black or reloading island cannot
+		# afford any — run 1 measured the batteries charging on the cheap
+		# blackout price, piling 300 MW of flex load onto a 200 MW island
+		# (the hydrogen_chain flex-feedback trap in its deadliest setting).
+		# FFR physics stays armed regardless; only the SCHEDULE is zeroed.
+		var dev_zone := str(home_zone.get(did, ""))
+		var dev_supplied := Wire.numf(wire_zones.get(dev_zone, {}), "supplied", 1.0)
+		var restoring: bool = dev_supplied == 0.0 \
+			or Restoration.active_zones.has(dev_zone)
 		match str(dev.get("kind", "")):
 			"battery", "grid_forming":
 				var bat_max := float(dev_params.get("p_max_mw", 0.0))
@@ -554,13 +593,15 @@ func _apply_flexibility(commands: Dictionary, price: float,
 					var soc := Wire.numf(device_states.get(did, {}), "soc", 1.0)
 					if soc <= bat_reserve_soc_floor:
 						bat_cmd = 0.0  # the reserved floor is FFR's, not the market's
+				if restoring:
+					bat_cmd = 0.0
 				_bat_charging[did] = bat_cmd < 0.0
 				if bat_cmd < 0.0:
 					flex_next += -bat_cmd  # charging is load next block
 				commands[did] = {"dispatch_mw": snappedf(bat_cmd, 0.1)}
 			"electrolyzer":
 				var was_on: bool = bool(_ely_on.get(did, false))
-				var run: bool = (not scarcity) \
+				var run: bool = (not scarcity) and not restoring \
 					and price < (ely_price_on if was_on else ely_price_off)
 				_ely_on[did] = run
 				var ely_mw: float = float(dev_params.get("p_max_mw", 0.0)) if run else 0.0

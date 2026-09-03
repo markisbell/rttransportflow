@@ -215,23 +215,58 @@ func device_commands(t_sim: float, dt_s: float = 0.0) -> Dictionary:
 			_ramp_from = previous
 		var progress: float = clampf(
 			fmod(t_sim + dt_s * 0.5, Dispatch.BLOCK_S) / Dispatch.RAMP_S, 0.0, 1.0)
+		var out: Dictionary
 		if progress >= 1.0 or _ramp_from.is_empty():
-			return _gridco["device_commands"]
-		var blended := {}
-		for pid: String in _gridco["device_commands"]:
-			var target: Dictionary = _gridco["device_commands"][pid]
-			var command: Dictionary = target.duplicate(true)
-			if target.has("dispatch_mw") and _ramp_from.has(pid) \
-					and (_ramp_from[pid] as Dictionary).has("dispatch_mw"):
-				var from_mw := float((_ramp_from[pid] as Dictionary)["dispatch_mw"])
-				var to_mw := float(target["dispatch_mw"])
-				command["dispatch_mw"] = snappedf(
-					from_mw + (to_mw - from_mw) * progress, 0.1)
-			blended[pid] = command
-		return blended
+			out = _gridco["device_commands"]
+		else:
+			var blended := {}
+			for pid: String in _gridco["device_commands"]:
+				var target: Dictionary = _gridco["device_commands"][pid]
+				var command: Dictionary = target.duplicate(true)
+				if target.has("dispatch_mw") and _ramp_from.has(pid) \
+						and (_ramp_from[pid] as Dictionary).has("dispatch_mw"):
+					var from_mw := float((_ramp_from[pid] as Dictionary)["dispatch_mw"])
+					var to_mw := float(target["dispatch_mw"])
+					command["dispatch_mw"] = snappedf(
+						from_mw + (to_mw - from_mw) * progress, 0.1)
+				blended[pid] = command
+			out = blended
+		return _merge_pending(out)
 	var idx := _step_index(t_sim)
 	var out := {}
 	for plant: Dictionary in docs["plants"].get("plants", []):
 		if World.SYNC_KINDS.has(str(plant["kind"])):
 			out[plant["id"]] = {"dispatch_mw": float(plant["profile_p_mw"][idx])}
-	return out
+	return _merge_pending(out)
+
+
+## One-shot per-device command overlay (C5: Restoration's crank/sustain;
+## the pending_events sibling). OVERRIDES the dispatcher's entry — a
+## black-start command blended with a schedule would be neither.
+var pending_device_commands: Dictionary = {}
+## One-shot zone commands ({zone: {restore_load: frac}}), sent by
+## Orchestrator.step_once beside device_commands.
+var pending_zone_commands: Dictionary = {}
+
+
+func _merge_pending(commands: Dictionary) -> Dictionary:
+	if pending_device_commands.is_empty():
+		return commands
+	var merged := commands.duplicate(true)
+	for pid: String in pending_device_commands:
+		var entry: Dictionary = (merged.get(pid, {}) as Dictionary).duplicate(true)
+		var override: Dictionary = pending_device_commands[pid]
+		for key: String in override:
+			entry[key] = override[key]
+		merged[pid] = entry
+	pending_device_commands = {}
+	return merged
+
+
+## The dispatcher's RAW decided entry for one device (no ramp blend, no
+## overlay consumption) — Restoration reads this to know when the merit
+## order has taken over from its sustain floor.
+func decided_command(pid: String) -> Dictionary:
+	if mode != "gridco" or _decided_block < 0:
+		return {}
+	return (_gridco["device_commands"] as Dictionary).get(pid, {})
