@@ -294,6 +294,21 @@ static func _nearest_placeable(world: Node, kind: String,
 const ERA_WIND_MW := 12000.0
 const ERA_SOLAR_MW := 6000.0
 const ERA_BATTERY_MW := 3000.0
+## C7 coal-exit era: the flex that replaces the retiring coal fleet
+## (ledger 9 nuclear stays, but 47 GW of coal's spinning mass leaves).
+## Syncon = inertia only (a P=0 sync machine, C6); grid_forming = inertia
+## (virtual H_v) AND fast reserve (FFR) AND peak MW. SUBSTANTIAL by
+## necessity, not token: a coal-free grid is inertia-light and adequacy-
+## tight, and a modest fleet (measured: 4 syncon + 1.5 GW GFM) left the
+## world SHEDDING UFLS on the retirement transient and parked in permanent
+## ALERT. 9 GW of grid-forming storage + 10 condensers holds it — 0 UFLS
+## through the exit, frequency CALM enough to grade. This is the coal-exit
+## lesson in one constant: you cannot delete 47 GW of spinning mass and
+## backfill it with a handful of machines. (The renewable base is inherited
+## 2025 reality per ledger 49; this flex is the committed coal-exit setup —
+## in a fuller game the player builds toward it.)
+const ERA_SYNCON_UNITS := 10
+const ERA_GFM_MW := 9000.0
 
 
 ## An era-progressed inherited world: author_start plus the plausible
@@ -303,7 +318,7 @@ const ERA_BATTERY_MW := 3000.0
 static func author_era(world: Node, era_id: String) -> bool:
 	# reject unknown eras BEFORE mutating the world (the review's nit: a
 	# failed call must not leave a half-built world behind)
-	if era_id != "green_push":
+	if era_id != "green_push" and era_id != "coal_exit":
 		push_error("author_era: unknown era %s" % era_id)
 		return false
 	if not author_start(world):
@@ -321,7 +336,74 @@ static func author_era(world: Node, era_id: String) -> bool:
 			% [era_id, placed.get("wind", 0.0), ERA_WIND_MW,
 			placed.get("solar", 0.0), ERA_SOLAR_MW])
 		return false
-	return author_hub_wave(world) != ""
+	if author_hub_wave(world) == "":
+		return false
+	# coal_exit then commissions the inertia replacement — LAST, so it never
+	# competes with the RE program for the scarce substation rings. It
+	# anchors on the THERMAL fleet's own feed corridors (a machine on a free
+	# tile beside a corridor that touches a synchronous plant joins that
+	# plant's bus in the MAIN island and actually SWINGS — substation-ring
+	# sides connect only intermittently, which stranded 15 of 18 machines,
+	# the ledger-44/C3 Potemkin-fleet trap). Soft floor: best-effort
+	# placement, but refuse a world that got no meaningful replacement.
+	if era_id == "coal_exit":
+		var inertia: Dictionary = author_inertia_replacement(world)
+		if float(inertia.get("gfm", 0.0)) < ERA_GFM_MW * 0.5 \
+				or int(inertia.get("syncon_units", 0)) < ERA_SYNCON_UNITS / 2:
+			push_error("author_era(coal_exit): inertia replacement starved (gfm %.0f/%.0f, syncon %d/%d)"
+				% [inertia.get("gfm", 0.0), ERA_GFM_MW,
+				inertia.get("syncon_units", 0), ERA_SYNCON_UNITS])
+			return false
+	return true
+
+
+## The C7 inertia-replacement program: syncon (inertia) + grid_forming
+## (inertia AND reserve) placed on free tiles beside the THERMAL fleet's
+## feed corridors — a corridor tile that touches a synchronous plant is a
+## guaranteed bus tile in the main island (GridTopology's touches_site
+## rule), so a machine on its free neighbour joins that bus and SWINGS.
+## Anchoring on the thermal fleet (not substation rings) both keeps the
+## machines in the main synchronous area AND avoids the RE program's rings.
+## Returns {"syncon_units": n, "gfm": MW}.
+static func author_inertia_replacement(world: Node) -> Dictionary:
+	# tiles of the synchronous fleet (coal/gas/nuclear/hydro — NOT syncon
+	# itself, which has no prime mover and forms no source bus)
+	var sync_tiles := {}
+	for pid: String in world.plants:
+		var kind := str(world.plants[pid]["kind"])
+		if kind in world.SYNC_KINDS and kind != "syncon":
+			sync_tiles[world.plants[pid]["tile"]] = true
+	# corridor tiles that touch one of those plants — the bus tiles to anchor
+	# beside, sorted for determinism
+	var anchors: Array = []
+	for tile: Vector2i in world.corridors:
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			if sync_tiles.has(tile + offset):
+				anchors.append(tile)
+				break
+	anchors.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var placed := {"syncon_units": 0, "gfm": 0.0}
+	# syncons first (inertia where the coal was), then GFM; one machine per
+	# anchor so they fan out over the fleet
+	for kind: String in ["syncon", "grid_forming"]:
+		for anchor: Vector2i in anchors:
+			if kind == "syncon" and int(placed["syncon_units"]) >= ERA_SYNCON_UNITS:
+				break
+			if kind == "grid_forming" and float(placed["gfm"]) >= ERA_GFM_MW:
+				break
+			for offset: Vector2i in GridTopology.NEIGHBORS:
+				var site: Vector2i = anchor + offset
+				if world.can_place_plant(kind, site):
+					var pid: String = world.place_plant(kind, site)
+					if pid != "":
+						if kind == "syncon":
+							placed["syncon_units"] = int(placed["syncon_units"]) + 1
+						else:
+							placed["gfm"] = float(placed["gfm"]) \
+								+ float(world.plants[pid]["p_max_mw"])
+					break
+	return placed
 
 
 ## The C3 RE program (moved from the smoke — extraction, not redesign):

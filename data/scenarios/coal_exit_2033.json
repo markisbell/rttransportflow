@@ -1,0 +1,18 @@
+{
+  "id": "coal_exit_2033",
+  "title": "Coal Exit (2035)",
+  "description": "Start in the final year of the coal phase-out with the green build-out and a substantial grid-forming-storage + synchronous-condenser fleet standing. Retire the last ~47 GW of coal before Jan 2035 (day 120) without shedding load: the coal leaves, and the storage fleet's virtual inertia + fast reserve holds the inertia-light grid. Zero UFLS is mastery; ≤ 2 passes.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "author_era": "coal_exit",
+  "start_day": 118.0,
+  "campaign": {
+    "milestone_index": 4
+  },
+  "economy": {
+    "treasury_eur": 10000000000.0,
+    "_rationale": "C7 fixture: the post-M4 player has the green build-out plus the coal-exit flex fleet standing; 10 B€ absorbs ~1.7 B€ of decommissioning fees (57 coal/lignite units at 2% catalog capex) and keeps clear of the -2 B€ insolvency line while the coal comes off."
+  },
+  "_why_start_day": "118.0 sits inside the milestone's graded final year (days 108-120, 2035): the coal is retired at 118.05 and the rest of the year runs coal-free on the flex fleet — the flex holds a UFLS-clean retirement (measured), so the in-year retirement does not cost the final-year budget. The M5 window opened at day 72 (2031); the recipe joins near the close (a legal in-window cold start, the M2/M4 pattern). The coal-free era world is inertia-light and runs permanent-ALERT (~35x realtime, calm_week class), so the full 48-day window is a multi-hour traversal; the smoke grades a ~2-day coal-free slice of the final year, which is what the pin needs."
+}

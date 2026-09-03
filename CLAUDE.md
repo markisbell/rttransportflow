@@ -2009,6 +2009,113 @@ economics, `author_era("coal_exit")` recipe, smoke `campaign_coal_exit`
 (8048), the fine/retry loop — the retirement toolkit whose inertia
 replacements C6 just shipped.
 
+### C7 — Slice M5: Coal Exit (campaign arc, 2026-09-03)
+
+**Built:** the coal-exit TOOLKIT, mechanic-complete and tested — the
+RETIRE verb, the economics of decommissioning, the coal-exit flex world.
+The M5 ★-rubric is NOT pinned: it is a surfaced balancing wall (§7 Q8,
+below and measured across five approaches) — retiring coal on this world
+cannot yet hold ≤ 2 UFLS/final-year. THE PLAYER
+VERB: the plant inspector gains a two-press "Retire this unit" (RETIRABLE
+= the thermal fleet; the confirm shows the fee so a mis-click can't scrap
+a GW unit) — model-instant (`coal_mw()` drops, the plant leaves World) but
+physics-deferred (world_changed → BuildSession rebuilds/re-registers,
+which removes the inertia). THE ECONOMICS (D6, §4.7):
+`Economy.book_retirement` — a 2 % of catalog-capex decommissioning fee in
+its OWN books category (not a fine — retiring on schedule is the
+milestone), ZERO refund (a refund invites retire-rebuild arbitrage), the
+sunk capex annuity keeps accruing; and `_bill_fom`'s mothball branch — a
+`plant_mode=="mothballed"` unit bills 0.3× FOM (preservation staffing),
+the idle-instead-of-scrap strategy. Keys in economy.json
+(`retirement_fee_frac_capex` 0.02, `fom_mothball_mult` 0.3);
+`retirement_cost` round-trips save/load AND the cost window; ONE fee
+formula (`Economy.retirement_fee_eur`), the inspector only displays it. THE
+WORLD: `GridPlan.author_era("coal_exit")` = green_push + the coal-exit
+flex fleet (10 synchronous condensers + 9 GW of grid-forming storage),
+coal STILL standing. THE SMOKE: `campaign_coal_exit` (8048) is a MECHANIC
+GATE — it retires the whole fleet through the Retire verb's own calls,
+asserts coal → 0, the €1.73 B of fees booked, the treasury survives, the
+flex fleet still ELECTRICALLY registered after the rebuild, and the
+coal-free world REGISTERS and SOLVES; then it MEASURES the shedding wall
+and reports it (not a ★-pin).
+
+**The wall the milestone hits (measured across five approaches — the C7
+finding):** retiring 47 GW of coal cannot meet §5.2.5's ≤ 2 UFLS/final-year
+on this world, for two independent reasons. (1) COAL-FREE RAMP FRAGILITY:
+with coal gone the inertia-light, RE-heavy grid sheds ~6 UFLS at the very
+next demand ramp — an inertia + ramp-POWER gap that pre-built condensers do
+NOT close (tried to 40: a syncon adds RoCoF headroom, not ramp power;
+grid-forming batteries have the power but not the sustained energy). (2)
+REBUILD TRANSIENT: retiring is `World.remove_plant` → a full backend
+net/reset (remove_device is not a patch op, P7), so EVERY retirement
+cold-starts the whole fleet (ledger 53) and perturbs frequency — even a
+6-unit batch grinds into ALERT, so neither all-at-once (into any window)
+NOR gradual retirement stays under the ceiling. WITH coal the same world is
+clean and fast (~0.3 s/step, zero shed through every ramp): coal's spinning
+mass is doing the work, and 9 GW of flex cannot stand in for 47 GW of it.
+Closing the wall is an owner decision (§7 Q8): a backend net/patch
+remove_device (retire with no cold-start), firmer flex (M6's H2-CCGT), or a
+rubric/retirement-cadence revisit. Coal exit is a flex problem, not a
+delete key — the milestone's point (§5.2.5); this world just cannot yet
+afford the flex.
+
+**Two placement/perf realities each cost a debugging arc:**
+- **Connection, not placement** (the ledger-44/C3 Potemkin trap, refound):
+  the flex fleet must ELECTRICALLY connect. `can_place_plant` forbids
+  corridor tiles, and a machine joins a bus ONLY when its tile neighbours a
+  corridor that TOUCHES A PLANT (GridTopology's touches_site) — substation
+  sides connect only intermittently (the RE program hides this by placing
+  at VOLUME, measuring placed not connected MW), so a bus-anchored first
+  cut stranded 15 of 18 machines. The fleet now anchors on the THERMAL
+  fleet's own feed corridors (a guaranteed main-island bus tile), lands
+  LAST after RE + hub (no ring contention). The GdUnit gate asserts
+  CONNECTED counts (native doc + devices), not placed — the placed check
+  passed the Potemkin.
+- **The coal-free world runs permanent-ALERT** (~35x realtime, the
+  calm_week class): the inertia-light post-coal grid keeps frequency
+  wandering enough to hold 10 ms ticks — which is BOTH the shedding wall and
+  why a full-window graded run is a multi-hour traversal. The mechanic gate
+  retires early (day 118.05) and steps a short coal-free window to prove
+  operability and measure the shedding; it does not traverse to the close.
+  dt = 60 s uniform (coarse 300-900 s steps land the demand+RE jump as a
+  multi-GW ALERT dive and overrun the step timeout).
+
+**Tests/acceptance:** GdUnit 87/87 (test_c7 ×8: fee formula + own-category,
+no refund on removal, mothball ×0.3, retirement_cost round-trip, the C7
+economy keys, the era world's flex + node budget + CONNECTED-count guard,
+unknown-era refusal); scenarios green with coal_exit_2033 (deterministic,
+milestone index from the recipe — the C4 CI-red fix holds). An adversarial
+3-lens review (11 agents) confirmed 5 findings (0 blocking), all fixed
+before the gate: the final-year UFLS read AFTER the window-close acc reset
+(vacuous — now captured pre-reset in the milestone_passed handler), the
+ungraded retirement transition (now a whole-run UFLS bound), the
+overclaiming docstring, the duplicated fee formula (the review's fixes
+predate the wall diagnosis and stand on their own). **Milestone 5: the
+mechanic gate is green** — the toolkit retires the 47 GW / 57 units (fee
+€1.73 B, treasury 10 → 8.3 B), the flex fleet stays connected across the
+rebuild, and the coal-free world registers and solves; the smoke reports
+the shedding rather than pinning stars. The ★-rubric is §7 Q8. Regression
+green: dispatch_day + save_load_replay + economy (avg 34.4496,
+economy_windows.csv BYTE-identical) + campaign_take_the_reins ★★★, all
+under the economy changes.
+
+**Deviations (deliberate):** M5's smoke is a MECHANIC gate, not a ★-pin —
+the first slice of the arc that does not pin its milestone, because the
+milestone as balanced is not passable (the wall above). The full-window
+★-traversal is doubly out: infeasible (permanent-ALERT coal-free world,
+~35x realtime, a multi-hour run) AND unpassable. The five approaches tried
+are logged here so the owner is not asked to re-discover them: 4-syncon
+token flex (shed on the transient + permanent ALERT), 9 GW-GFM +
+10-syncon all-at-once early (shed 6 at the morning ramp), the same late
+into declining evening demand (shed > 2 on the re-commit transient alone),
+40 syncon (no help — ramp-power gap, not inertia), and 10-batch gradual
+(every batch's rebuild grinds — worse, not better). The coal-exit flex
+fleet is pre-built as the committed setup (the renewable base stays
+inherited-2025 per ledger 49). §7 Q8 carries the decision.
+
+**Next:** C8 — slice M6 (The Hydrogen Loop): electrolysis + cavern +
+H2-conversion as the player path, smoke campaign_hydrogen_loop (8049).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -2030,6 +2137,27 @@ ledger entry:
 7. **Synthetic-inertia & PHS variants** — wind synthetic inertia ships as a
    2035 unlock (chosen); ternary/var-speed PHS and PHS syncon mode are
    backlog flags.
+8. **M5 Coal-Exit playability — BLOCKED, needs a decision (C7, 2026-09-03).**
+   The retire toolkit ships and works, but the milestone as balanced is not
+   passable: retiring 47 GW of coal on the realistic world sheds > 2
+   UFLS/final-year, from two independent causes measured across five
+   approaches (see the C7 §6 entry) — (a) the coal-free grid is inertia-light
+   and sheds ~6 UFLS at the next demand ramp, a ramp-POWER gap no amount of
+   pre-built condensers closes; (b) every retirement is a `World.remove_plant`
+   → full backend net/reset cold-start (ledger 53) that perturbs frequency,
+   so even a 6-unit batch grinds into ALERT. WITH coal the same world is
+   clean and fast — coal's spinning mass is doing the work, and 9 GW of flex
+   cannot stand in for 47 GW of it. Three ways to close it, an owner call:
+   (i) a backend `net/patch remove_device` so a retirement is a live edit,
+   not a cold-start (the cleanest — removes cause (b), and lets coal come off
+   gradually without a transient); (ii) firmer low-carbon capacity — M6's
+   H2-CCGT is exactly the fast, dispatchable, coal-replacing plant the ramps
+   need, so M5 may be MEANT to depend on M6 (retire coal only after the H2
+   chain is up); (iii) relax the §5.2.5 rubric or model a slower
+   retirement cadence. Recommended default until overridden: sequence M5
+   after M6 (option ii) AND add `remove_device` (option i) in a backend
+   slice, because both are independently useful. Nothing downstream is
+   blocked — C8 (M6) is the natural next step and feeds the answer.
 
 ## 8. Release checklist (ROADMAP P10)
 

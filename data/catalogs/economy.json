@@ -131,5 +131,8 @@
     "h2_cavern_fom_meur_a": 1.4,
     "syncon_meur": 54.0,
     "syncon_fom_meur_a": 1.1,
-    "_syncon_rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser is priced per UNIT (its p_max is 0, so the per-kW formula yields ~0). 54 MEUR ~= 180 EUR/kVA * 300 MVA for a purpose-built machine (a retired-generator conversion is cheaper in reality — v1 prices the buildable, not the conversion discount). FOM ~2% capex/a."
+    "_syncon_rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser is priced per UNIT (its p_max is 0, so the per-kW formula yields ~0). 54 MEUR ~= 180 EUR/kVA * 300 MVA for a purpose-built machine (a retired-generator conversion is cheaper in reality — v1 prices the buildable, not the conversion discount). FOM ~2% capex/a.",
+    "retirement_fee_frac_capex": 0.02,
+    "fom_mothball_mult": 0.3,
+    "_retirement_rationale": "C7/D6: retiring a plant costs 2% of its catalog capex (decommissioning, site remediation) with zero refund — a refund would invite retire-rebuild arbitrage. Mothballing bills only 0.3x FOM (preservation staffing, no fuel/CO2) — the strategy that lets a player idle a coal unit through a mild year instead of paying to scrap it, at the cost of keeping the capacity on the books."
 }

@@ -10,6 +10,10 @@ extends PanelContainer
 ## sandbox_panel headless-cache lesson).
 
 const MODES: Array[String] = ["auto", "must_run", "reserve_only", "mothballed"]
+## C7: the decommissionable thermal fleet — the kinds a coal-exit player
+## retires. Renewables/devices are not "retired" with a decommission fee in
+## v1; every listed kind has a capex_eur_per_kw for the §4.7 fee formula.
+const RETIRABLE: Array[String] = ["coal", "lignite", "gas_ccgt", "gas_ocgt", "nuclear"]
 
 var pid := ""
 var _title: Label
@@ -18,6 +22,8 @@ var _mode: OptionButton
 var _policy: OptionButton
 var _policy_row: HBoxContainer
 var _black_start: Button
+var _retire: Button
+var _retire_armed := false  # two-press confirm: a mis-click must not scrap a unit
 
 
 func _ready() -> void:
@@ -87,6 +93,18 @@ func _ready() -> void:
 		_refresh_state())
 	stack.add_child(_black_start)
 
+	# C7: the retire verb — the coal-exit path. Model-instant (the plant
+	# leaves World and coal_mw() drops immediately) but physics-deferred:
+	# remove_plant fires world_changed, BuildSession debounces a rebuild and
+	# re-registers. Two-press confirm because the fee is real and there is no
+	# refund (ledger 51/D6). Retire the inertia BEFORE the final year or the
+	# ledger-13 reference incident has nothing to swing.
+	_retire = Button.new()
+	_retire.focus_mode = Control.FOCUS_NONE
+	_retire.modulate = Color(1.0, 0.72, 0.62)
+	_retire.pressed.connect(_on_retire)
+	stack.add_child(_retire)
+
 	var close := Button.new()
 	close.text = "Close"
 	close.focus_mode = Control.FOCUS_NONE
@@ -111,6 +129,9 @@ func open(plant_id: String) -> void:
 	_policy_row.visible = kind in ["battery", "grid_forming"]
 	if _policy_row.visible:
 		_policy.selected = Dispatch.BATTERY_POLICIES.find(Dispatch.battery_policy)
+	_retire_armed = false
+	_retire.visible = kind in RETIRABLE
+	_refresh_retire()
 	_refresh_state()
 	tooltip_text = "%s — %.0f MW" % [
 		str(World.KIND_LABELS.get(kind, kind)), float(plant.get("p_max_mw", 0.0))]
@@ -153,6 +174,43 @@ func _refresh_state() -> void:
 	if device.has("soc"):
 		parts.append("SoC %.0f %%" % (Wire.numf(device, "soc", 0.0) * 100.0))
 	_state.text = " · ".join(parts)
+
+
+func _retire_fee_eur() -> float:
+	var plant: Dictionary = World.plants.get(pid, {})
+	# ONE fee formula: Economy owns it, the inspector only displays it (a
+	# second copy is a drift bug — the review's nit)
+	return Economy.retirement_fee_eur(str(plant.get("kind", "")),
+		float(plant.get("p_max_mw", 0.0)))
+
+
+func _refresh_retire() -> void:
+	if not _retire.visible:
+		return
+	if _retire_armed:
+		_retire.text = "Confirm retire — €%.1fM fee" % (_retire_fee_eur() / 1e6)
+	else:
+		_retire.text = "Retire this unit"
+
+
+func _on_retire() -> void:
+	if pid == "" or not World.plants.has(pid):
+		return
+	if not _retire_armed:
+		_retire_armed = true  # first press arms; the fee is shown, no charge yet
+		_refresh_retire()
+		return
+	# second press: charge the decommission fee, drop the plant (coal_mw()
+	# falls now), and let BuildSession debounce the rebuild/re-register that
+	# actually removes its inertia from the island.
+	var plant: Dictionary = World.plants.get(pid, {})
+	Economy.book_retirement(str(plant.get("kind", "")), float(plant.get("p_max_mw", 0.0)))
+	print("INSPECTOR retire %s (%s, %.0f MW) fee €%.1fM" % [pid,
+		str(plant.get("kind", "")), float(plant.get("p_max_mw", 0.0)),
+		_retire_fee_eur() / 1e6])
+	Dispatch.plant_mode.erase(pid)  # no shadow mode for a gone plant
+	World.remove_plant(pid)
+	close_panel()
 
 
 func _on_mode(index: int) -> void:

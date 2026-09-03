@@ -427,6 +427,7 @@ func _books_snapshot() -> Dictionary:
 		"capex_annuity": Economy.capex_annuity_eur,
 		"interest": Economy.loan_eur,
 		"penalties": Economy.penalty_cost,
+		"retirement": Economy.retirement_cost,
 		"delivered": Economy.delivered_mwh}
 
 
@@ -445,7 +446,8 @@ func _window_avg_cost() -> float:
 		+ (Economy.redispatch_cost - float(start["redispatch"])) \
 		+ (Economy.capex_annuity_eur - float(start.get("capex_annuity", Economy.capex_annuity_eur))) \
 		+ (Economy.loan_eur - float(start.get("interest", Economy.loan_eur))) \
-		+ (Economy.penalty_cost - float(start.get("penalties", Economy.penalty_cost)))
+		+ (Economy.penalty_cost - float(start.get("penalties", Economy.penalty_cost))) \
+		+ (Economy.retirement_cost - float(start.get("retirement", Economy.retirement_cost)))
 	# missing keys (a pre-D2 snapshot) default to the CURRENT value so an
 	# absent axis contributes zero — a 0.0 default would bill the whole
 	# campaign's loan interest into one window (C1 review)

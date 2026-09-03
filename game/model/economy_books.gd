@@ -21,6 +21,7 @@ var voll_penalty := 0.0
 var reserve_income := 0.0
 var redispatch_cost := 0.0
 var penalty_cost := 0.0
+var retirement_cost := 0.0  # C7: decommissioning fees (D6)
 ## §4.7 cost axis (D2, ledger 51): the annuity is a KPI accumulator, NOT a
 ## treasury debit — capex was already paid in full on placement; charging
 ## the annuity to the treasury would pay twice. The campaign's cost window
@@ -130,6 +131,24 @@ func book_penalty(eur: float) -> void:
 	books_updated.emit()
 
 
+## Retirement fee (C7/D6): decommissioning is not free — a fraction of the
+## plant's capex, refund 0 (a refund would invite retire-rebuild
+## arbitrage). Its OWN books category, not a fine: retiring on schedule is
+## the milestone, not a regulatory failure. The plant's sunk capex stays
+## booked (its annuity keeps accruing on capital already spent — realistic).
+func retirement_fee_eur(kind: String, p_max_mw: float) -> float:
+	var frac: float = float(cfg.get("retirement_fee_frac_capex", 0.02))
+	var eur_per_kw: float = (cfg["capex_eur_per_kw"] as Dictionary).get(kind, 0.0)
+	return frac * eur_per_kw * p_max_mw * 1000.0
+
+
+func book_retirement(kind: String, p_max_mw: float) -> void:
+	var fee := retirement_fee_eur(kind, p_max_mw)
+	retirement_cost += fee
+	treasury_eur -= fee
+	books_updated.emit()
+
+
 # --- per-step operating books --------------------------------------------
 
 func _on_step(_t: int, result: Dictionary) -> void:
@@ -217,7 +236,15 @@ func _bill_fom(days: int) -> void:
 			daily += float(cfg.get("syncon_fom_meur_a", 1.1)) * 1e6 / 365.0
 			continue
 		var p_max: float = World.plants.get(pid, {}).get("p_max_mw", 0.0)
-		daily += (cfg["fom_eur_per_kw_a"] as Dictionary).get(kind, 0.0) * p_max * 1000.0 / 365.0
+		var unit_fom: float = (cfg["fom_eur_per_kw_a"] as Dictionary).get(kind, 0.0) \
+			* p_max * 1000.0 / 365.0
+		# C7/D6: a MOTHBALLED plant bills only preservation staffing (×0.3) —
+		# the upside that makes mothball a real strategy vs full FOM. Economy
+		# reads Dispatch.plant_mode directly (already reaches into Dispatch
+		# for the catalog and redispatch cost).
+		if str(Dispatch.plant_mode.get(pid, "auto")) == "mothballed":
+			unit_fom *= float(cfg.get("fom_mothball_mult", 0.3))
+		daily += unit_fom
 	fom_cost += daily * days
 	treasury_eur -= daily * days
 	# same daily convention as FOM (/365 of the annual figure per sim-day)
@@ -263,6 +290,7 @@ func to_dict() -> Dictionary:
 		"redispatch_cost": redispatch_cost, "delivered_mwh": delivered_mwh,
 		"unserved_mwh": unserved_mwh, "co2_t": co2_t,
 		"penalty_cost": penalty_cost, "capex_annuity_eur": capex_annuity_eur,
+		"retirement_cost": retirement_cost,
 		"fom_billed_days": _fom_billed_days,
 		"last_redispatch_seen": _last_redispatch_seen,
 	}
@@ -284,6 +312,7 @@ func from_dict(state: Dictionary) -> void:
 	unserved_mwh = float(state.get("unserved_mwh", 0.0))
 	co2_t = float(state.get("co2_t", 0.0))
 	penalty_cost = float(state.get("penalty_cost", 0.0))
+	retirement_cost = float(state.get("retirement_cost", 0.0))
 	capex_annuity_eur = float(state.get("capex_annuity_eur", 0.0))
 	_fom_billed_days = int(state.get("fom_billed_days", 0))
 	_last_redispatch_seen = float(state.get("last_redispatch_seen", 0.0))
