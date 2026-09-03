@@ -1885,6 +1885,67 @@ confirmation run + regression triad green.
 `zone_commands` channel and the staged manual reload below the UFLS
 floor), smoke `black_start` (8047).
 
+### C5 — Black start & restoration (campaign arc, 2026-09-03)
+
+**Built:** the ledger-34 doctrine's GAME side — recon's headline was
+that the backend wire surface has been COMPLETE since P8
+(`device_commands.black_start`, `zone_commands.restore_load` routed
+zone→island backend-side, tested), so C5 is game code plus one v2.md
+doc fix. The `Restoration` autoload is the player's single verb
+(`begin(pid)`, the inspector's Black-start button) run as a state
+machine: CRANK (one-shot breaker-close + black_start via the new
+`Boundary.pending_device_commands` overlay — override, never blend;
+re-armed each block so a lost step or a lockout note can't wedge it)
+→ RELOAD (the unit held at a 30 MW house-load floor via an always-on
+override; restore_load blocks released one per wire block only when
+measured ONLINE capacity covers the summed next target — run 1
+measured the engine's 1 %/10 s ramp outrunning a lone 200 MW OCGT
+and re-collapsing the island at 20 %; fleet restarts staged two
+breaker-closes per block) → completion against the measured wire
+(done zones complete even when a swept-up second pocket stays black —
+it is released for its own black start; a machine orphaned by a
+rebuild self-heals when the world comes back healthy). Dispatcher
+guards, identity in every healthy run: black/restoring zones bill
+measured `supplied` in BOTH the need ledger and the 24 h forecast
+loop (unscaled forecast committed the whole fleet one block after a
+blackout and parked every candidate "starting"), and batteries/
+electrolyzers in such zones schedule NO flex load (run 1: batteries
+charging on the cheap blackout price piled 300 MW onto a 200 MW
+island). Candidates are physics-honest fast starters only
+(OCGT/PHS/CCGT — slow steam and nuclear cannot crank a dead island
+and nuclear's 48 h lockout silently swallowed the command) and a
+PARKED "starting" unit is a candidate (the backend accepts
+black_start on a STARTING row). Advisor names the black zones + best
+unit ahead of all advisories; the button doubles as Cancel; armed
+one-shots clear on scenario/save loads.
+
+**Tests/acceptance:** GdUnit 65 → 73 (machine transitions incl.
+re-collapse, self-heal and multi-pocket; candidate ranking with
+"starting"; the need guard black-vs-UFLS matrix; overlay
+override-and-clear; advisor hint). Backend suite untouched (no engine
+change). The 2-lens review confirmed 11 (3 refuted) — the two
+BLOCKING finds were invisible to the smoke's timing: the dispatcher
+converts every candidate to "starting" one block after any blackout
+(verb permanently unreachable in real play), and CRANK could wedge
+forever with the button disabled. **Smoke `black_start` (8047)
+measured green 12/12 twice**: blackout at supplied 0.0 → advisor
+hint → crank 15 min (OCGT 900 s lead) → re-energized at exactly
+50.0 Hz onto the unloaded system, unit never commanded past 30 MW
+while dark → capacity gate visibly pacing ("online 920 < 1081 —
+hold") → staged reload to supplied 1.000 in 8 blocks, load_restored,
+f_end 49.92, no re-collapse. Full regression set green: triad exact
+(★★★, 53.8333/63.1186), cascade/ride_through under the new guards,
+hydrogen_chain round trip 0.3747 byte-identical to HEAD,
+battery_response. A verification-hygiene incident cost one bisect:
+two smokes "failed" mid-gate because the review fixes were edited
+into the tree WHILE a chain ran against it — each smoke reads the
+tree at its own start; the sequence rule (edits → GdUnit → then
+chains) is recorded in session memory beside the cwd trap.
+
+**Next:** C6 — the inertia portfolio: GFM buildable + the syncon
+backend kind (the arc's only backend phase; validate_core P=0 spike
+first), smoke `syncon_inertia` (8051).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
