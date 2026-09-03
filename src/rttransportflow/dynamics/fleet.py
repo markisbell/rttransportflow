@@ -121,6 +121,11 @@ class Fleet:
     db: np.ndarray
     fcr_band: np.ndarray
     ramp_mw_s: np.ndarray
+    # station service while ONLINE (C6: the syncon's 1 % S_n — §1.15).
+    # A PARAMETER, not state: derivable from the catalog + composition,
+    # so it stays OUT of the model hash (existing saves keep their hash;
+    # a world with a syncon already differs via ids/s_n).
+    sync_aux_mw: np.ndarray
     # chain coefficients
     t_a: np.ndarray
     t_b: np.ndarray
@@ -598,7 +603,8 @@ class Fleet:
             self.fuel_mwh_th[fueled] += (e_step[fueled] / np.maximum(eta[fueled], 1e-9))
 
         p_mech = np.zeros(n_islands)
-        np.add.at(p_mech, self.island_of, y - self.hy_pump_p)
+        aux_s = np.where(self.status == ONLINE, self.sync_aux_mw, 0.0)
+        np.add.at(p_mech, self.island_of, y - self.hy_pump_p - aux_s)
         p_inv = np.zeros(n_islands)
 
         # --- inverter plants (wind/PV): lags + LFSM-O -------------------
@@ -840,6 +846,7 @@ def make_fleet(
         k_droop=np.array([float(s["s_n"]) / (float(s.get("r", d.r_pu)) * F0) for s in sync])
         if n else np.zeros(0),
         db=col("db", lambda s: d.db_hz),
+        sync_aux_mw=col("aux_mw", lambda s: 0.0),
         fcr_band=np.array(
             [float(s.get("fcr_band", d.fcr_band_frac * float(s["s_n"]))) for s in sync]
         ) if n else np.zeros(0),

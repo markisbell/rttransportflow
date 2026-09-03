@@ -28,6 +28,12 @@ _REQUIRED_BY_MODEL = {
                 "soc_min_frac", "soc_max_frac", "soc_target_frac",
                 "recharge_frac_pn", "recharge_quiet_hz", "h_v_s"},
     "electrolyzer": {"t_e_s", "shed_full_hz", "deadband_hz"},
+    # C6 (§1.15): a synchronous condenser — spinning mass and voltage
+    # support, no prime mover. Inertia and Q ride on S_n; the station
+    # load is the price of the spinning steel. (The Q band is the shared
+    # GEN_Q_BAND = 0.40 = §1.15's ±0.40·S_n; no per-kind knob — a catalog
+    # value nothing read would be a dead knob.)
+    "syncon": {"h_s", "aux_frac_sn"},
 }
 
 
@@ -55,14 +61,38 @@ def load_catalog(path: str | Path = DEFAULT_CATALOG) -> dict[str, Any]:
 
 def sync_spec(kind: str, params: dict, *, device_id: str, island: int,
               p_max_mw: float, p_min_mw: float, p_set_mw: float,
-              offline: bool = False) -> dict:
+              offline: bool = False, sn_mva: float | None = None) -> dict:
     """Fleet sync-spec from a catalog entry. Envelope p_min is DEVICE-level
     (game/scenario-set); the catalog p_min_pct informs the dispatcher, not
     the engine clamp."""
     model = params["model"]
+    if model == "syncon":
+        # no prime mover: pure inertia + Q support. S_n MUST be explicit
+        # (p_max is 0 — the /0.9 derivation would zero the machine out);
+        # fcr_band 0 is the governor's off switch (the droop clamp),
+        # k_droop is zeroed via a huge r, and the steam-chain taus are
+        # inert placeholders the u = 0 chain never excites.
+        if not sn_mva or sn_mva <= 0.0:
+            raise CatalogError(f"{device_id}: syncon requires sn_mva > 0")
+        return {
+            "id": device_id, "island": island, "model": "steam",
+            "s_n": float(sn_mva), "p_max": 0.0, "p_min": 0.0, "p_set": 0.0,
+            "h": params["h_s"], "r": 1e9, "db": 0.5,
+            "fcr_band": 0.0, "afrr_band": 0.0, "ramp_mw_s": 0.0,
+            "start_hot_s": params.get("start_hot_s", 900),
+            "start_warm_s": params.get("start_warm_s", 900),
+            "start_cold_s": params.get("start_cold_s", 900),
+            "warm_after_s": params.get("warm_after_s", 28800),
+            "cold_after_s": params.get("cold_after_s", 172800),
+            "trip_lockout_s": params.get("trip_lockout_s", 0),
+            "eta_full": 0.0, "eta_min": 0.0, "offline": offline,
+            "t_g": 1.0, "t_ch": 1.0, "t_rh": 10.0, "f_hp": 0.3,
+            "aux_mw": params["aux_frac_sn"] * float(sn_mva),
+        }
     spec = {
         "id": device_id, "island": island, "model": model,
-        "s_n": p_max_mw / 0.9, "p_max": p_max_mw, "p_min": p_min_mw,
+        "s_n": float(sn_mva) if sn_mva else p_max_mw / 0.9,
+        "p_max": p_max_mw, "p_min": p_min_mw,
         "p_set": p_set_mw,
         "h": params["h_s"], "r": params["r_pu"], "db": params["deadband_hz"],
         "fcr_band": params["fcr_band_frac_pn"] * p_max_mw,

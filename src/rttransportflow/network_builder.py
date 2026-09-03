@@ -123,18 +123,25 @@ def build_network(data: InputData) -> BuiltNetwork:
     sgen_rows: list[list[float]] = []
     for plant in data.plants.plants:
         if plant.kind in SYNC_KINDS:
+            # Q rides on the RATING: sn_mva when explicit (C6 — a P=0
+            # syncon's whole point is ±0.40·S_n; the p_max band would be
+            # zero), the historic p_max band otherwise (bit-identical)
+            q_base = plant.sn_mva if plant.sn_mva else plant.p_max_mw
             idx = pp.create_gen(
                 net,
                 bus_index[plant.bus],
                 p_mw=0.0,
                 vm_pu=plant.vm_pu,
-                min_q_mvar=-GEN_Q_BAND * plant.p_max_mw,
-                max_q_mvar=GEN_Q_BAND * plant.p_max_mw,
+                min_q_mvar=-GEN_Q_BAND * q_base,
+                max_q_mvar=GEN_Q_BAND * q_base,
                 name=plant.id,
             )
             gen_idx.append(idx)
             gen_ids.append(plant.id)
             gen_rows.append(plant.profile_p_mw)
+            # (a syncon's station load is appended by the SIMULATOR after
+            # build, beside the electrolyzer load rows — the catalog owns
+            # the aux fraction and the builder is schema-only)
         elif plant.kind in CONVERTER_KINDS:
             idx = pp.create_sgen(net, bus_index[plant.bus], p_mw=0.0, q_mvar=0.0, name=plant.id)
             sgen_idx.append(idx)

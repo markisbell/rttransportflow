@@ -114,6 +114,50 @@ def spike_powerflow(n: int = 20, repeats: int = 100) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Spike (c) — C6/D4: a synchronous condenser as a P=0 controllable gen.
+# Measured 2026-09-03: cold converges (first solve = JIT warmup), warm
+# median 4.95 ms, P held at exactly 0, Q regulates within ±0.40·S_n and
+# pegs cleanly under enforce_q_lims. The syncon plant kind stands on this.
+# ---------------------------------------------------------------------------
+
+def spike_syncon() -> dict:
+    import pandapower as pp
+
+    net = pp.create_empty_network(sn_mva=100.0)
+    buses = [pp.create_bus(net, vn_kv=380.0) for _ in range(6)]
+    for i in range(5):
+        pp.create_line_from_parameters(net, buses[i], buses[i + 1], 80.0,
+                                       0.028, 0.32, 13.0, 2.0, parallel=2)
+    pp.create_ext_grid(net, buses[0], vm_pu=1.02)
+    for i, b in enumerate(buses[1:4], 1):
+        pp.create_load(net, b, p_mw=350.0 + 40 * i)
+    pp.create_gen(net, buses[2], p_mw=600.0, vm_pu=1.02,
+                  max_q_mvar=240.0, min_q_mvar=-240.0)
+    # the syncon: P=0, Q band from S_n = 300 MVA (±0.4), 1 % station load
+    sc = pp.create_gen(net, buses[4], p_mw=0.0, vm_pu=1.03,
+                       max_q_mvar=120.0, min_q_mvar=-120.0)
+    pp.create_load(net, buses[4], p_mw=3.0)
+    pp.runpp(net, enforce_q_lims=True, init="flat")
+    warm = []
+    for k in range(50):
+        net.load.loc[net.load.index[0], "p_mw"] = 350.0 + 5.0 * np.sin(k)
+        t0 = time.perf_counter()
+        pp.runpp(net, enforce_q_lims=True, init="results")
+        warm.append((time.perf_counter() - t0) * 1e3)
+    p_sc = float(net.res_gen.p_mw.at[sc])
+    net.gen.loc[sc, "vm_pu"] = 1.10  # unreachable target → Q must peg
+    pp.runpp(net, enforce_q_lims=True, init="results")
+    return {
+        "converged": bool(net.converged),
+        "syncon_p_mw": p_sc,
+        "warm_median_ms": statistics.median(warm),
+        "q_pegged_mvar": float(net.res_gen.q_mvar.at[sc]),
+        "ok": bool(net.converged) and abs(p_sc) < 1e-9
+              and abs(float(net.res_gen.q_mvar.at[sc]) - 120.0) < 1.0,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Spike (b): vectorized dynamics tick, 150 devices x 3 lag states
 # ---------------------------------------------------------------------------
 
@@ -184,6 +228,10 @@ def main() -> None:
         pf = spike_powerflow(n)
         for k, v in pf.items():
             print(f"  {k:26s} {v:.3f}" if isinstance(v, float) else f"  {k:26s} {v}")
+
+    print("== Spike (c): syncon as a P=0 controllable gen (C6/D4) ==")
+    for k, v in spike_syncon().items():
+        print(f"  {k:26s} {v:.3f}" if isinstance(v, float) else f"  {k:26s} {v}")
 
     print("== Spike (b): NumPy dynamics tick, 150 devices x 3 lag states ==")
     for dt in (0.010, 0.250):

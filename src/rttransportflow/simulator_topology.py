@@ -133,7 +133,14 @@ class TopologyMixin:
                 continue
             rows = np_.nonzero(fleet.online
                                & (fleet.island_of == island))[0]
-            best = max(rows, key=lambda r: float(fleet.s_n[r]))
+            # slack must be a machine that can SOURCE power: a 300 MVA
+            # syncon (p_max 0) would out-rank a 200 MW OCGT on raw s_n
+            # and pandapower would draw the island's residual from a
+            # machine with no prime mover (C6). Prefer real generators;
+            # a syncon-only island keeps a slack for solvability and its
+            # frequency model collapses it honestly (p_mech stays 0).
+            sourced = [r for r in rows if float(fleet.p_max[r]) > 0.0]
+            best = max(sourced or list(rows), key=lambda r: float(fleet.s_n[r]))
             net.gen.at[self.built.gen_idx[best], "slack"] = True
         for bus, comp in self._bus_island.items():
             net.bus.at[bus, "in_service"] = bool(live[comp])

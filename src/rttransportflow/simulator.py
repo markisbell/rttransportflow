@@ -248,6 +248,7 @@ class DynSimulator(TopologyMixin, CommandsMixin, ReportingMixin):
                     plant.kind, params, device_id=plant.id, island=0,
                     p_max_mw=plant.p_max_mw, p_min_mw=plant.p_min_mw,
                     p_set_mw=plant.profile_p_mw[0],
+                    sn_mva=plant.sn_mva,
                 ))
             elif plant.kind in CONVERTER_KINDS:
                 inv_specs.append(inverter_spec(
@@ -306,7 +307,8 @@ class DynSimulator(TopologyMixin, CommandsMixin, ReportingMixin):
         self._ely_load_idx: list[int] = []
         self._hub_sgen_idx: list[int] = []
         self._term_sgen_idx: list[int] = []
-        if wire["bat"] or wire["ely"] or hub_specs or wire["pairs"]:
+        _has_sync_aux = any(s.get("aux_mw", 0.0) > 0.0 for s in sync_specs)
+        if wire["bat"] or wire["ely"] or hub_specs or wire["pairs"] or _has_sync_aux:
             import pandapower as pp
             bus_of = built.bus_index
             for spec in wire["bat"]:
@@ -317,6 +319,18 @@ class DynSimulator(TopologyMixin, CommandsMixin, ReportingMixin):
                 self._ely_load_idx.append(int(pp.create_load(
                     built.net, bus_of[wire["nodes"][spec["id"]]],
                     p_mw=0.0, q_mvar=0.0, name=spec["id"])))
+            # syncon station loads (C6, §1.15: 1 % S_n): a constant PF
+            # load row per machine — the frequency ledger carries the
+            # same MW via fleet.sync_aux_mw, so bus flows and the island
+            # balance agree; the catalog owns the fraction (one source)
+            for spec in sync_specs:
+                if spec.get("aux_mw", 0.0) > 0.0:
+                    pp.create_load(
+                        built.net, bus_of[
+                            next(p.bus for p in data.plants.plants
+                                 if p.id == spec["id"])],
+                        p_mw=float(spec["aux_mw"]), q_mvar=0.0,
+                        name=f"{spec['id']}_aux")
             for hub in hub_specs:
                 self._hub_sgen_idx.append(int(pp.create_sgen(
                     built.net, bus_of[wire["nodes"][hub["id"]]],

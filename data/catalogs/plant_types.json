@@ -149,6 +149,15 @@
       "_reservoir_rationale": "PARAMETERS 1.10: 300 MW / 8 h = 2400 MWh reference; pump/turbine efficiencies give the ~0.79 round trip; pumping is a motor load that keeps the machine's inertia in the pool (P8 pump mode)",
       "afrr_band_frac_pn": 0.2
     },
+    "syncon": {
+      "model": "syncon",
+      "h_s": 3.0,
+      "aux_frac_sn": 0.01,
+      "start_hot_s": 900,
+      "start_warm_s": 900,
+      "start_cold_s": 900,
+      "rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser — spinning mass and voltage support with no prime mover. H 3.0 s on the EXPLICIT S_n rating (sn_mva on the plant row; p_max is 0, so the historic p_max/0.9 derivation would zero the machine), Q ±0.40·S_n at any operating point, 1 % S_n station service while online (a PF load row + the frequency ledger, one catalog fraction). No governor: fcr_band 0 is the droop clamp's off switch, the chain idles at u = 0. Starts like a fast machine (15 min any state — a motor start)."
+    },
     "wind_onshore": {
       "model": "inverter",
       "t_up_s": 2.0,

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class _Doc(BaseModel):
@@ -67,6 +67,7 @@ _KIND_FAMILY: dict[str, str] = {
     "gas_ccgt": "sync",
     "gas_ocgt": "sync",
     "hydro_ps": "sync",
+    "syncon": "sync",
     "wind_onshore": "converter",
     "wind_offshore": "converter",
     "solar_pv": "converter",
@@ -79,6 +80,7 @@ PlantKind = Literal[
     "gas_ccgt",
     "gas_ocgt",
     "hydro_ps",
+    "syncon",
     "wind_onshore",
     "wind_offshore",
     "solar_pv",
@@ -106,11 +108,25 @@ class PlantSpec(_Doc):
     p_max_mw: float
     p_min_mw: float = 0.0
     vm_pu: float = 1.02  # voltage setpoint (synchronous kinds, PV node)
+    # C6: explicit machine rating [MVA]. Default None keeps the historic
+    # p_max/0.9 derivation BIT-IDENTICAL for every existing kind (the
+    # model hash covers s_n) — required in practice only for "syncon",
+    # whose p_max is 0 and would otherwise carry zero inertia and a zero
+    # Q band (PARAMETERS §1.15: H on S_n, Q ±0.40·S_n).
+    sn_mva: float | None = None
     profile_p_mw: list[float]  # standalone dispatch profile, one value per step
     # H2 fuel chain (P7): converted gas plants burn from a named store.
     # v1 supports full conversion only (x_h2 = 1.0) — PHYSICS §2.8 gating.
     fuel: Literal["ng", "h2", "coal", "lignite", "uranium"] | None = None
     h2_store_id: str | None = None
+
+    @model_validator(mode="after")
+    def _syncon_needs_rating(self) -> "PlantSpec":
+        # reject loudly at the SCHEMA (a 400 on reset), not deep in the
+        # spec build where a raise would 500 — never-crash discipline
+        if self.kind == "syncon" and not (self.sn_mva and self.sn_mva > 0.0):
+            raise ValueError(f"{self.id}: syncon requires sn_mva > 0")
+        return self
 
 
 class PlantsDoc(_Doc):
