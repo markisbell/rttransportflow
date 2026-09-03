@@ -63,3 +63,29 @@ static func assess(result: Dictionary) -> Array[String]:
 			% [int(incident), worst_rocof])
 	return lines
 
+
+## C5: a black island names its own way back — the zones that are dark
+## and the best black-start unit (the inspector's verb). Checked BEFORE
+## assess() by the HUD, because a blackout outranks any advisory.
+static func black_start_hint(result: Dictionary) -> String:
+	var black: Array[String] = []
+	var zones: Dictionary = result.get("zones", {})
+	for zone_id: String in zones:
+		if Wire.numf(zones[zone_id], "supplied", 1.0) == 0.0:
+			black.append(zone_id)
+	if black.is_empty():
+		return ""
+	black.sort()
+	var dead := {}
+	for zone_id: String in black:
+		dead[zone_id] = true
+	var candidates := FleetQuery.black_start_candidates(
+		result.get("devices", {}), dead)
+	if candidates.is_empty():
+		return "ADVISOR BLACKOUT %s — no black-start unit in the island" \
+			% ", ".join(black)
+	var name := str(World.plants.get(candidates[0], {})
+		.get("name", candidates[0]))
+	return "ADVISOR BLACKOUT %s — black-start %s (click the plant)" \
+		% [", ".join(black), name]
+

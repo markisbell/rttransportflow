@@ -17,6 +17,7 @@ var _state: Label
 var _mode: OptionButton
 var _policy: OptionButton
 var _policy_row: HBoxContainer
+var _black_start: Button
 
 
 func _ready() -> void:
@@ -73,6 +74,19 @@ func _ready() -> void:
 	_policy_row.add_child(_policy)
 	stack.add_child(_policy_row)
 
+	# C5: the black-start verb — visible only on an offline/tripped unit
+	# whose home zone is BLACK on the wire (ledger 34's player action)
+	_black_start = Button.new()
+	_black_start.text = "Black-start this unit"
+	_black_start.focus_mode = Control.FOCUS_NONE
+	_black_start.pressed.connect(func() -> void:
+		if Restoration.phase != Restoration.Phase.IDLE:
+			Restoration.cancel()
+		elif Restoration.begin(pid):
+			pass
+		_refresh_state())
+	stack.add_child(_black_start)
+
 	var close := Button.new()
 	close.text = "Close"
 	close.focus_mode = Control.FOCUS_NONE
@@ -111,6 +125,26 @@ func close_panel() -> void:
 func _refresh_state() -> void:
 	var device: Dictionary = (Orchestrator.latest().get("devices", {}) as Dictionary) \
 		.get(pid, {})
+	var zone := str(Dispatch.home_zone.get(pid, ""))
+	var supplied := Wire.numf((Orchestrator.latest().get("zones", {})
+		as Dictionary).get(zone, {}), "supplied", 1.0)
+	var state := str(device.get("state", ""))
+	# "starting" counts: the dispatcher parks committed units at the
+	# sick-island hold one block after a blackout, and the backend accepts
+	# black_start on a STARTING row (the C5 review's blocking find)
+	_black_start.visible = supplied == 0.0 and state != "online" \
+		and FleetQuery.START_CLASS_RANK.has(
+			str(World.plants.get(pid, {}).get("kind", "")))
+	if Restoration.phase == Restoration.Phase.IDLE:
+		_black_start.text = "Black-start this unit"
+		_black_start.disabled = false
+	else:
+		# a stuck restoration must never lock the feature: the same
+		# button cancels (Restoration re-arms its crank every block, so
+		# cancel is for the player changing plans, not a rescue hatch)
+		_black_start.text = "Cancel restoration"
+		_black_start.visible = true
+		_black_start.disabled = false
 	if device.is_empty():
 		_state.text = "no live data (not registered yet)"
 		return

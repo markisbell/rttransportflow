@@ -114,7 +114,11 @@ var view: WorldView3D:
 func _on_step_completed(_t: int, result: Dictionary) -> void:
 	_latest_devices = result.get("devices", {})
 	if BuildSession.use_gridco:
-		_advisor_label.text = "\n".join(Advisor.assess(result))
+		# a blackout outranks any advisory (C5): the hint names the black
+		# zones and the best black-start unit
+		var hint := Advisor.black_start_hint(result)
+		_advisor_label.text = hint if hint != "" \
+			else "\n".join(Advisor.assess(result))
 
 
 ## Debug key (P4 testing aid): T trips the largest online synchronous unit.
@@ -241,6 +245,8 @@ func _format_event(event: Dictionary) -> String:
 				element, absf(float(data.get("df_hz", 0.0)))]
 		"load_restored":
 			return "load fully restored (%s) — defense re-armed" % element
+		"black_start":
+			return "%s RE-ENERGIZED by black start — reload the island in stages" % element
 		"trip":
 			var cause := str(data.get("cause", ""))
 			var why: String = str({"f_window": "f-window relay", "pole_slip": "pole slip",
