@@ -391,6 +391,8 @@ static func make(kind: String) -> Node3D:
 		"wind_offshore": return _make_wind_offshore()
 		"solar_pv": return _make_solar_pv()
 		"battery": return _make_battery()
+		"grid_forming": return _make_grid_forming()
+		"syncon": return _make_syncon()
 		"electrolyzer": return _make_electrolyzer()
 		"h2_cavern": return _make_h2_cavern()
 		"hvdc_converter": return _make_hvdc_converter()
@@ -658,6 +660,47 @@ static func _make_battery() -> Node3D:
 	tr.position = Vector3(0.0, 0.04, 0.32)
 	node.add_child(tr)
 	node.add_child(_fence(0.88))
+	return node
+
+
+## Grid-forming battery (C6): the battery yard, marked by a cyan
+## grid-forming accent cap on each container — the identity color the way
+## H2_TEAL marks the hydrogen chain.
+const GFM_CYAN := Color(0.30, 0.80, 0.95)
+
+
+static func _make_grid_forming() -> Node3D:
+	var node := _make_battery()
+	for container: Node3D in node.get_children():
+		if container.get_child_count() >= 4:  # the six BESS containers
+			container.add_child(box(Vector3(0.21, 0.012, 0.11), GFM_CYAN,
+				Vector3(0, 0.107, 0)))  # a grid-forming cap ridge
+	return node
+
+
+## Synchronous condenser (C6): a turbine hall WITHOUT a boiler/stack —
+## the spinning machine and its transformer, spinning steel and nothing
+## else. Steam-grey, no chimney (the visual tell it burns no fuel).
+static func _make_syncon() -> Node3D:
+	var node := Node3D.new()
+	node.add_child(pad(0.85, Color(0.55, 0.56, 0.58)))
+	# the machine hall: a low rounded turbine housing
+	node.add_child(box(Vector3(0.40, 0.16, 0.22), Color(0.70, 0.72, 0.74),
+		Vector3(-0.06, 0.08, 0)))
+	# the rotor drum lying ALONG the hall (a cylinder rolled onto its side)
+	var drum := cyl(0.09, 0.42, Color(0.62, 0.63, 0.66), Vector3.ZERO)
+	drum.rotation = Vector3(0, 0, PI / 2.0)
+	drum.position = Vector3(-0.06, 0.17, 0)
+	node.add_child(drum)
+	# exciter end-cap in the grid accent
+	var cap := cyl(0.05, 0.06, GFM_CYAN, Vector3.ZERO)
+	cap.rotation = Vector3(0, 0, PI / 2.0)
+	cap.position = Vector3(0.17, 0.17, 0)
+	node.add_child(cap)
+	var tr := _transformer(0.7)
+	tr.position = Vector3(0.20, 0.04, 0.24)
+	node.add_child(tr)
+	node.add_child(_fence(0.82))
 	return node
 
 

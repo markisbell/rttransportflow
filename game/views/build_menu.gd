@@ -41,6 +41,8 @@ const ITEMS := [
 	{"cat": "Storage & H2", "items": [
 		{"tool": "battery", "label": "Battery 300 MW / 600 MWh",
 			"desc": "Full power in 0.3 s: catches the fall a steam plant cannot."},
+		{"tool": "grid_forming", "label": "Grid-forming battery 300 MW",
+			"desc": "A battery that HOLDS the grid: 4 s of virtual inertia into the\nisland's E_k, reserve-biased so the inertia is always there. Unlocks 2031."},
 		{"tool": "electrolyzer", "label": "Electrolyzer 300 MW",
 			"desc": "Turns surplus power into hydrogen. Sheds instantly on under-frequency."},
 		{"tool": "h2_cavern", "label": "H2 cavern 4000 t",
@@ -53,6 +55,8 @@ const ITEMS := [
 			"desc": "Regional lines, lower rating."},
 		{"tool": "substation", "label": "Substation",
 			"desc": "Forces a bus where corridors meet."},
+		{"tool": "syncon", "label": "Synchronous condenser 300 MVA",
+			"desc": "Spinning steel, no fuel: 3 s of real inertia and reactive support\non the retiring fleet's ground. No power, just stability. Unlocks 2031."},
 	]},
 	{"cat": "HVDC & Offshore", "items": [
 		{"tool": "corridor_cable", "label": "400 kV cable (underground)",

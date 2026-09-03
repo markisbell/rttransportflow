@@ -53,7 +53,7 @@
         "h2_cavern": 2029,
         "h2_retrofit": 2033,
         "wind_synthetic_inertia": 2035,
-        "_rationale": "GAME_DESIGN §4.3 unlock table verbatim: battery 2027 (before milestone 4, per §5.2), HVDC + offshore platforms 2028 (mid-milestone-3), electrolyzer + cavern 2029, H2-fired retrofits 2033, wind synthetic inertia 2035 (open-question 7 default). Grid-forming firmware and syncon conversion (2031) are listed for completeness but have no buildable yet — they gate nothing until their tools exist.",
+        "_rationale": "GAME_DESIGN §4.3 unlock table verbatim: battery 2027 (before milestone 4, per §5.2), HVDC + offshore platforms 2028 (mid-milestone-3), electrolyzer + cavern 2029, H2-fired retrofits 2033, wind synthetic inertia 2035 (open-question 7 default). Grid-forming batteries and synchronous condensers unlock 2031 (C6 shipped both buildables — grid_forming a battery variant with virtual inertia, syncon a P=0 sync machine).",
         "grid_forming": 2031,
         "syncon": 2031
     },
