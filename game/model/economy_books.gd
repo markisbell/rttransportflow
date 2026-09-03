@@ -64,9 +64,10 @@ func set_fleet(plants: Array, devices: Array = []) -> void:
 			_pid_fuel[str(plant["id"])] = str(plant["fuel"])
 	for dev: Dictionary in devices:
 		var kind := str(dev.get("kind", ""))
-		if kind == "grid_forming":
-			kind = "battery"
-		elif kind == "hvdc":
+		# grid_forming keeps its OWN kind (C6): its FOM/VOM bill at the
+		# grid_forming rates, not battery's — the P5 mapping folded it into
+		# battery and would have under-billed the premium hardware
+		if kind == "hvdc":
 			kind = "hvdc_converter"
 		elif kind == "offshore_hub":
 			kind = "offshore_platform"
@@ -81,6 +82,10 @@ func _on_plant_placed(_pid: String, kind: String, p_max_mw: float) -> void:
 	if kind == "h2_cavern":
 		# leached volume, not nameplate MW: flat per-cavern price (§1.14)
 		_spend_capex(float(cfg.get("h2_cavern_meur", 93.0)) * 1e6)
+		return
+	if kind == "syncon":
+		# priced per UNIT, not per MW — its p_max is 0 (C6/§1.15)
+		_spend_capex(float(cfg.get("syncon_meur", 54.0)) * 1e6)
 		return
 	var eur_per_kw: float = (cfg["capex_eur_per_kw"] as Dictionary).get(kind, 0.0)
 	_spend_capex(eur_per_kw * p_max_mw * 1000.0)
@@ -207,6 +212,9 @@ func _bill_fom(days: int) -> void:
 		var kind: String = _pid_kind[pid]
 		if kind == "h2_cavern":  # flat per-cavern FOM (1.5 % capex/a, §1.14)
 			daily += float(cfg.get("h2_cavern_fom_meur_a", 1.4)) * 1e6 / 365.0
+			continue
+		if kind == "syncon":  # flat per-unit FOM (C6, p_max is 0)
+			daily += float(cfg.get("syncon_fom_meur_a", 1.1)) * 1e6 / 365.0
 			continue
 		var p_max: float = World.plants.get(pid, {}).get("p_max_mw", 0.0)
 		daily += (cfg["fom_eur_per_kw_a"] as Dictionary).get(kind, 0.0) * p_max * 1000.0 / 365.0

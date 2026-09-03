@@ -118,6 +118,8 @@ static func _fill_profiles(world: Node, plant_ids: Array[String],
 					value = p_max * maxf(0.0, sin(PI * (h - 8.0) / 10.0)) if h >= 8.0 and h <= 18.0 else 0.0
 				"wind_onshore", "wind_offshore":
 					value = 0.55 * p_max
+				"syncon":
+					continue  # C6: p_max 0, no prime mover — flat-0 profile
 				_:
 					dispatchable_cap += p_max
 					continue

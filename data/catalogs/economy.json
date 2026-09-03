@@ -35,7 +35,8 @@
         "electrolyzer": 1500.0,
         "hvdc_converter": 175.0,
         "offshore_platform": 400.0,
-        "_p7_rationale": "PARAMETERS: battery 150 EUR/kW PCS + 200 EUR/kWh at the 2 h default; electrolyzer 1500 EUR/kW; converter station 350 MEUR / 2 GW; platform 800 MEUR / 2 GW (marinized)."
+        "_p7_rationale": "PARAMETERS: battery 150 EUR/kW PCS + 200 EUR/kWh at the 2 h default; electrolyzer 1500 EUR/kW; converter station 350 MEUR / 2 GW; platform 800 MEUR / 2 GW (marinized).",
+        "grid_forming": 660.0
     },
     "fom_eur_per_kw_a": {
         "nuclear": 120.0,
@@ -51,7 +52,8 @@
         "battery": 8.0,
         "electrolyzer": 45.0,
         "hvdc_converter": 3.5,
-        "offshore_platform": 8.0
+        "offshore_platform": 8.0,
+        "grid_forming": 9.6
     },
     "vom_eur_per_mwh": {
         "nuclear": 2.5,
@@ -65,7 +67,8 @@
         "solar_pv": 0.0,
         "_rationale": "PARAMETERS §1 variable O&M.",
         "battery": 1.5,
-        "electrolyzer": 0.0
+        "electrolyzer": 0.0,
+        "grid_forming": 1.5
     },
     "startup_eur_per_mw": {
         "nuclear": 100.0,
@@ -125,5 +128,8 @@
     },
     "hvdc_submarine_meur_per_km": 2.0,
     "h2_cavern_meur": 93.0,
-    "h2_cavern_fom_meur_a": 1.4
+    "h2_cavern_fom_meur_a": 1.4,
+    "syncon_meur": 54.0,
+    "syncon_fom_meur_a": 1.1,
+    "_syncon_rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser is priced per UNIT (its p_max is 0, so the per-kW formula yields ~0). 54 MEUR ~= 180 EUR/kVA * 300 MVA for a purpose-built machine (a retired-generator conversion is cheaper in reality — v1 prices the buildable, not the conversion discount). FOM ~2% capex/a."
 }

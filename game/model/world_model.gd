@@ -69,7 +69,7 @@ var _plant_tiles: Dictionary = {}  # Vector2i -> pid
 var _next_pid: int = 1
 
 const SYNC_KINDS: Array[String] = ["nuclear", "coal", "lignite", "gas_ccgt",
-	"gas_ocgt", "hydro_ps"]
+	"gas_ocgt", "hydro_ps", "syncon"]
 const CONVERTER_KINDS: Array[String] = ["wind_onshore", "wind_offshore", "solar_pv"]
 ## SYNC_KINDS minus nuclear: what a dispatcher may actually move (nuclear is
 ## must-run identity, ledger 9). The topology builder's stub dispatch used to
@@ -78,8 +78,8 @@ const DISPATCHABLE_KINDS: Array[String] = ["coal", "lignite", "gas_ccgt",
 	"gas_ocgt", "hydro_ps"]
 ## P7 wire devices: placed like plants but emitted on the reset `devices`
 ## channel, never in the native plants doc (contract v2 kinds table).
-const DEVICE_KINDS: Array[String] = ["battery", "electrolyzer", "h2_cavern",
-	"hvdc_converter", "offshore_platform"]
+const DEVICE_KINDS: Array[String] = ["battery", "grid_forming", "electrolyzer",
+	"h2_cavern", "hvdc_converter", "offshore_platform"]
 
 ## Default unit sizes per kind (PARAMETERS §1; balancing constants)
 ## Display names for plant kinds — ONE source (tags, charts, menus).
@@ -90,6 +90,7 @@ const KIND_LABELS := {
 	"offshore_platform": "Offshore hub", "solar_pv": "Solar PV",
 	"battery": "Battery", "electrolyzer": "Electrolyzer",
 	"h2_cavern": "H2 cavern", "hvdc_converter": "HVDC converter",
+	"grid_forming": "Grid-forming battery", "syncon": "Synchronous condenser",
 }
 
 const PLANT_SIZES := {
@@ -98,7 +99,12 @@ const PLANT_SIZES := {
 	"wind_onshore": 200.0, "wind_offshore": 500.0, "solar_pv": 150.0,
 	"battery": 300.0, "electrolyzer": 300.0, "h2_cavern": 0.0,
 	"hvdc_converter": 2000.0, "offshore_platform": 2000.0,
+	"grid_forming": 300.0,  # a battery variant (§1.11); H_v is backend
+	"syncon": 0.0,  # P = 0 — the RATING sn_mva carries it (§1.15), not p_max
 }
+## Machine ratings [MVA] for kinds whose p_max is not their rating (C6:
+## a syncon delivers no MW; its inertia and Q ride on S_n).
+const PLANT_SN_MVA := {"syncon": 300.0}
 const BATTERY_HOURS := 2.0  # PARAMETERS §1.11 default duration
 const CAVERN_CAPACITY_KG := 4_000_000.0  # §1.14 working gas
 ## Far-shore farms bind to a platform within 100 km (PARAMETERS §1.16
@@ -277,7 +283,7 @@ func can_place_plant(kind: String, tile: Vector2i) -> bool:
 			return t in ["p", "h"]
 		"hydro_ps":
 			return has_resource("phs_site", tile)
-		"battery", "electrolyzer", "hvdc_converter":
+		"battery", "grid_forming", "electrolyzer", "hvdc_converter", "syncon":
 			return is_land(tile)
 		"h2_cavern":
 			return has_resource("salt_cavern", tile)
@@ -330,8 +336,10 @@ func place_plant(kind: String, tile: Vector2i) -> String:
 	var entry := {"kind": kind, "tile": tile,
 		"p_max_mw": float(PLANT_SIZES[kind])}
 	match kind:
-		"battery":
+		"battery", "grid_forming":
 			entry["e_mwh"] = float(PLANT_SIZES[kind]) * BATTERY_HOURS
+		"syncon":
+			entry["sn_mva"] = float(PLANT_SN_MVA[kind])
 		"h2_cavern":
 			entry["capacity_kg"] = CAVERN_CAPACITY_KG
 	plants[pid] = entry
@@ -437,7 +445,7 @@ func serialize() -> Dictionary:
 		var row := {"pid": pid, "kind": p["kind"],
 			"tile": [(p["tile"] as Vector2i).x, (p["tile"] as Vector2i).y],
 			"p_max_mw": p["p_max_mw"]}
-		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id", "name"]:
+		for extra: String in ["e_mwh", "capacity_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				row[extra] = p[extra]
 		plant_list.append(row)
@@ -466,7 +474,7 @@ func restore(envelope: Dictionary) -> bool:
 		var tile := Vector2i(int(p["tile"][0]), int(p["tile"][1]))
 		var entry := {"kind": str(p["kind"]), "tile": tile,
 			"p_max_mw": float(p["p_max_mw"])}
-		for extra: String in ["e_mwh", "capacity_kg", "fuel", "h2_store_id", "name"]:
+		for extra: String in ["e_mwh", "capacity_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				entry[extra] = p[extra]
 		plants[str(p["pid"])] = entry

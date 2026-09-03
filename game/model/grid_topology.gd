@@ -270,7 +270,12 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 	var island_of := _bus_islands(n_buses, branches)
 	var island_sync_capacity := {}
 	for pid: String in plant_bus:
-		if str(world.plants[pid]["kind"]) in world.SYNC_KINDS:
+		# a syncon is NOT a source (C6: p_max 0, no prime mover) — an
+		# island with only a condenser cannot serve load and drops out
+		# like any sourceless island; without this it passes the gate,
+		# elects a 0 MW slack, and the frequency model collapses it
+		if str(world.plants[pid]["kind"]) in world.SYNC_KINDS \
+				and str(world.plants[pid]["kind"]) != "syncon":
 			var island: int = island_of[plant_bus[pid]]
 			island_sync_capacity[island] = float(island_sync_capacity.get(island, 0.0)) \
 				+ float(world.plants[pid]["p_max_mw"])
@@ -428,6 +433,8 @@ static func build(world: Node, demand_sampler: Callable = Callable()) -> Diction
 			"p_min_mw": 0.0, "vm_pu": 1.02,
 			"profile_p_mw": dispatch[pid],
 		}
+		if p.has("sn_mva"):  # C6: a syncon carries its rating (p_max is 0)
+			row["sn_mva"] = float(p["sn_mva"])
 		if str(p.get("fuel", "")) == "h2":
 			var cavern := str(p.get("h2_store_id", ""))
 			if world.plants.has(cavern) \

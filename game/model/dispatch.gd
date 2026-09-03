@@ -192,9 +192,21 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	# --- thermal merit order ---------------------------------------------
 	var thermal: Array[Dictionary] = []
 	var mothballed: Array[String] = []
+	var _syncon_restarts: Array[String] = []  # tripped condensers to re-close
 	for plant: Dictionary in plants:
 		var kind := str(plant["kind"])
 		if not (kind in World.SYNC_KINDS):
+			continue
+		if kind == "syncon":
+			# C6: a synchronous condenser has NO prime mover — never in the
+			# merit order (marginal_cost ~0 would sort it cheapest and commit
+			# real MW it cannot produce). A TRIPPED syncon (f-window relay)
+			# is restarted below, or its inertia is lost for good (the
+			# review: nothing else re-closes it); otherwise it is never
+			# commanded (silence = the flat-0 startup profile, exactly right).
+			if str(device_states.get(str(plant["id"]), {}).get(
+					"state", "online")) in ["offline", "tripped"]:
+				_syncon_restarts.append(str(plant["id"]))
 			continue
 		if plant_mode.get(str(plant["id"]), "auto") == "mothballed":
 			# a mothballed plant leaves the merit order entirely, so nothing
@@ -236,6 +248,8 @@ func decide(t_sim: float, plants: Array, device_states: Dictionary,
 	var reserve: float = maxf(largest_infeed, float(economy_cfg["reserve_margin_mw_min"]))
 	var need := forecast_peak * loss_margin + reserve - renewable_mw * 0.5
 	var commands := {}
+	for pid: String in _syncon_restarts:
+		commands[pid] = {"breaker": "close"}  # inertia back, no power (C6)
 	for pid: String in mothballed:
 		commands[pid] = {"dispatch_mw": 0.0, "breaker": "open"}
 	var committed_cap := 0.0
@@ -585,11 +599,17 @@ func _apply_flexibility(commands: Dictionary, price: float,
 				elif price <= (bat_charge_price_on if was_charging else bat_charge_price_off):
 					bat_cmd = -bat_charge_frac * bat_max  # sticky through the self-bump
 				# §3.3 policy overlay (C4): "arbitrage" leaves the P7 block
-				# untouched; the other stances hold FFR energy back
+				# untouched; the other stances hold FFR energy back.
+				# D5 (C6): a grid_forming unit is RESERVE-BIASED by default —
+				# inertia held is inertia present, so it obeys the reserved
+				# SoC floor regardless of the global stance (inertia is the
+				# reason to build one; draining it for the arbitrage margin
+				# defeats the purchase).
+				var gfm: bool = str(dev.get("kind", "")) == "grid_forming"
 				if battery_policy == "reserve_ffr":
 					if bat_cmd > 0.0:
 						bat_cmd = 0.0  # FFR-only: nothing scheduled out
-				elif battery_policy == "balanced" and bat_cmd > 0.0:
+				elif (battery_policy == "balanced" or gfm) and bat_cmd > 0.0:
 					var soc := Wire.numf(device_states.get(did, {}), "soc", 1.0)
 					if soc <= bat_reserve_soc_floor:
 						bat_cmd = 0.0  # the reserved floor is FFR's, not the market's

@@ -19,8 +19,11 @@ const GROUP_OF_KIND := {
 	"gas_ccgt": "gas", "gas_ocgt": "gas", "hydro_ps": "hydro",
 	"wind_onshore": "wind_on", "wind_offshore": "wind_off",
 	"offshore_platform": "wind_off", "solar_pv": "solar",
-	"battery": "battery", "electrolyzer": "electrolysis",
+	"battery": "battery", "grid_forming": "battery",
+	"electrolyzer": "electrolysis",
 	"hvdc_converter": "transfer",
+	# syncon has no power trace (P = 0) — deliberately ungrouped, it
+	# never appears on a generation chart
 }
 
 var _stamp := PackedInt64Array()  # abs block recorded in each slot, -1 empty

@@ -29,8 +29,11 @@ static func emit(world: Node, hvdc_corridors: Dictionary, farm_hub: Dictionary,
 		var p: Dictionary = world.plants[pid]
 		var node := "b%d" % bus_rename[device_bus[pid]]
 		match str(p["kind"]):
-			"battery":
-				devices.append({"id": pid, "kind": "battery", "node": node,
+			"battery", "grid_forming":
+				# C6: grid_forming is the P7 backend device kind (virtual
+				# inertia H_v = 4 s counted into island E_k); same params
+				# as a battery, the catalog key battery_gfm carries the rest
+				devices.append({"id": pid, "kind": str(p["kind"]), "node": node,
 					"params": {"p_max_mw": float(p["p_max_mw"]),
 						"e_mwh": float(p.get("e_mwh", float(p["p_max_mw"]) * 2.0))}})
 			"electrolyzer":
