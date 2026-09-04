@@ -309,6 +309,15 @@ const ERA_BATTERY_MW := 3000.0
 ## in a fuller game the player builds toward it.)
 const ERA_SYNCON_UNITS := 10
 const ERA_GFM_MW := 9000.0
+## C8 hydrogen era: the H2 chain the player builds by 2033-36 to survive
+## Dunkelflaute II on stored hydrogen. FOUR caverns, not three — 3 × 4 kt ×
+## 33.33 kWh/kg = 399.96 GWh_th, just UNDER the 400 pass floor (the recon's
+## arithmetic trap); 4 caverns = 533 GWh_th and clears the ★★★ 480 tier.
+## Electrolysis + conversion targets sit comfortably above the 5 GW / 4 GW
+## pass floors so the era world satisfies M6's build criteria by construction.
+const ERA_H2_CAVERNS := 4
+const ERA_ELECTROLYZER_MW := 6000.0  # 20 × 300 MW; pass floor is 5000
+const ERA_H2_CONVERT_MW := 4800.0    # 8 × 600 MW gas_ccgt; pass floor is 4000
 
 
 ## An era-progressed inherited world: author_start plus the plausible
@@ -318,11 +327,23 @@ const ERA_GFM_MW := 9000.0
 static func author_era(world: Node, era_id: String) -> bool:
 	# reject unknown eras BEFORE mutating the world (the review's nit: a
 	# failed call must not leave a half-built world behind)
-	if era_id != "green_push" and era_id != "coal_exit":
+	if era_id != "green_push" and era_id != "coal_exit" and era_id != "hydrogen":
 		push_error("author_era: unknown era %s" % era_id)
 		return false
 	if not author_start(world):
 		return false
+	# hydrogen is a POST-M5 world: a player who passed Coal Exit arrives
+	# coal-free (§5.2.6, and coal past day 120 fires the coal_deadline fine),
+	# so the era retires coal HERE — during authoring, before any engine
+	# exists, so there is none of the play-time rebuild transient that made
+	# M5's retire path a wall (§7 Q8). The flex + H2 chain then build on the
+	# coal-free base. This is the honest §7-Q8 test: can the H2-CCGT + gas +
+	# the C6 inertia fleet carry a coal-free grid through the drought?
+	if era_id == "hydrogen":
+		for pid: String in world.plants.keys():
+			var k := str(world.plants[pid]["kind"])
+			if k == "coal" or k == "lignite":
+				world.remove_plant(pid)
 	# the RE program is best-effort by construction (every can_place
 	# refusal shrinks it) — an era world that misses its quotas is the
 	# WRONG WORLD and must fail loudly, not load as success (the review:
@@ -346,13 +367,32 @@ static func author_era(world: Node, era_id: String) -> bool:
 	# sides connect only intermittently, which stranded 15 of 18 machines,
 	# the ledger-44/C3 Potemkin-fleet trap). Soft floor: best-effort
 	# placement, but refuse a world that got no meaningful replacement.
-	if era_id == "coal_exit":
+	# coal_exit AND hydrogen both inherit the inertia replacement — the C6
+	# lesson (inertia for the daily ramps) is orthogonal to the H2 chain
+	# (firm energy for the Dunkelflaute), and a hydrogen-era grid still needs
+	# both (§7 Q8).
+	if era_id == "coal_exit" or era_id == "hydrogen":
 		var inertia: Dictionary = author_inertia_replacement(world)
 		if float(inertia.get("gfm", 0.0)) < ERA_GFM_MW * 0.5 \
 				or int(inertia.get("syncon_units", 0)) < ERA_SYNCON_UNITS / 2:
-			push_error("author_era(coal_exit): inertia replacement starved (gfm %.0f/%.0f, syncon %d/%d)"
-				% [inertia.get("gfm", 0.0), ERA_GFM_MW,
+			push_error("author_era(%s): inertia replacement starved (gfm %.0f/%.0f, syncon %d/%d)"
+				% [era_id, inertia.get("gfm", 0.0), ERA_GFM_MW,
 				inertia.get("syncon_units", 0), ERA_SYNCON_UNITS])
+			return false
+	# hydrogen then builds the H2 chain LAST: caverns on salt sites,
+	# electrolyzers anchored on the thermal fleet's live corridors (so they
+	# actually SOAK power and FILL the caverns), and gas units converted to
+	# fire hydrogen. Quota guard at 90 % — a starved H2 chain would measure
+	# every M6 number against fiction (ledger 29/38/47).
+	if era_id == "hydrogen":
+		var h2: Dictionary = author_h2_program(world)
+		if int(h2.get("caverns", 0)) < ERA_H2_CAVERNS \
+				or float(h2.get("electrolysis_mw", 0.0)) < ERA_ELECTROLYZER_MW * 0.9 \
+				or float(h2.get("converted_mw", 0.0)) < ERA_H2_CONVERT_MW * 0.9:
+			push_error("author_era(hydrogen): H2 chain starved (caverns %d/%d, electrolysis %.0f/%.0f, converted %.0f/%.0f)"
+				% [h2.get("caverns", 0), ERA_H2_CAVERNS,
+				h2.get("electrolysis_mw", 0.0), ERA_ELECTROLYZER_MW,
+				h2.get("converted_mw", 0.0), ERA_H2_CONVERT_MW])
 			return false
 	return true
 
@@ -366,23 +406,7 @@ static func author_era(world: Node, era_id: String) -> bool:
 ## machines in the main synchronous area AND avoids the RE program's rings.
 ## Returns {"syncon_units": n, "gfm": MW}.
 static func author_inertia_replacement(world: Node) -> Dictionary:
-	# tiles of the synchronous fleet (coal/gas/nuclear/hydro — NOT syncon
-	# itself, which has no prime mover and forms no source bus)
-	var sync_tiles := {}
-	for pid: String in world.plants:
-		var kind := str(world.plants[pid]["kind"])
-		if kind in world.SYNC_KINDS and kind != "syncon":
-			sync_tiles[world.plants[pid]["tile"]] = true
-	# corridor tiles that touch one of those plants — the bus tiles to anchor
-	# beside, sorted for determinism
-	var anchors: Array = []
-	for tile: Vector2i in world.corridors:
-		for offset: Vector2i in GridTopology.NEIGHBORS:
-			if sync_tiles.has(tile + offset):
-				anchors.append(tile)
-				break
-	anchors.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var anchors := _thermal_bus_anchors(world)
 	var placed := {"syncon_units": 0, "gfm": 0.0}
 	# syncons first (inertia where the coal was), then GFM; one machine per
 	# anchor so they fan out over the fleet
@@ -404,6 +428,87 @@ static func author_inertia_replacement(world: Node) -> Dictionary:
 								+ float(world.plants[pid]["p_max_mw"])
 					break
 	return placed
+
+
+## The C8 H2-chain program: caverns on salt sites, electrolyzers anchored on
+## the thermal fleet's live corridors (they must CONNECT to soak power and
+## fill the caverns — the criterion counts placed MW, but the PHYSICS needs
+## them live), and gas units converted to fire H2 from their nearest cavern.
+## Returns {caverns, electrolysis_mw, converted_mw, cavern_gwh_th}.
+static func author_h2_program(world: Node) -> Dictionary:
+	var out := {"caverns": 0, "electrolysis_mw": 0.0, "converted_mw": 0.0,
+		"cavern_gwh_th": 0.0}
+	# --- caverns on salt-cavern resource tiles (sorted for determinism) ---
+	var salt: Array = (world.resources.get("salt_cavern", {}) as Dictionary).keys()
+	salt.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var cavern_pids: Array[String] = []
+	for tile: Vector2i in salt:
+		if int(out["caverns"]) >= ERA_H2_CAVERNS:
+			break
+		if world.can_place_plant("h2_cavern", tile):
+			var cid: String = world.place_plant("h2_cavern", tile)
+			if cid != "":
+				# an era world at day 120 (2035) has had years to fill its
+				# caverns — start them near full so the episode has H2 to burn
+				# (the wire reads this level_kg; C8). A player fills from 7 %.
+				world.plants[cid]["level_kg"] = 0.9 * float(world.plants[cid]["capacity_kg"])
+				cavern_pids.append(cid)
+				out["caverns"] = int(out["caverns"]) + 1
+	# --- electrolyzers on the thermal fleet's live corridors ---------------
+	var anchors := _thermal_bus_anchors(world)
+	for anchor: Vector2i in anchors:
+		if float(out["electrolysis_mw"]) >= ERA_ELECTROLYZER_MW:
+			break
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			var site: Vector2i = anchor + offset
+			if world.can_place_plant("electrolyzer", site):
+				var eid: String = world.place_plant("electrolyzer", site)
+				if eid != "":
+					out["electrolysis_mw"] = float(out["electrolysis_mw"]) \
+						+ float(world.plants[eid]["p_max_mw"])
+				break
+	# --- convert gas_ccgt units to H2 (nearest cavern) ---------------------
+	if not cavern_pids.is_empty():
+		var gas: Array[String] = []
+		for pid: String in world.plants:
+			if str(world.plants[pid]["kind"]) == "gas_ccgt" \
+					and str(world.plants[pid].get("fuel", "")) != "h2":
+				gas.append(pid)
+		gas.sort()
+		for pid: String in gas:
+			if float(out["converted_mw"]) >= ERA_H2_CONVERT_MW:
+				break
+			var cavern: String = WireDeviceEmit._nearest_cavern(
+				world, cavern_pids, world.plants[pid]["tile"])
+			if world.convert_to_h2(pid, cavern):
+				out["converted_mw"] = float(out["converted_mw"]) \
+					+ float(world.plants[pid]["p_max_mw"])
+	out["cavern_gwh_th"] = int(out["caverns"]) * 4_000_000.0 * 33.33 / 1e6
+	return out
+
+
+## Corridor tiles that touch a synchronous plant (coal/gas/nuclear/hydro —
+## NOT syncon, which has no prime mover): guaranteed bus tiles in the main
+## island (GridTopology's touches_site rule), so a device on a free neighbour
+## connects and SWINGS. The reliable anchor for flex/H2 kit that must be
+## electrically live (substation-ring sides connect only intermittently —
+## the ledger-44/C3 Potemkin trap). Sorted for determinism.
+static func _thermal_bus_anchors(world: Node) -> Array:
+	var sync_tiles := {}
+	for pid: String in world.plants:
+		var kind := str(world.plants[pid]["kind"])
+		if kind in world.SYNC_KINDS and kind != "syncon":
+			sync_tiles[world.plants[pid]["tile"]] = true
+	var anchors: Array = []
+	for tile: Vector2i in world.corridors:
+		for offset: Vector2i in GridTopology.NEIGHBORS:
+			if sync_tiles.has(tile + offset):
+				anchors.append(tile)
+				break
+	anchors.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	return anchors
 
 
 ## The C3 RE program (moved from the smoke — extraction, not redesign):

@@ -109,7 +109,26 @@ func _emit_status(ok: bool, message: String, warnings: Array) -> void:
 	(func() -> void: build_status.emit(ok, message, warnings)).call_deferred()
 
 
+## Sync each cavern's WorldModel level_kg from the engine's last reported
+## h2_kg, so a topology-only rebuild re-emits the REAL stored H2, not a stale
+## authored/default literal (C8 review: else a mid-play rebuild would refill
+## the authored era caverns to 90% — free hydrogen — or, pre-C8, empty them
+## to 7%; either falsifies the energy budget). Skipped on the first
+## registration (no engine frame yet — the authored level stands).
+func _sync_cavern_levels() -> void:
+	if not registered:
+		return
+	var devices: Dictionary = Orchestrator.latest().get("devices", {})
+	for pid: String in World.plants:
+		if str(World.plants[pid]["kind"]) != "h2_cavern":
+			continue
+		var d: Dictionary = devices.get(pid, {})
+		if d.has("h2_kg"):
+			World.plants[pid]["level_kg"] = float(d["h2_kg"])
+
+
 func _rebuild() -> void:
+	_sync_cavern_levels()
 	var sampler := Callable()
 	if use_gridco:
 		# Anchor the startup profile at NOW, not at floor(day): the engine's

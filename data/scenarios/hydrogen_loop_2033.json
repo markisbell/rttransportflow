@@ -1,0 +1,19 @@
+{
+  "id": "hydrogen_loop_2033",
+  "title": "The Hydrogen Loop (2033–36)",
+  "description": "Start at milestone 6 in the COAL-FREE world Coal Exit produced: ≥5 GW of electrolysis, four salt caverns (533 GWh_th of stored H2), and ≥4 GW of gas converted to fire hydrogen, on top of the green build-out and the C6 inertia fleet — but no coal. Hold the lights through Dunkelflaute II (days 126–131, wind ×0.3) on stored hydrogen and residual gas. SAIDI under 30 minutes passes; under 5 is mastery.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "author_era": "hydrogen",
+  "start_day": 125.9,
+  "campaign": {
+    "milestone_index": 5
+  },
+  "economy": {
+    "treasury_eur": 12000000000.0,
+    "_rationale": "C8 fixture: the post-M5 player has spent heavily on the green build-out, the flex fleet, and the H2 chain. 12 B€ leaves operating headroom through the scarcity episode without trivializing the -2 B€ insolvency line. Pre-built era assets carry no booked capex (inherited, per C2)."
+  },
+  "_why_start_day": "125.5 gives a short cold-start settle just before Dunkelflaute II opens at day 126 (the M5-late pattern) — the graded span IS the episode. The world is COAL-FREE (a player who passed M5 arrives coal-free, §5.2.6; coal past day 120 fires the coal_deadline fine), so this is the honest §7-Q8 test: the H2-CCGT + gas + the C6 inertia fleet must carry the drought without coal's spinning mass. Starting near the episode keeps the ungraded ordinary-ramp exposure (where a coal-free grid sheds, the C7 wall) small; the caverns are pre-filled (a day-125 player has years of stored H2), so the episode has hydrogen to burn.",
+  "forces": []
+}

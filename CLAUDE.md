@@ -2116,6 +2116,107 @@ inherited-2025 per ledger 49). §7 Q8 carries the decision.
 **Next:** C8 — slice M6 (The Hydrogen Loop): electrolysis + cavern +
 H2-conversion as the player path, smoke campaign_hydrogen_loop (8049).
 
+### C8 — Slice M6: The Hydrogen Loop (campaign arc, 2026-09-04)
+
+**Built:** milestone 6's toolkit — the most-SHIPPED milestone in the arc, so
+C8 is small: the P7 H2 chain (backend + electrolyzer/cavern buildables +
+fuel-aware dispatch) and the C1 grading were already complete; C8 adds the
+one missing player verb + the slice machinery. Structurally it is C7 with
+Retire → Convert. THE PLAYER VERB: a two-press "Convert to hydrogen" in the
+plant inspector (CONVERTIBLE = gas_ccgt/gas_ocgt; gated at the TOOL layer on
+the 2033 h2_retrofit unlock + a cavern existing, never in WorldModel — the C1
+rule), auto-binding the SAME cavern the wire would
+(WireDeviceEmit._nearest_cavern), model-instant (fuel→"h2",
+h2_converted_mw() rises) but physics-deferred (rebuild → native fuel="h2"
+row). THE ECONOMICS (D-C8-2): `Economy.retrofit_fee_eur`/`book_retrofit` — a
+20 % of gas-capex retrofit fee in its own §4.7 books category (ledger 51),
+round-tripping save/load AND the cost window. THE WORLD:
+`GridPlan.author_era("hydrogen")` = green_push + the C6 flex fleet +
+`author_h2_program`: FOUR salt caverns (not three — 3 × 4 kt = 399.96 GWh_th,
+just under the 400 pass floor; 4 = 533 GWh, clearing the ★★★ 480 tier), ≥20
+electrolyzers anchored on the fleet's live corridors (a shared
+`_thermal_bus_anchors` factored from the C7 inertia author, so they CONNECT
+and soak, not just place), and ≥8 gas→H2 conversions — with a 90 % quota
+guard. THE PRE-FILL: an era-deep player has years of stored H2, so the
+caverns carry `level_kg` = 0.9·capacity, `wire_device_emit` reads it (a fresh
+player cavern still starts at 7 %), and `level_kg` joins the serialize/restore
+whitelist AND — the review's fix — `BuildSession` now syncs each cavern's
+level_kg from the engine's h2_kg before any rebuild, so a topology edit
+neither refills nor empties the caverns. THE SMOKE: `campaign_hydrogen_loop`
+(8049), a MECHANIC GATE.
+
+**The honest world is COAL-FREE — the review's correction:** the first C8 cut
+kept residual coal to make M6 pinnable the M4 way (a generous fleet trivially
+covers the episode). The adversarial review showed that world is the WRONG
+one: a player who passed Coal Exit arrives COAL-FREE (§5.2.6 says the same),
+and coal past day 120 fires the coal_deadline fine (~1.3 B€) — the coal-backed
+recipe tests a world no real player reaches and that the campaign actively
+penalizes. So M6 grades the coal-free world M5 produces, retiring coal during
+AUTHORING (clean — none of M5's play-time rebuild transient). That makes M6
+the honest §7-Q8 test C7 pointed at: can the H2-CCGT + gas + the C6 inertia
+fleet carry Dunkelflaute II WITHOUT coal's spinning mass?
+
+**The measured answer: NO — same wall as M5, now WITHIN the episode.** The
+smoke stepped a bounded slice of Dunkelflaute II (dt = 60 s — the coal-free
+world runs pathologically ALERT-slow, 3+ s/step, so 300 s blocks overrun the
+step timeout, the C7 wall) and measured the coal-free grid through the drought
+onset. The episode OPENS held (days 126.0–126.30: zero UFLS, SAIDI 0 — the
+H2-CCGT + all gas commit at scarcity, so firm-plant inertia is present exactly
+when demanded), and the loop CLOSES: the caverns draw down 0.89 → 0.84
+(4.8 % burned in the slice — H2 is actually fired, the whole point). But as
+wind collapses toward the trough the grid SHEDS — 6 UFLS incidents in a burst
+at days 126.33–126.36, SAIDI climbing to 15.2 min and still rising by the
+slice end (day 126.45), treasury holding (min 11.97 B€, no insolvency). This
+is the SAME inertia/ramp-power wall C7 found for M5, now shown to bite INSIDE
+the graded episode, not only on ordinary ramps: energy was never the binding
+constraint — the H2 chain has the megawatt-hours — inertia and ramp-power are.
+Hydrogen closes the ENERGY half of coal exit; it does NOT close the
+ramp/inertia half, even during the drought it was built for. (Caveat of
+honesty: dt = 60 s is finer than the 900 s blocks but coarser than
+interactive 0.1–6 s stepping, so the sampled ramp is somewhat sharper than a
+player would drive — the mechanism is the real C7 wall, its exact SAIDI is a
+slice-and-cadence number, which is why the gate REPORTS it rather than pinning
+it.)
+
+**Why a MECHANIC GATE, not a ★-pin:** the gate proves the toolkit is real and
+the loop closes, and MEASURES the §7-Q8 survival question rather than
+asserting a SAIDI ceiling it would fail. It checks the three build criteria
+(by construction) + MEASURED registration (the C3 Potemkin lesson —
+electrolyzers as devices not dropped, 4 caverns as h2_store carrying their
+90 % fill, converted plants as native fuel="h2" rows) + the coal-free world
+solves + reaches the episode + treasury survives; the SAIDI and UFLS it
+records are owner data. All 13 checks green (ok:true). The full coal-free
+window is a multi-hour ALERT-slow traversal AND it sheds — doubly unpinnable
+on this world, exactly like M5. The ★-pin is deferred to the §7-Q8 fixes that
+make the coal-free grid ride its own ramps (and simulate at a sane speed).
+
+**Tests/acceptance:** GdUnit 99/99 (test_c8 ×12: retrofit fee + own-category
++ round-trip, the economy key, convert gas-only gate + sets fuel/store +
+grades + requires a cavern, fuel/store save round-trip, author_era hydrogen
+builds the chain COAL-FREE + connects within budget, cavern pre-fill on the
+wire + level_kg round-trip, the h2_retrofit unlock gate); scenarios green
+with hydrogen_loop_2033 (deterministic). An adversarial 3-lens review
+confirmed 4 findings (0 blocking), all addressed: the mid-rebuild cavern
+refill exploit (level_kg sync in BuildSession), the coal-backed world (pivoted
+to coal-free — the two majors), the pre-measurement star bet and the missing
+H2 grade axis (both moot once M6 is a mechanic gate). Regression triad green:
+campaign ★★★ / save_load bit-identical / dispatch prices 53.83/63.12.
+
+**Deviations (deliberate):** M6's smoke is a MECHANIC GATE, not a ★-pin — the
+second slice (with M5) whose milestone the coal-free wall makes unpinnable on
+this world; it measures the §7-Q8 survival question, and the measurement is
+that the coal-free grid SHEDS the drought (the honest result, not the
+hoped-for hold). The retrofit fee (20 % capex) and auto-nearest cavern
+(D-C8-2/3) are owner defaults; the caverns are pre-filled in the era world
+(a day-125 player's stored H2), the sync fix keeping that honest under
+rebuilds.
+
+**Next:** C9 — slice M7 (The Inverter Grid, finale): fix the inverter_share
+`pass` no-op (a measured energy-share accumulator), the double-contingency
+finale, smoke campaign_inverter_grid (8050). §7 Q8 (coal-free viability, now
+spanning M5+M6 with one unified finding — the inertia/ramp wall, not energy)
+awaits the owner.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -2137,7 +2238,8 @@ ledger entry:
 7. **Synthetic-inertia & PHS variants** — wind synthetic inertia ships as a
    2035 unlock (chosen); ternary/var-speed PHS and PHS syncon mode are
    backlog flags.
-8. **M5 Coal-Exit playability — BLOCKED, needs a decision (C7, 2026-09-03).**
+8. **M5 + M6 coal-free playability — BLOCKED, needs a decision (C7 2026-09-03,
+   confirmed + widened by C8 2026-09-04).**
    The retire toolkit ships and works, but the milestone as balanced is not
    passable: retiring 47 GW of coal on the realistic world sheds > 2
    UFLS/final-year, from two independent causes measured across five
@@ -2157,7 +2259,29 @@ ledger entry:
    retirement cadence. Recommended default until overridden: sequence M5
    after M6 (option ii) AND add `remove_device` (option i) in a backend
    slice, because both are independently useful. Nothing downstream is
-   blocked — C8 (M6) is the natural next step and feeds the answer.
+   blocked — C8 (M6) fed the answer, and it is the SAME wall.
+   **C8 update:** M6 (The Hydrogen Loop) is the same world one milestone on —
+   coal-free (a player who passed M5 is coal-free, §5.2.6; coal past day 120
+   is fined) with the H2 chain built. C8's smoke measured it, and the answer
+   is UNIFORM with M5, not a reprieve. The hydrogen chain closes the ENERGY
+   half: the caverns draw down measurably (4.8 % burned in a bounded episode
+   slice — H2 actually fired), and the episode OPENS held (the H2-CCGT + all
+   gas commit at scarcity, so firm-plant inertia is present when demanded).
+   But as wind collapses toward the drought trough the coal-free grid STILL
+   SHEDS — 6 UFLS incidents in a burst, SAIDI climbing to 15.2 min and still
+   rising by the (partial) slice end — the SAME inertia/ramp-power wall as M5,
+   now shown to bite WITHIN the graded episode, not only on ordinary ramps.
+   Energy was never the binding constraint (the H2 chain has the MWh); inertia
+   and ramp-power are. And the coal-free world runs pathologically ALERT-slow
+   (3+ s/step), so BOTH ship as MECHANIC GATES — M5 and M6 alike measure the
+   wall rather than pin a milestone the wall makes unpassable. **Revised
+   default:** the load-bearing fix is RAMP-FOLLOWING / INERTIA, confirmed on
+   both milestones — (i) a backend `net/patch remove_device` (retire live, no
+   cold-start), AND/OR more grid-forming FFR / letting the H2-CCGT self-commit
+   for inertia, OR a §5.2.5/§5.2.6 rubric revisit that grades on survivable
+   stress rather than every ramp — hydrogen ENERGY alone does NOT close it.
+   Both toolkits are proven; the pins await the ramp/inertia decision (and a
+   faster coal-free traversal). C9 (the M7 finale) is next.
 
 ## 8. Release checklist (ROADMAP P10)
 

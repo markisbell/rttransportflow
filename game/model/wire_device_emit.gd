@@ -20,7 +20,8 @@ static func emit(world: Node, hvdc_corridors: Dictionary, farm_hub: Dictionary,
 			"capacity_kg": float(world.plants[pid]["capacity_kg"]),
 			# a fresh cavern starts at the recovery threshold: nothing to
 			# burn until the electrolyzers fill it (PHYSICS §2.8 floor rule)
-			"level_kg": 0.07 * float(world.plants[pid]["capacity_kg"]),
+			"level_kg": float(world.plants[pid].get("level_kg",
+					0.07 * float(world.plants[pid]["capacity_kg"]))),
 		}})
 	var device_ids: Array[String] = []
 	device_ids.assign(device_bus.keys())

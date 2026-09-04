@@ -134,5 +134,7 @@
     "_syncon_rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser is priced per UNIT (its p_max is 0, so the per-kW formula yields ~0). 54 MEUR ~= 180 EUR/kVA * 300 MVA for a purpose-built machine (a retired-generator conversion is cheaper in reality — v1 prices the buildable, not the conversion discount). FOM ~2% capex/a.",
     "retirement_fee_frac_capex": 0.02,
     "fom_mothball_mult": 0.3,
+    "h2_retrofit_frac_capex": 0.20,
+    "_h2_retrofit_rationale": "C8/D-C8-2: converting a gas plant to fire hydrogen (burner + fuel handling) costs ~20% of the gas plant's new-build capex — a real investment, so a fifth of capex, not a decommission sliver. Booked as its own §4.7 category (ledger 51). Owner default; a free fuel-switch is the alternative.",
     "_retirement_rationale": "C7/D6: retiring a plant costs 2% of its catalog capex (decommissioning, site remediation) with zero refund — a refund would invite retire-rebuild arbitrage. Mothballing bills only 0.3x FOM (preservation staffing, no fuel/CO2) — the strategy that lets a player idle a coal unit through a mild year instead of paying to scrap it, at the cost of keeping the capacity on the books."
 }

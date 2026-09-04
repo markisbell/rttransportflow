@@ -445,7 +445,7 @@ func serialize() -> Dictionary:
 		var row := {"pid": pid, "kind": p["kind"],
 			"tile": [(p["tile"] as Vector2i).x, (p["tile"] as Vector2i).y],
 			"p_max_mw": p["p_max_mw"]}
-		for extra: String in ["e_mwh", "capacity_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
+		for extra: String in ["e_mwh", "capacity_kg", "level_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				row[extra] = p[extra]
 		plant_list.append(row)
@@ -474,7 +474,7 @@ func restore(envelope: Dictionary) -> bool:
 		var tile := Vector2i(int(p["tile"][0]), int(p["tile"][1]))
 		var entry := {"kind": str(p["kind"]), "tile": tile,
 			"p_max_mw": float(p["p_max_mw"])}
-		for extra: String in ["e_mwh", "capacity_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
+		for extra: String in ["e_mwh", "capacity_kg", "level_kg", "sn_mva", "fuel", "h2_store_id", "name"]:
 			if p.has(extra):
 				entry[extra] = p[extra]
 		plants[str(p["pid"])] = entry

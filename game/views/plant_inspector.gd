@@ -14,6 +14,9 @@ const MODES: Array[String] = ["auto", "must_run", "reserve_only", "mothballed"]
 ## retires. Renewables/devices are not "retired" with a decommission fee in
 ## v1; every listed kind has a capex_eur_per_kw for the §4.7 fee formula.
 const RETIRABLE: Array[String] = ["coal", "lignite", "gas_ccgt", "gas_ocgt", "nuclear"]
+## C8: the gas kinds a hydrogen-loop player converts to H2 firing (the
+## backend gates on the `gas_` prefix — world_model.convert_to_h2).
+const CONVERTIBLE: Array[String] = ["gas_ccgt", "gas_ocgt"]
 
 var pid := ""
 var _title: Label
@@ -24,6 +27,8 @@ var _policy_row: HBoxContainer
 var _black_start: Button
 var _retire: Button
 var _retire_armed := false  # two-press confirm: a mis-click must not scrap a unit
+var _convert: Button
+var _convert_armed := false  # two-press confirm: the retrofit fee is real
 
 
 func _ready() -> void:
@@ -105,6 +110,17 @@ func _ready() -> void:
 	_retire.pressed.connect(_on_retire)
 	stack.add_child(_retire)
 
+	# C8: the convert-to-H2 verb — the hydrogen-loop path. Model-instant (the
+	# plant's fuel becomes "h2" and h2_converted_mw() rises) but physics-
+	# deferred: world_changed → BuildSession rebuilds and the plant re-emits
+	# as a native fuel="h2" row bound to its cavern. Two-press confirm; the
+	# retrofit fee is real (ledger 51/D-C8-2). Needs a cavern to bind to.
+	_convert = Button.new()
+	_convert.focus_mode = Control.FOCUS_NONE
+	_convert.modulate = Color(0.66, 0.86, 1.0)
+	_convert.pressed.connect(_on_convert)
+	stack.add_child(_convert)
+
 	var close := Button.new()
 	close.text = "Close"
 	close.focus_mode = Control.FOCUS_NONE
@@ -132,6 +148,15 @@ func open(plant_id: String) -> void:
 	_retire_armed = false
 	_retire.visible = kind in RETIRABLE
 	_refresh_retire()
+	# C8 convert-to-H2: a gas plant not already on H2, once the 2033
+	# h2_retrofit unlock is open, and only if a cavern exists to bind to.
+	# Unlock gates at the TOOL layer (C1), never in WorldModel.
+	_convert_armed = false
+	_convert.visible = kind in CONVERTIBLE \
+		and str(plant.get("fuel", "")) != "h2" \
+		and Campaign.unlocked("h2_retrofit") \
+		and _nearest_cavern() != ""
+	_refresh_convert()
 	_refresh_state()
 	tooltip_text = "%s — %.0f MW" % [
 		str(World.KIND_LABELS.get(kind, kind)), float(plant.get("p_max_mw", 0.0))]
@@ -210,6 +235,61 @@ func _on_retire() -> void:
 		_retire_fee_eur() / 1e6])
 	Dispatch.plant_mode.erase(pid)  # no shadow mode for a gone plant
 	World.remove_plant(pid)
+	close_panel()
+
+
+## The cavern this plant would fire from — the SAME one the wire binds an
+## electrolyzer to (WireDeviceEmit._nearest_cavern), so the verb and the
+## engine agree. "" when no cavern exists (the button then hides).
+func _nearest_cavern() -> String:
+	var caverns: Array[String] = []
+	for cid: String in World.plants:
+		if str(World.plants[cid]["kind"]) == "h2_cavern":
+			caverns.append(cid)
+	if caverns.is_empty():
+		return ""
+	var plant: Dictionary = World.plants.get(pid, {})
+	return WireDeviceEmit._nearest_cavern(World, caverns, plant.get("tile", Vector2i.ZERO))
+
+
+func _convert_fee_eur() -> float:
+	var plant: Dictionary = World.plants.get(pid, {})
+	# ONE fee formula: Economy owns it, the inspector only displays it
+	return Economy.retrofit_fee_eur(str(plant.get("kind", "")),
+		float(plant.get("p_max_mw", 0.0)))
+
+
+func _refresh_convert() -> void:
+	if not _convert.visible:
+		return
+	if _convert_armed:
+		var cavern := _nearest_cavern()
+		var name := str(World.plants.get(cavern, {}).get("name", cavern))
+		_convert.text = "Confirm H2 retrofit — €%.1fM → %s" % [
+			_convert_fee_eur() / 1e6, name]
+	else:
+		_convert.text = "Convert to hydrogen"
+
+
+func _on_convert() -> void:
+	if pid == "" or not World.plants.has(pid):
+		return
+	var cavern := _nearest_cavern()
+	if cavern == "":
+		return  # no cavern to bind to (button should be hidden anyway)
+	if not _convert_armed:
+		_convert_armed = true  # first press arms; the fee + target are shown
+		_refresh_convert()
+		return
+	# second press: charge the retrofit fee, switch the fuel (h2_converted_mw
+	# rises now), and let BuildSession rebuild so the plant re-emits as a
+	# native fuel="h2" row bound to the cavern.
+	var plant: Dictionary = World.plants.get(pid, {})
+	Economy.book_retrofit(str(plant.get("kind", "")), float(plant.get("p_max_mw", 0.0)))
+	print("INSPECTOR convert %s (%s, %.0f MW) to H2 from %s, fee €%.1fM" % [pid,
+		str(plant.get("kind", "")), float(plant.get("p_max_mw", 0.0)), cavern,
+		_convert_fee_eur() / 1e6])
+	World.convert_to_h2(pid, cavern)
 	close_panel()
 
 
