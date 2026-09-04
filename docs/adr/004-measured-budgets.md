@@ -62,3 +62,26 @@ Findings:
 PF dominates everywhere; `pf_interval_calm` (30 s → 60 s) halves the CALM
 worst case if ever needed. Feasibility confirmed — no architecture change
 required.
+
+## Spike (d) — per-machine angle observer (the phasor arc, ledger 56)
+
+The classical COI-anchored multi-machine swing, measured on this machine
+(`spike_angles`), BEFORE any engine change — the pin that de-risks the arc:
+
+| check | result | meaning |
+|---|---|---|
+| case9 classical reduction | reduced-Y symmetric to **2.3e-16** | the Kron reduction to generator internal nodes is reciprocal/clean |
+| 2-machine inter-machine mode | analytic **1.9412 Hz** = numeric **1.9412 Hz** (0.00 %) | the swing physics is analytically correct |
+| COI-projection identity | residual **0.0** (< 1e-12) | the inertia-weighted mean ω EQUALS the Tier-1 COI f — the wire f and every §6 pin survive bit-exact |
+| loss-of-synchronism | cleared→bounded, permanent→**pole slip** | the model shows the phenomenon PHYSICS §7 currently disclaims |
+| P_e matvec @ 180 machines | **≈ 337 µs/tick** | dense O(n²); the worst case is a single 180-machine island |
+| determinism | bit-identical | no RNG / wall-clock in the integration |
+
+**Budget note:** at the 180-machine (ledger-55) ceiling the observer adds
+≈ 337 µs to a 10 ms ALERT tick (≈ 3.4 % of the < 10 ms/tick wall budget) —
+feasible for real-time. It is a downstream *observer* (never an NR solve, no
+pandapower call in the tick; the reduced Y is a fixed matrix rebuilt on
+topology change), so it can never turn a solve into a 500 or perturb the
+balance. Phase-1 mitigation if the matvec is hot: block-diagonalise per island
+(each reduced matrix is island-local) and/or run the observer at CALM cadence
+when the island's angle spread is small.

@@ -9,6 +9,12 @@ docs/adr/004-measured-budgets.md:
   (b) vectorized NumPy dynamics tick for 150 devices x 3 lag states
       (struct-of-arrays, exact-exponential updates, droop/deadband/clamps,
       per-island reduceat, semi-implicit swing): us/tick at dt=10 ms and 250 ms.
+  (c) syncon as a P=0 controllable gen (C6): solver-clean, Q pegs at the band.
+  (d) per-machine angle observer (the phasor arc, ledger 56): the classical
+      COI-anchored multi-machine swing — reducible from case9, analytically
+      correct (2-machine inter-machine mode), COI-consistent (< 1e-12 so the
+      wire f and every §6 pin survive), captures loss-of-synchronism, fast
+      enough, deterministic. Proves the model BEFORE any engine change.
 
 Usage: .venv/bin/python scripts/validate_core.py
 """
@@ -222,6 +228,159 @@ def spike_dynamics_tick(n_dev: int = 150, n_ticks: int = 100_000, dt: float = 0.
     return {"n_dev": n_dev, "dt_s": dt, "us_per_tick": total / n_ticks * 1e6, "f_end": f}
 
 
+# ---------------------------------------------------------------------------
+# Spike (d): per-machine angle dynamics — the classical COI-anchored observer
+# (the phasor arc, reopens ledger 1). Proves the model is reducible from a real
+# pandapower case, analytically correct, COI-consistent (< 1e-12 so the wire f
+# and every §6 pin survive), captures loss-of-synchronism, is fast enough, and
+# is deterministic — BEFORE any engine change.
+# ---------------------------------------------------------------------------
+
+WS = 2.0 * np.pi * 50.0  # synchronous electrical speed [rad/s]
+
+
+def _pe(E, G, B, delta):
+    """Classical electrical power: P_ei = E_i Σ_j E_j (G_ij cos δij + B_ij sin δij)."""
+    dij = delta[:, None] - delta[None, :]
+    return E * ((G * np.cos(dij) + B * np.sin(dij)) @ E)
+
+
+def _classical_reduce_case9(xd_prime: float = 0.30):
+    """Kron-reduce the solved WSCC 3-machine 9-bus to its generator internal
+    nodes (loads as constant-impedance shunts, machines E' behind Xd'). Returns
+    the reduced Y and the internal EMFs — the exact machinery Phase 1 builds."""
+    import pandapower as pp
+    import pandapower.networks as ppn
+
+    net = ppn.case9()
+    pp.runpp(net)
+    Y = np.asarray(net._ppc["internal"]["Ybus"].todense()).astype(complex)
+    b_lookup = net._pd2ppc_lookups["bus"]  # net bus idx -> ppc idx
+    base = net.sn_mva
+    V = net.res_bus.vm_pu.values * np.exp(1j * np.deg2rad(net.res_bus.va_degree.values))
+    for li in net.load.index:
+        b = int(net.load.at[li, "bus"])
+        s = (net.load.at[li, "p_mw"] + 1j * net.load.at[li, "q_mvar"]) / base
+        Y[b_lookup[b], b_lookup[b]] += np.conj(s) / (abs(V[b]) ** 2)
+    mach_bus, pg, qg, vg = [], [], [], []
+    for i in net.ext_grid.index:
+        b = int(net.ext_grid.at[i, "bus"]); mach_bus.append(b)
+        pg.append(net.res_ext_grid.at[i, "p_mw"] / base)
+        qg.append(net.res_ext_grid.at[i, "q_mvar"] / base); vg.append(V[b])
+    for i in net.gen.index:
+        b = int(net.gen.at[i, "bus"]); mach_bus.append(b)
+        pg.append(net.res_gen.at[i, "p_mw"] / base)
+        qg.append(net.res_gen.at[i, "q_mvar"] / base); vg.append(V[b])
+    ng, nb = len(mach_bus), Y.shape[0]
+    xdp = np.full(ng, xd_prime)
+    vg = np.array(vg); s = np.array(pg) + 1j * np.array(qg)
+    e_int = vg + 1j * xdp * np.conj(s / vg)  # E' = V + jXd' conj(S/V)
+    n = ng + nb
+    yaug = np.zeros((n, n), complex)
+    yaug[ng:, ng:] = Y
+    yg = 1.0 / (1j * xdp)
+    ppc_mb = [b_lookup[b] for b in mach_bus]
+    for k in range(ng):
+        yaug[k, k] += yg[k]
+        yaug[k, ng + ppc_mb[k]] -= yg[k]
+        yaug[ng + ppc_mb[k], k] -= yg[k]
+        yaug[ng + ppc_mb[k], ng + ppc_mb[k]] += yg[k]
+    a, bm = yaug[:ng, :ng], yaug[:ng, ng:]
+    c, d = yaug[ng:, :ng], yaug[ng:, ng:]
+    y_red = a - bm @ np.linalg.solve(d, c)  # reduced to internal nodes
+    return y_red, np.abs(e_int), ng
+
+
+def _two_machine_mode(H=(5.0, 5.0), X=0.5, E=(1.1, 1.1), pm=0.5, dt=0.001, T=6.0):
+    """Integrate the observer swing on a 2-machine island; return the analytic
+    inter-machine mode frequency and the measured one (mean crossing period)."""
+    B = np.array([[-1.0 / X, 1.0 / X], [1.0 / X, -1.0 / X]])
+    G = np.zeros((2, 2)); em = np.array(E)
+    pmax = em[0] * em[1] / X
+    d0 = np.arcsin(pm / pmax)
+    p_mech = _pe(em, G, B, np.array([d0, 0.0])).copy()
+    k = pmax * np.cos(d0)  # synchronizing coefficient
+    hs = np.array(H)
+    f_analytic = (1.0 / (2 * np.pi)) * np.sqrt(WS * k * (hs[0] + hs[1]) / (2 * hs[0] * hs[1]))
+    delta = np.array([d0 + 0.02, 0.0]); omega = np.zeros(2)
+    minv = WS / (2.0 * hs)
+    n = int(T / dt); trace = np.empty(n)
+    for j in range(n):
+        omega = omega + dt * minv * (p_mech - _pe(em, G, B, delta))
+        delta = delta + dt * omega  # symplectic Euler (δ against post-update ω)
+        trace[j] = delta[0] - delta[1]
+    sig = trace - trace.mean()
+    up = np.where((sig[:-1] <= 0) & (sig[1:] > 0))[0]
+    tc = np.array([(i + sig[i] / (sig[i] - sig[i + 1])) * dt for i in up])
+    return f_analytic, 1.0 / np.mean(np.diff(tc))
+
+
+def _coi_projection_identity() -> float:
+    """After the tick projection ω_i += (f_coi − ω_COI), the inertia-weighted
+    mean speed EQUALS the Tier-1 COI f — the pin that keeps the wire f exact."""
+    h = np.linspace(3.0, 8.0, 7); sn = np.linspace(300.0, 1600.0, 7)
+    w = 2.0 * h * sn
+    omega = np.array([0.03, -0.02, 0.05, -0.01, 0.00, 0.04, -0.03])
+    f_coi_dev = 49.987 - 50.0
+    omega_p = omega + (f_coi_dev - np.sum(w * omega) / np.sum(w))
+    return abs(np.sum(w * omega_p) / np.sum(w) - f_coi_dev)
+
+
+def _loss_of_sync(x_perm: float | None = None, dt=0.002, T=6.0, kick=0.02):
+    E = np.array([1.1, 1.1]); G = np.zeros((2, 2))
+    x0, pm = 0.5, 0.5
+    d0 = np.arcsin(pm / (E[0] * E[1] / x0))
+    b0 = np.array([[-1.0 / x0, 1.0 / x0], [1.0 / x0, -1.0 / x0]])
+    p_mech = _pe(E, G, b0, np.array([d0, 0.0])).copy()
+    x = x_perm if x_perm is not None else x0
+    B = np.array([[-1.0 / x, 1.0 / x], [1.0 / x, -1.0 / x]])
+    minv = WS / (2.0 * np.array([5.0, 5.0]))
+    delta = np.array([d0 + kick, 0.0]); omega = np.zeros(2); slipped = False
+    for _ in range(int(T / dt)):
+        omega = omega + dt * minv * (p_mech - _pe(E, G, B, delta))
+        delta = delta + dt * omega
+        if abs(delta[0] - delta[1]) > np.pi:
+            slipped = True
+    return slipped
+
+
+def _pe_perf(ng: int, ticks: int = 2000) -> float:
+    rng = np.random.default_rng(1)
+    E = rng.uniform(0.9, 1.15, ng)
+    G = rng.uniform(-1, 1, (ng, ng)); G = (G + G.T) / 2
+    B = rng.uniform(-5, 5, (ng, ng)); B = (B + B.T) / 2
+    delta = rng.uniform(-0.5, 0.5, ng)
+    t0 = time.perf_counter()
+    for _ in range(ticks):
+        _pe(E, G, B, delta)
+    return (time.perf_counter() - t0) / ticks * 1e6
+
+
+def spike_angles() -> dict:
+    y_red, e_mag, ng = _classical_reduce_case9()
+    sym = float(np.max(np.abs(y_red - y_red.T)))
+    f_an, f_num = _two_machine_mode()
+    mode_err = abs(f_an - f_num) / f_an
+    coi_resid = _coi_projection_identity()
+    slip_cleared = _loss_of_sync()            # small kick, intact tie -> bounded
+    slip_perm = _loss_of_sync(x_perm=3.0)     # permanent weak tie -> pole slip
+    det = _two_machine_mode()[1] == f_num
+    return {
+        "machines": ng,
+        "reduced_sym_maxabs": sym,
+        "mode_analytic_hz": f_an,
+        "mode_numeric_hz": f_num,
+        "mode_err_pct": mode_err * 100.0,
+        "coi_residual": coi_resid,
+        "sync_bounded": not slip_cleared,
+        "sync_pole_slip": slip_perm,
+        "us_per_tick_180": _pe_perf(180),
+        "deterministic": det,
+        "ok": sym < 1e-9 and mode_err < 0.01 and coi_resid < 1e-12
+        and (not slip_cleared) and slip_perm and det,
+    }
+
+
 def main() -> None:
     for n in (20, 300):
         print(f"== Spike (a): pandapower NR, {n}-bus 380 kV meshed, enforce_q_lims ==")
@@ -237,6 +396,16 @@ def main() -> None:
     for dt in (0.010, 0.250):
         d = spike_dynamics_tick(dt=dt)
         print(f"  dt={dt*1e3:5.0f} ms   {d['us_per_tick']:.2f} us/tick   (f_end={d['f_end']:.6f})")
+
+    print("== Spike (d): per-machine angle observer (phasor arc, ledger 56) ==")
+    a = spike_angles()
+    print(f"  case9 machines={a['machines']}  reduced-Y |Y-Y^T|max={a['reduced_sym_maxabs']:.2e}")
+    print(f"  inter-machine mode  analytic={a['mode_analytic_hz']:.4f} Hz  "
+          f"numeric={a['mode_numeric_hz']:.4f} Hz  err={a['mode_err_pct']:.2f}%")
+    print(f"  COI-projection residual={a['coi_residual']:.2e} (< 1e-12 keeps the wire f exact)")
+    print(f"  loss-of-sync  cleared-bounded={a['sync_bounded']}  permanent-pole-slip={a['sync_pole_slip']}")
+    print(f"  P_e matvec @180 machines={a['us_per_tick_180']:.1f} us/tick  deterministic={a['deterministic']}")
+    print(f"  ok={a['ok']}")
 
     import numba, pandapower
     print(f"== versions: pandapower {pandapower.__version__}, numba {numba.__version__}, numpy {np.__version__} ==")

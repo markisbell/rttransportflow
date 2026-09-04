@@ -25,6 +25,33 @@ def test_case9_pins() -> None:
     assert float(net.res_line.pl_mw.sum()) == pytest.approx(CASE9_LOSS_MW, abs=1e-4)
 
 
+def test_case9_angle_model_internals() -> None:
+    """Pin the pandapower internals the per-machine angle observer's classical
+    Kron reduction depends on (the phasor arc, ledger 56) — so a library
+    upgrade that moves the Ybus / lookups / result columns fails loudly here,
+    not silently inside the engine's reduced-network build."""
+    import numpy as np
+    import pandapower as pp
+    import pandapower.networks as nw
+
+    net = nw.case9()
+    pp.runpp(net)
+    # the admittance matrix is exposed on the solved ppc as a square sparse Ybus
+    ybus = net._ppc["internal"]["Ybus"]
+    assert ybus.shape == (len(net.bus), len(net.bus))
+    assert hasattr(ybus, "todense")  # scipy sparse
+    # the net-bus -> ppc-bus lookup the reduction maps machine buses through
+    b_lookup = net._pd2ppc_lookups["bus"]
+    assert int(b_lookup[int(net.gen.at[net.gen.index[0], "bus"])]) >= 0
+    # the per-machine operating point the internal EMF E' is initialised from
+    for col in ("p_mw", "q_mvar", "va_degree"):
+        assert col in net.res_gen.columns
+    assert "va_degree" in net.res_bus.columns
+    # the classic WSCC 3-machine, 9-bus shape (1 ext_grid + 2 gens = 3 machines)
+    assert len(net.ext_grid) + len(net.gen) == 3
+    assert not np.isnan(net.res_bus.va_degree.values).any()
+
+
 @pytest.fixture(scope="module")
 def dyn():
     from rttransportflow.simulator import build_dyn_simulator

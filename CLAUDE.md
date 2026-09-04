@@ -564,6 +564,39 @@ docs/GAME_DESIGN.md.
     scale, and the §8 soak re-verifies. Warn threshold 150. Ledger 13's
     discrete-unit pedagogy and the never-crash rules are untouched.
 
+56. **Per-machine rotor angles as a COI-anchored OBSERVER** (owner-directed,
+    2026-09-04 — reopens ledger 1; a multi-week physics ARC in gated phases).
+    The owner asked for a transient-phase-angle PHASOR OVERLAY: watch machines
+    swing against each other after a trip, and see the contrast between
+    high-inertia synchronous, low-storage-inverter, and high-storage-inverter
+    grids. That needs per-machine angle dynamics, which ledger 1 deliberately
+    did NOT model (PHYSICS §7 "Not modeled: inter-machine rotor-angle swings").
+    **The decision (owner chose the real model over a cheap per-island
+    interim): a classical multi-machine swing OBSERVER, not a COI replacement.**
+    The per-island semi-implicit COI swing STAYS the integrated authority for
+    f/RoCoF/nadir/QSS/energy-balance and every §6 pin — not one float moves.
+    Per-machine (δ_i, ω_i) integrate ADDITIVELY on the same tick grid via a
+    classical E'-behind-Xd' reduced-Y-bus coupling, and are CONSTRAINED each
+    tick so their inertia-weighted mean speed equals the COI f (the projection,
+    pinned < 1e-12) — so ledger 1's numbers survive bit-exact as the aggregate,
+    and the observer is a strict downstream consumer of the COI, never a
+    feedback into it. That is the whole safety argument and what makes the arc
+    shippable in phases without re-baselining the validated core. Phases: **P0
+    the spike (DONE — `validate_core` spike (d): case9 reduction, the 2-machine
+    mode analytic to 0.00 %, the COI-projection identity 0.0, pole-slip
+    captured, 337 µs/tick at 180 machines, deterministic; ADR-004 records it;
+    no engine change)**; P1 engine (integrator/fleet per-machine swing + the
+    reduced network in a new `dynamics/angles.py`, COI re-derived); P2 wire +
+    snapshot (ADDITIVE per-machine angle/speed fields, `xd_prime`/`d_damp`
+    OUT of model_hash like the syncon `s_n` precedent, tolerant restore — old
+    bundles byte-identical); P3 the Godot phasor overlay. Owner decisions still
+    open: the Xd'/D_i per-kind catalog defaults (PARAMETERS §1), and the
+    sanctioned ADDITIVE wire-frame golden re-baseline. This entry supersedes
+    PHYSICS §7's "not modeled" line for inter-machine swings — modeled as a
+    linearized COI-anchored observer; true loss-of-synchronism is still
+    performed by protection line-splits (the observer shows the pole slip, the
+    protection does the disconnection).
+
 ## 5. Key reference paths (sibling repos, same parent folder)
 
 | Path | Why |
@@ -2389,6 +2422,54 @@ backend change (the completion path is pure GDScript); `net/patch remove_device`
 transient-phase-angle phasor overlay the owner proposed (needs the engine
 extended from one COI angle per island to per-machine angle dynamics, a physics
 arc, not a visualization layer).
+
+### Phasor arc — P0: the physics spike (owner-directed, 2026-09-04)
+
+**Built:** the phasor arc opens (ledger 56 — the owner chose the REAL
+per-machine angle model over a cheap per-island interim, reopening ledger 1).
+P0 is the de-risking SPIKE, no engine change: a 15-agent recon mapped the
+COI integrator / fleet state / PF coupling / pin surface / render hook and
+produced the phased plan; its load-bearing design decision is a **classical
+multi-machine swing OBSERVER anchored to the COI** — the per-island COI swing
+stays the integrated authority (every §6 pin bit-exact), per-machine
+(δ_i, ω_i) integrate additively and are projected each tick so their
+inertia-weighted mean equals the COI f (residual pinned < 1e-12), so the
+observer is a strict downstream consumer of the COI and never feeds back.
+`scripts/validate_core.py` gains **spike (d)** (`spike_angles`): it Kron-reduces
+the solved WSCC 3-machine 9-bus (`case9`) to its generator internal nodes
+(loads as constant-impedance shunts, E' behind Xd'), integrates the 2-machine
+observer swing, and measures the network-coupling model end to end.
+
+**Tests/acceptance (measured on this machine, ADR-004 records the table):**
+spike (d) green — case9 reduced-Y symmetric to 2.3e-16; the 2-machine
+inter-machine mode **analytic 1.9412 Hz = numeric 1.9412 Hz (0.00 %)** (mode
+read via mean crossing-period, not FFT bins); the **COI-projection identity
+residual 0.0** (< 1e-12 — the pin that guarantees the wire f and every §6 pin
+survive when the engine adds per-machine ω); loss-of-synchronism captured (a
+cleared kick stays bounded at 0.23 rad; a permanent weak tie POLE-SLIPS past
+π — the phenomenon PHYSICS §7 currently disclaims); P_e matvec 337 µs/tick at
+the 180-machine ceiling (≈ 3.4 % of the < 10 ms ALERT-tick wall, feasible;
+Phase-1 mitigation is per-island block-diagonalisation); deterministic
+(bit-identical, no RNG/wall-clock). `test_pf_sanity` gains
+`test_case9_angle_model_internals` (4/4) — pins the pandapower internals the
+Phase-1 reduction depends on (the ppc Ybus, the pd2ppc bus lookup, res_gen
+P/Q + res_bus va_degree) so a library upgrade fails loudly here, not silently
+in the engine.
+
+**Deviations (deliberate):** P0 is a spike + pin + ADR only — NO engine
+change, NO wire change, NO ledger-1 code touched yet (the COI swing still runs
+exactly as before). The classical reduction against the REAL pandapower
+topology (with the ppc bus mapping) + the E' init from the live PF is Phase 1;
+P0 proves the machinery on `case9`. `xd_prime`/`d_damp` per-kind defaults and
+the additive wire-golden re-baseline are owner decisions queued for P1/P2
+(ledger 56).
+
+**Next:** Phasor P1 — the engine: per-machine (δ_i, ω_i) swing vectors +
+`dynamics/angles.py` (the cached reduced network, rebuilt on split/merge like
+`refresh_e_k`) wired into `integrator._tick` downstream of the untouched COI
+swing, with EVERY existing frequency pin held bit-exact (any drift is a RED
+FLAG, not a re-baseline) plus the new angle pins (mode / COI-identity /
+slicing / snapshot / pole-slip-bounded / GFM-holds-reference).
 
 ## 7. Open questions for the project owner
 
