@@ -18,6 +18,9 @@ signal milestone_failed(id: String, reason: String)
 signal campaign_failed(reason: String)
 signal era_changed(era: Dictionary)
 signal year_changed(y: int)
+## C10: the finale evaluated — the campaign is complete (§5.2.7). Carries the
+## per-milestone results and the aggregate stars for the closing screen.
+signal campaign_complete(results: Array, total_stars: int, max_stars: int)
 
 const CAMPAIGN_PATH := "data/campaign/campaign_v1.json"
 const START_STATE_PATH := "data/campaign/start_2025.json"
@@ -117,6 +120,11 @@ var _last_eval_block := -1
 var _last_year := -1
 var _autosave_done := false   # for the CURRENT milestone's window
 var _autosave_block := -1     # retry cadence: one attempt per block
+## C10: terminal latch — set when the finale (last milestone) evaluates. A
+## completed campaign stops accumulating and can no longer be dismissed /
+## insolvent / coal-fined (the step-driven mutators early-return on it).
+## Persisted so a save taken post-finale reloads terminal, not resumable.
+var _complete := false
 
 
 func _ready() -> void:
@@ -140,6 +148,7 @@ func start_campaign() -> void:
 	fired_events = {}
 	milestone_results = []
 	failed_reason = ""
+	_complete = false
 	insolvent_since_day = -1.0
 	blackout_days = []
 	ufls_days = []
@@ -218,7 +227,7 @@ func _apply_era(day: float) -> void:
 # ---------------------------------------------------------------- stepping
 
 func _on_step(_t: int, result: Dictionary) -> void:
-	if not active or failed_reason != "":
+	if not active or failed_reason != "" or _complete:
 		return
 	var day := day_now()
 	_apply_era(day)
@@ -604,6 +613,19 @@ func _evaluate_milestone(day: float) -> void:
 	_reset_acc()
 	_autosave_done = false  # the next milestone saves at ITS window open
 	_last_eval_block = int(day / BLOCK_DAYS)
+	# C10: the finale just evaluated — the campaign is complete (§5.2.7). The
+	# guard fires exactly once (re-entry short-circuits at current_milestone()
+	# is_empty above), and `not _complete` makes a reload-then-re-evaluate
+	# path idempotent. The closing screen renders whatever stars were earned —
+	# M7 currently fails its own rubric, and that is what it must honestly show.
+	if not _complete and milestone_index >= (data.get("milestones", []) as Array).size():
+		_complete = true
+		var total := 0
+		var maxs := 0
+		for r: Dictionary in milestone_results:
+			total += int(r.get("stars", 0))
+			maxs += stars_max(str(r.get("id", "")))
+		campaign_complete.emit(milestone_results.duplicate(true), total, maxs)
 
 
 ## "" when every criterion holds, else the first unmet criterion's name.
@@ -693,6 +715,20 @@ func _stars(milestone: Dictionary) -> int:
 	return total
 
 
+## Max stars a milestone can earn = its non-`_` star axes × 3. The ONE source
+## (the completion aggregate and the summary panel both read it — a duplicated
+## copy would silently diverge on a future rubric edit).
+func stars_max(id: String) -> int:
+	for milestone: Dictionary in data.get("milestones", []):
+		if str(milestone.get("id", "")) == id:
+			var axes := 0
+			for axis: String in milestone.get("stars", {}):
+				if not axis.begins_with("_"):
+					axes += 1
+			return axes * 3
+	return 3
+
+
 func notify_replay_viewed() -> void:
 	replay_viewed = true
 
@@ -716,6 +752,8 @@ func apply_recipe_state(c: Dictionary) -> void:
 # ---------------------------------------------------------------- failure states
 
 func _check_failures(day: float) -> void:
+	if _complete:
+		return  # a finished campaign can't be dismissed/insolvent/coal-fined
 	var fails: Dictionary = data.get("failure_states", {})
 	# insolvency: sustained deep-negative treasury
 	var insolvency: Dictionary = fails.get("insolvency", {})
@@ -814,6 +852,7 @@ func to_dict() -> Dictionary:
 		"coal_fine_months_billed": coal_fine_months_billed,
 		"last_eval_block": _last_eval_block,
 		"autosave_done": _autosave_done,
+		"complete": _complete,
 	}
 
 
@@ -852,5 +891,6 @@ func from_dict(state: Dictionary) -> void:
 	# silently migrate the D7 retry point forward (C1 review)
 	_autosave_done = bool(state.get("autosave_done", false))
 	_autosave_block = -1
+	_complete = bool(state.get("complete", false))
 	if active:
 		_apply_era(day_now())

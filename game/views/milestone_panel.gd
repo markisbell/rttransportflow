@@ -72,6 +72,7 @@ func _ready() -> void:
 	Campaign.milestone_passed.connect(_on_passed)
 	Campaign.milestone_failed.connect(_on_failed)
 	Campaign.campaign_failed.connect(_on_campaign_failed)
+	Campaign.campaign_complete.connect(_on_campaign_complete)
 	Campaign.era_changed.connect(_on_era)
 
 
@@ -83,14 +84,7 @@ func _milestone_title(id: String) -> String:
 
 
 func _stars_max(id: String) -> int:
-	for milestone: Dictionary in Campaign.data.get("milestones", []):
-		if str(milestone.get("id", "")) == id:
-			var axes := 0
-			for axis: String in milestone.get("stars", {}):
-				if not axis.begins_with("_"):
-					axes += 1
-			return axes * 3
-	return 3
+	return Campaign.stars_max(id)  # ONE source (C10)
 
 
 func _on_passed(id: String, stars: int) -> void:
@@ -115,6 +109,25 @@ func _on_campaign_failed(reason: String) -> void:
 	_body.text = "GridCo Europa: %s" % reason
 	_retry_index = Campaign.milestone_index
 	_retry.visible = FileAccess.file_exists(Campaign.autosave_file(_retry_index))
+	_panel.visible = true
+
+
+## C10 closing screen (§5.2.7): the finale evaluated — roll up every
+## milestone's stars. Honest, not celebratory: it renders whatever was earned
+## (M5/M6/M7 ship as mechanic gates and M7 fails its own rubric — the screen
+## shows that, it does not hide it). Retry hidden; the star-summary IS the
+## closing screen (a replay-driven cinematic is a later look pass, D9).
+func _on_campaign_complete(results: Array, total: int, maxs: int) -> void:
+	_title.text = "Campaign complete"
+	var lines := PackedStringArray()
+	for r: Dictionary in results:
+		var id := str(r.get("id", ""))
+		lines.append("%s — %d/%d ★" % [_milestone_title(id),
+			int(r.get("stars", 0)), _stars_max(id)])
+	lines.append("")
+	lines.append("GridCo Europa — %d/%d ★" % [total, maxs])
+	_body.text = "\n".join(lines)
+	_retry.visible = false
 	_panel.visible = true
 
 

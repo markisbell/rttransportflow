@@ -25,21 +25,24 @@ divergence-is-data, Docker/Grafana stack.
 ## 2. State
 
 **v0.0.1-pre RELEASED (2026-08-22): three OS bundles on GitHub Releases,
-each verified by playing a day inside the bundle.** P0–P10 complete;
-refactoring campaign landed (2026-08-20); strategic-zoom arc merged
-(2026-08-22) — the real-grid look, the freeze campaign, the site-note
-weekly graphs. Three post-merge arcs followed (last §6 entries): look
-polish + the boot-wedge root cause, the owner-directed North Sea
-build-out + 2025 renewable base (ledger 49), and the macOS/Windows
-installer pipelines that fed the release. The campaign gate is green
-(★★★, zero UFLS on the realistic world); every phase's evidence is in
-§6 — read the last entries before touching anything. The 2026-08-24
-housekeeping pass swept the full §8 matrix green against the
-re-baselined world (21/21) and re-cut the release assets with
-LICENSE/NOTICE. Next arc (owner-chosen): **campaign playability** —
-milestones 2–7 are authored and implemented but never executed, and
-5–7 lack player paths; the C1–C10 plan lives in the published arc-plan
-artifact (see the last §6 entry).
+each verified by playing a day inside the bundle.** P0–P10 complete, then
+these arcs (all in §6): refactoring campaign (2026-08-20); strategic-zoom
+(2026-08-22, the real-grid look + freeze campaign + site-note graphs); look
+polish + the boot-wedge root cause; the North Sea build-out + 2025 renewable
+base (ledger 49); the macOS/Windows installers that fed the release; the
+2026-08-24 housekeeping pass (full §8 matrix green, 21/21, assets re-cut with
+LICENSE/NOTICE); and — most recently — the **campaign-playability arc C1–C10
+(2026-08-25 → 2026-09-04), now COMPLETE.** The milestone campaign is
+implemented and measured end to end: M1 ★★★ (`campaign_take_the_reins`);
+**M2 ★5 / M3 ★6 / M4 ★3 star-pinned** (merit order, first green gigawatts,
+the Dunkelflaute); **M5/M6/M7 ship as MECHANIC GATES** — toolkits + exams +
+KPIs proven and measured, but the milestones are not ★-passable as balanced,
+blocked on ONE owner decision (the coal-free wall, §7-Q8: inertia + ramp +
+dispatch-mix). C10 wrapped the arc — the campaign-completion / closing-screen
+path (§5.2.7), the doc/ROADMAP reconciliation, and the §7-Q8 writeup. Every
+phase's evidence is in §6 — read the last entries before touching anything.
+No new release was cut for the arc (the v0.0.1-pre tag stays at 252f700; a
+re-cut is the owner's call).
 
 Read order for any session: SPEC.md §0 → ROADMAP.md (current phase) →
 docs/PHYSICS.md → docs/PARAMETERS.md → docs/contract/v2.md →
@@ -2308,6 +2311,85 @@ world, the campaign-completion/closing-screen path (M7's passed replay,
 §5.2.7), the docs/ROADMAP reconciliation, and the §7-Q8 decision writeup
 (now spanning M5/M6/M7 — inertia + ramp + dispatch-mix, one owner call).
 
+### C10 — Slice: the arc wrap (campaign arc, 2026-09-04)
+
+**Built:** the campaign-playability arc's close — one small code piece, then
+reconciliation. THE COMPLETION / CLOSING-SCREEN PATH (§5.2.7): recon's
+headline was that the finale had no ending — after M7 evaluated, milestone_index
+went to 7 and the game just kept running; there was no `campaign_complete`
+signal, no closing screen, no cross-milestone aggregate, and — a live gap —
+a "finished" campaign was NOT terminal (`_on_step`/`_check_failures` were
+unguarded by milestone_index, so a completed campaign could still be dismissed
+/ go insolvent / be coal-fined). C10 lands it: a `campaign_complete(results,
+total_stars, max_stars)` signal emitted once at the finale (guarded
+`not _complete and milestone_index >= milestones.size()` — idempotent under a
+reload-then-re-evaluate), a `_complete` terminal latch (round-tripped in
+to_dict/from_dict so a post-finale save reloads terminal, and guarding
+`_on_step` + `_check_failures` so a done campaign stops mutating), a public
+`stars_max(id)` single-sourced on Campaign (the summary panel repoints to it —
+a duplicated copy would diverge on a rubric edit), and `milestone_panel`'s
+closing screen: title "Campaign complete", the per-milestone star roll-up +
+the `GridCo Europa — N/M ★` aggregate, Retry hidden. Honest, not celebratory —
+it renders whatever stars were earned (M5/M6/M7 fail their own rubrics and the
+screen shows that; a replay-driven cinematic backdrop is a later look pass, D9).
+THE DOC RECONCILIATION (the arc left several surfaces stale): CLAUDE.md §2
+State (the "milestones 2–7 never executed" forward-pointer replaced with the
+shipped C1–C10 result — M1 ★★★, M2 ★5 / M3 ★6 / M4 ★3 pinned, M5/M6/M7
+mechanic gates, §7-Q8); §7-Q8 DISTILLED from a stacked C7→C8→C9 changelog into
+ONE clean owner-decision block (the question, the one wall's four facets —
+inertia / ramp-power / cold-start transient / dispatch-mix — the good news that
+H2 solves the drought ENERGY, the three-option fix menu with the recommended
+default, evidence referenced to §6 not re-inlined); §8 registry (the eight
+campaign-arc smokes 8044–8051, the coal-free three flagged MECHANIC/bounded);
+ROADMAP.md (a "Campaign-playability arc C1–C10" section in the phase-gate
+style + the P5 node-budget "warn 120 / refuse 150" annotated superseded by
+ledger 55, and — the review's catch — GAME_DESIGN's four node-budget spots the
+first pass missed, the doc SPEC cites as its source); README.md (the
+seven-milestone campaign feature + status + the port line 8034→8051);
+docs/GAME_DESIGN.md §5.2 (a shipped-reality caveat: M5/M6/M7 are mechanic
+gates, the closing screen is the functional star roll-up); SPEC.md line 80
+(the "50 km tiles / ≤150 buses" compression figures reconciled to 5 km / ≤180 —
+ledgers 38/55, a verify-not-assume catch).
+
+**Tests/acceptance:** GdUnit 108 → 113 (test_c10 ×5 — the completion path's
+FIRST-EVER coverage: emit-once-on-finale with the correct aggregate, no
+double-fire across re-evaluation, the terminal latch blocking a post-finale
+insolvency + `_complete` round-trip, out-of-range milestone_index safety on
+every step-driven path, stars_max single-source). The C10 verification sweep
+(the completion path is finale-only and provably inert for M1–M6): dispatch_day
+53.8333/63.1186, scenarios green (all nine recipes load incl. inverter_grid_2037,
+mid-campaign deterministic), **ui_boot green** (HUD + every panel built — the
+milestone_panel change is clean), save_load_replay bit-identical (the new
+`complete` save key round-trips), campaign_take_the_reins ★★★ / zero UFLS /
+state_round_trips. An adversarial 2-lens review (completion-code + doc-accuracy)
+confirmed 3 findings, 0 refuted — ALL doc-accuracy, ZERO code findings (the
+completion path passed clean), all fixed before the gate: GAME_DESIGN's four
+node-budget spots still read ≤150/warn 120 (the SPEC/ROADMAP fix had missed
+GAME_DESIGN — the doc SPEC cites as its source, so the two binding docs
+contradicted); the README milestone list was off by one against its own
+"seven-milestone" count (dropped M1); and the ROADMAP arc-section Proof line
+pointed at "§6 C1–C10 entries" before this very entry existed (the review
+catching the wrap mid-write).
+
+**Deviations (deliberate):** NO new release or tag — the arc wrap ships no
+assets; the v0.0.1-pre tag stays at 252f700 (a re-cut is the owner's call, §3).
+The closing screen is the functional star roll-up (D9); the §5.2.7
+replay-driven cinematic backdrop is a later look pass. The full literal §8
+sweep — all ~29 smokes including the three coal-free MECHANIC gates
+(coal_exit/hydrogen_loop/inverter_grid) — is a multi-hour RELEASE-gate run
+(the coal-free world is permanent-ALERT, ~35× realtime); C10 ran the
+representative subset above and confirmed the completion path inert, and each
+campaign pin / mechanic gate stands green from its own C-slice this arc (M2 C2,
+M3 C3, M4 C4, M5 C7, M6 C8, M7 C9) — stated, never a silent cap. No engine /
+backend change (the completion path is pure GDScript); `net/patch remove_device`
+(the §7-Q8 option i) is a documented future backend slice, not built here.
+
+**The arc is COMPLETE.** Open, all owner calls: the §7-Q8 balancing decision
+(M5/M6/M7 ★-pins); a release re-cut; and — queued separately — the
+transient-phase-angle phasor overlay the owner proposed (needs the engine
+extended from one COI angle per island to per-machine angle dynamics, a physics
+arc, not a visualization layer).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -2331,70 +2413,53 @@ ledger entry:
    backlog flags.
 8. **M5 + M6 + M7 coal-free playability — BLOCKED, needs a decision
    (C7 2026-09-03, confirmed by C8 + widened by C9 2026-09-04).**
-   The retire toolkit ships and works, but the milestone as balanced is not
-   passable: retiring 47 GW of coal on the realistic world sheds > 2
-   UFLS/final-year, from two independent causes measured across five
-   approaches (see the C7 §6 entry) — (a) the coal-free grid is inertia-light
-   and sheds ~6 UFLS at the next demand ramp, a ramp-POWER gap no amount of
-   pre-built condensers closes; (b) every retirement is a `World.remove_plant`
-   → full backend net/reset cold-start (ledger 53) that perturbs frequency,
-   so even a 6-unit batch grinds into ALERT. WITH coal the same world is
-   clean and fast — coal's spinning mass is doing the work, and 9 GW of flex
-   cannot stand in for 47 GW of it. Three ways to close it, an owner call:
-   (i) a backend `net/patch remove_device` so a retirement is a live edit,
-   not a cold-start (the cleanest — removes cause (b), and lets coal come off
-   gradually without a transient); (ii) firmer low-carbon capacity — M6's
-   H2-CCGT is exactly the fast, dispatchable, coal-replacing plant the ramps
-   need, so M5 may be MEANT to depend on M6 (retire coal only after the H2
-   chain is up); (iii) relax the §5.2.5 rubric or model a slower
-   retirement cadence. Recommended default until overridden: sequence M5
-   after M6 (option ii) AND add `remove_device` (option i) in a backend
-   slice, because both are independently useful. Nothing downstream is
-   blocked — C8 (M6) fed the answer, and it is the SAME wall.
-   **C8 update:** M6 (The Hydrogen Loop) is the same world one milestone on —
-   coal-free (a player who passed M5 is coal-free, §5.2.6; coal past day 120
-   is fined) with the H2 chain built. C8's smoke measured it, and the answer
-   is UNIFORM with M5, not a reprieve. The hydrogen chain closes the ENERGY
-   half: the caverns draw down measurably (4.8 % burned in a bounded episode
-   slice — H2 actually fired), and the episode OPENS held (the H2-CCGT + all
-   gas commit at scarcity, so firm-plant inertia is present when demanded).
-   But as wind collapses toward the drought trough the coal-free grid STILL
-   SHEDS — 6 UFLS incidents in a burst, SAIDI climbing to 15.2 min and still
-   rising by the (partial) slice end — the SAME inertia/ramp-power wall as M5,
-   now shown to bite WITHIN the graded episode, not only on ordinary ramps.
-   Energy was never the binding constraint (the H2 chain has the MWh); inertia
-   and ramp-power are. And the coal-free world runs pathologically ALERT-slow
-   (3+ s/step), so BOTH ship as MECHANIC GATES — M5 and M6 alike measure the
-   wall rather than pin a milestone the wall makes unpassable. **Revised
-   default:** the load-bearing fix is RAMP-FOLLOWING / INERTIA, confirmed on
-   both milestones — (i) a backend `net/patch remove_device` (retire live, no
-   cold-start), AND/OR more grid-forming FFR / letting the H2-CCGT self-commit
-   for inertia, OR a §5.2.5/§5.2.6 rubric revisit that grades on survivable
-   stress rather than every ramp — hydrogen ENERGY alone does NOT close it.
-   Both toolkits are proven; the pins await the ramp/inertia decision (and a
-   faster coal-free traversal). C9 (the M7 finale) is next.
-   **C9 update (the finale confirms it a third time, + a dispatch-mix
-   dimension):** M7 (The Inverter Grid) grades the coal-free inverter grid
-   M5/M6 leave behind, and its measured first run splits cleanly: the
-   scripted double contingency (largest hub + largest unit, ~3.6 GW paired
-   loss) is SURVIVED without total blackout — but only through the full UFLS
-   defense and a 45.90 Hz nadir (a near-death ride; C6 pinned the SAME
-   portfolio at 49.48 for a single loss). And the world misses its own
-   §5.2.7 rubric in the measured slice: inverter share 12.1 % (vs ≥ 70 %),
-   122 gCO2/kWh (vs < 50), 7 final-year UFLS (vs 0) — because a coal-free
-   moment leans on must-run nuclear + gas, the GFM fleet sits in reserve
-   (energy ~0), and delivered RE share is weather/dispatch-bound not
-   capacity-bound. So the finale adds a THIRD axis to the wall: on top of
-   inertia (M5/M6) and ramp-power, the coal-free world's DISPATCH MIX must
-   change to clear 70 % inverter share and < 50 gCO2 — which points at more
-   RE-committing dispatch / storage cycling / less residual gas, alongside
-   the ramp/inertia fixes. All three milestones (M5/M6/M7) ship as MECHANIC
-   GATES; the ★-pins await ONE owner decision — some combination of a
-   backend net/patch remove_device, firmer grid-forming FFR / self-committing
-   firm low-carbon capacity, a dispatch/rubric revisit (grade on stress
-   episodes + the exam, not every ramp and every hour) — and a faster
-   coal-free traversal. The toolkits and the measurements for all three are
-   proven and green.
+   **The question.** M5 (Coal Exit), M6 (The Hydrogen Loop) and M7 (The
+   Inverter Grid) are TOOLKIT-COMPLETE and MEASURED — the retire/convert
+   verbs, the H2 chain, the GFM+FFR+syncon inertia portfolio, the
+   inverter-share KPI and the double-contingency exam all ship and pass their
+   mechanic gates — but the three milestones are NOT ★-passable as balanced.
+   The toolkits ship; the grades don't. This is a balancing/rubric decision,
+   not a build blocker: nothing downstream is blocked, the arc is complete.
+
+   **Why (one wall, three facets — measured across the arc, evidence in §6
+   C7/C8/C9):**
+   - **Inertia.** With coal's ~47 GW of spinning mass gone the grid is
+     inertia-light; syncons add RoCoF headroom but no ramp power, so a
+     condenser fleet does not close it (tried to 40 units, C7).
+   - **Ramp-power.** The ORDINARY-day wall: firm plants are offline and the
+     H2-CCGT is a ~155 €/MWh peaker that does not self-commit, so the
+     coal-free grid sheds UFLS at the next demand ramp (C7/C8) — and even the
+     M7 finale's double contingency survives only via full UFLS to a 45.90 Hz
+     nadir (C9).
+   - **Cold-start transient.** Every `World.remove_plant` is a full backend
+     net/reset cold-start (ledger 53) that perturbs frequency, so even a
+     6-unit retirement batch grinds into ALERT (C7).
+   - **Dispatch-mix (M7).** A coal-free moment leans on must-run nuclear +
+     gas, the GFM fleet sits in reserve (energy ~0), so measured inverter
+     share is 12 % (vs ≥ 70 %) and CO2 122 g/kWh (vs < 50) — the delivered
+     mix, not the capacity, misses the rubric (C9).
+
+   **The good news (decision-relevant).** The hydrogen chain SOLVES the
+   drought ENERGY: M6's Dunkelflaute-II episode OPENS held coal-free (the
+   H2-CCGT + gas commit at scarcity), caverns drawing down = H2 actually
+   fired (C8). Energy was never the binding constraint — inertia, ramp-power
+   and dispatch-mix are.
+
+   **The fix menu (an owner call — some combination):**
+   (i) a backend `net/patch remove_device` so a retirement is a LIVE edit,
+   not a cold-start (removes the transient facet; a future backend slice,
+   NOT done);
+   (ii) firmer ramp-following / inertia between droughts — more grid-forming
+   FFR, or let the H2-CCGT self-commit — plus a dispatch that commits more RE
+   / cycles storage / carries less residual gas (attacks the ramp + mix
+   facets);
+   (iii) a §5.2.5/§5.2.6/§5.2.7 rubric revisit that grades on survivable
+   STRESS episodes + the exam, not on every ordinary ramp and every hour.
+   **Recommended default (in force until overridden):** (i) + (ii). The
+   toolkits and measurements for all three milestones are proven and green;
+   the ★-pins await this decision and a faster coal-free traversal (the
+   permanent-ALERT world runs ~35× realtime, so a full-window graded run is
+   multi-hour — the mechanic gates measure bounded windows by that physics).
 
 ## 8. Release checklist (ROADMAP P10)
 
@@ -2413,6 +2478,18 @@ Run in order; every step is a gate, not a suggestion.
    `north_sea_hub`; P8 `ride_through`, `cascade_low_inertia`,
    `replay_panel`; P9 `save_load_replay`, `campaign_take_the_reins`,
    `scenarios`; P10 `soak`.
+   **Campaign-arc smokes (C1–C10, heavy/local — 8044–8051):** `campaign_merit_order`
+   (8044, M2 ★5), `campaign_green_gigawatts` (8045, M3 ★6),
+   `campaign_dunkelflaute` (8046, M4 ★3), `black_start` (8047, C5 mechanic),
+   `campaign_coal_exit` (8048, M5 MECHANIC — bounded coal-free window, not a
+   full-window ★-traversal), `campaign_hydrogen_loop` (8049, M6 MECHANIC —
+   bounded episode slice), `campaign_inverter_grid` (8050, M7 MECHANIC —
+   bounded to the day-174.5 exam), `syncon_inertia` (8051, C6). The three
+   coal-free MECHANIC gates run permanent-ALERT (~35× realtime, multi-hour to
+   a full window) — they run BOUNDED to their measured windows BY THE PHYSICS,
+   not a silent time cap; each ★-pin (M5/M6/M7) awaits the §7-Q8 decision.
+   A literal all-in-one sweep of every smoke is a multi-hour run — cut it per
+   release, isolated by `RTTF_PORT_OFFSET`, and log which tier ran.
 4. `scripts/freeze_backend.sh` — frozen backend boots and answers `/health`.
 5. `scripts/package_game.sh linux` — assembles the bundle AND plays it
    (`boot_and_day` inside the bundle). A bundle that assembles but cannot

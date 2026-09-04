@@ -163,7 +163,9 @@ plants, substations, corridor drawing (line kinds, parallel circuits,
 transformer bays), load-center footprints; `grid_topology.gd` builder → native
 bundle + interpretation maps, golden-file pinned; debounced reset (2.5 s idle)
 + `/gb/net/patch` for device-only changes; node budget enforcement (warn 120 /
-refuse 150 buses); islands-without-source dropped with UI warning.
+refuse 150 buses — the P5-era values, **superseded by ledger 55: warn 150 /
+refuse 180**, raised when M3's build hit the wall, C3); islands-without-source
+dropped with UI warning.
 *Done when:* scripted build of a 3-country grid connects a load center →
 `supplied 1.0`; cutting the only line → unsupplied zone + island event in UI;
 topology goldens byte-stable; reset storms impossible (debounce test).
@@ -271,6 +273,38 @@ HVDC-coupled areas; grid-forming island-survival gameplay.
 *Done when:* fresh-machine install → playing a campaign start within 10 min;
 soak green; all smokes + suites green in the release CI matrix.
 *Proof:* soak verdict line; release checklist in CLAUDE.md.
+
+---
+
+## Campaign-playability arc (C1–C10) — post-release, COMPLETE (2026-09-04)
+
+*Goal:* make the milestone campaign (GAME_DESIGN §5.2) actually playable and
+measured — it shipped in P9 authored-but-1/7-executed (the survey found
+milestone 7's criterion a literal `pass`, unlock years unenforced, no player
+path to retire coal / convert to H2 / build GFM). Ten thin milestone slices,
+a gate on every phase, per the published arc-plan. Each slice's Built / Tests
+/ Acceptance evidence is a §6 log entry in CLAUDE.md (read those — they are
+authoritative; this is the index).
+*Scope (per slice):* C1 rails & rubric truth (window-blind trackers, UFLS
+per-incident, the §4.7 cost axis, the two-component finale exam, unlock
+enforcement, mid-campaign recipes, autosave — ledgers 50–52). C2 M2 The Merit
+Order (boot menu, mode inspector, summary panel; **★5-pinned**). C3 M3 First
+Green Gigawatts (the RE/hub build program; **★6**; node budget raised to
+≤180/≤360, ledger 55). C4 M4 The Dunkelflaute (`author_era`, the §3.3 battery
+policy; **★3**). C5 black start & staged restoration (the `Restoration`
+autoload; mechanic gate). C6 the inertia portfolio (GFM buildable + the P=0
+syncon backend kind; "inertia AND reserve are different services"). C7 M5 Coal
+Exit (retire verb + decommission economics; **MECHANIC gate** — the coal-free
+wall, §7-Q8). C8 M6 The Hydrogen Loop (convert-to-H2 verb + retrofit fee;
+MECHANIC gate). C9 M7 The Inverter Grid finale (the measured inverter-share
+KPI + the double-contingency exam; MECHANIC gate). C10 the wrap
+(campaign-completion / closing-screen path §5.2.7, this ROADMAP + doc
+reconciliation, the §7-Q8 owner writeup).
+*Done when:* M1–M7 all implemented + measured; M2/M3/M4 star-pinned;
+M5/M6/M7 mechanic-gate green with the balancing question captured (§7-Q8);
+GdUnit + regression triad green; the completion path lands the closing screen.
+*Proof:* the §6 C1–C10 entries; §7-Q8 (the one open owner decision); the
+star pins and mechanic-gate verdict lines in each campaign smoke.
 
 ---
 

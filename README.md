@@ -83,9 +83,14 @@ Docker, clock — no imports from `game/`.
   inertia gauge, FCR deployment), an adequacy advisor, event vocabulary, and
   per-site weekly charts in the energy-charts.info style — click a city's or
   plant's location pin to open its measured generation/load week.
-- **Campaign, sandbox, scenarios.** Milestone campaign on the inherited 2025
-  world, a classroom sandbox console (difficulty, scripted trips, weather
-  forcing), and hand-editable scenario recipes.
+- **Campaign, sandbox, scenarios.** A seven-milestone campaign on the
+  inherited 2025 world (take the reins → merit order → green gigawatts → the
+  Dunkelflaute → coal exit → the hydrogen loop → the inverter-grid finale), a
+  classroom
+  sandbox console (difficulty, scripted trips, weather forcing), and
+  hand-editable scenario recipes. The early milestones are star-graded;
+  the coal-free late milestones are mechanic-verified with an open balancing
+  question (tracked honestly in [CLAUDE.md](CLAUDE.md) §7-Q8).
 - **Ships on three platforms.** Self-contained bundles (frozen backend, no
   Python on the player's machine) for Linux, macOS (Apple Silicon) and
   Windows — each verified by *playing a simulated day inside the bundle*
@@ -97,8 +102,12 @@ Docker, clock — no imports from `game/`.
 
 **P0–P10 complete** — scaffold through packaging, plus the post-release
 arcs: the realistic campaign world, the strategic-zoom UI, site notes, the
-North Sea build-out and the macOS/Windows installers. Per-phase log with
-acceptance evidence: [CLAUDE.md](CLAUDE.md) §6.
+North Sea build-out, the macOS/Windows installers, and the
+**campaign-playability arc (C1–C10, complete)** — the milestone campaign
+implemented and measured across M1–M7, M2/M3/M4 star-pinned and M5/M6/M7
+shipping as mechanic-verified gates (the coal-free balancing question is
+open — [CLAUDE.md](CLAUDE.md) §7-Q8). Per-phase log with acceptance
+evidence: [CLAUDE.md](CLAUDE.md) §6.
 
 | Document | Contents |
 |---|---|
@@ -182,7 +191,8 @@ provisioned Grafana dashboard shows flows, voltages and the live frequency.
 
 **Port scheme** (deliberate, collision-checked against the sibling
 projects): backend 8003, game sidecar 8030, acceptance smokes 8031, contract
-tests 8032, per-smoke backends 8034–8043. `RTTF_PORT_OFFSET=<n>` shifts a
+tests 8032, per-smoke backends 8034–8051 (the campaign-arc smokes occupy
+8044–8051). `RTTF_PORT_OFFSET=<n>` shifts a
 whole smoke run for parallel use.
 
 ---

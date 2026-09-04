@@ -77,9 +77,10 @@ Design pillars (binding, from docs/GAME_DESIGN.md):
    (infrastruct principle); replays annotate real traces.
 3. **Automatic dispatch, deliberate strategy.** Merit order runs itself;
    the player builds and sets policy.
-4. **One honest compression.** 50 km tiles, ~25 load zones, ≤150 buses,
-   12 representative days per year — documented, consistent, never pretending
-   to higher fidelity.
+4. **One honest compression.** 5 km tiles (ledger 38; was 50), ~25 load
+   zones, ≤180 buses (ledger 55; the P5-era ≤150 was raised when M3's build
+   hit the wall), 12 representative days per year — documented, consistent,
+   never pretending to higher fidelity.
 
 The **honesty section** (rtheatflow §3.5 pattern) is mandatory in
 docs/PHYSICS.md §2.1 and must be mirrored in-game: uniform frequency per

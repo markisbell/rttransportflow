@@ -15,9 +15,10 @@ Authority: map/tiles, load centers, game loop, economy rules, campaign, UI
 3. **Automatic dispatch, deliberate strategy.** The player sets policy and
    builds steel; the merit order runs itself. Overrides exist but are the
    exception.
-4. **One honest compression.** Europe at 50 km tiles, 25 load zones, ≤150
-   buses, 12 representative days per year. Every compression is documented and
-   consistent; nothing pretends to be higher-fidelity than it is.
+4. **One honest compression.** Europe at 5 km tiles (ledger 38; was 50), 25
+   load zones, ≤180 buses (ledger 55; was 150), 12 representative days per
+   year. Every compression is documented and consistent; nothing pretends to
+   be higher-fidelity than it is.
 
 ---
 
@@ -126,10 +127,11 @@ output byte-for-byte):
   own frequency automatically (PHYSICS §2.7) — split events are real from day
   one; deliberate multi-area operation (separate AGC areas, HVDC-coupled
   frequency) is a later phase.
-- **Node budget (hard)**: ≤ **150 buses / ≤ 300 branches** at maximum
-  build-out (the infrastruct-proven ≤300-node budget). The builder enforces
-  it: bus-merge rules plus a palette warning at 120 buses and hard refusal at
-  150 ("consolidate substations"). The base scenario is authored ≤ 60 buses.
+- **Node budget (hard)**: ≤ **180 buses / ≤ 360 branches** at maximum
+  build-out (ledger 55; the P5-era 150/300 was raised when M3's build hit the
+  wall, C3). The builder enforces it: bus-merge rules plus a palette warning
+  at 150 buses and hard refusal at 180 ("consolidate substations"). The base
+  scenario is authored ≤ 60 buses.
   Offshore platforms and HVDC links are **devices, not AC buses** — they
   don't consume the budget.
 
@@ -526,6 +528,17 @@ frequency stability.**
    sized grid-forming + FFR + syncon portfolio. The passed replay is the
    campaign's closing screen.
 
+> **Shipped reality (campaign arc C1–C10, CLAUDE.md §6).** M1 is ★★★-pinned
+> and M2/M3/M4 are star-pinned as designed. Milestones **5, 6 and 7 ship as
+> MECHANIC GATES**: the player toolkits (retire, convert-to-H2, the
+> GFM+FFR+syncon inertia portfolio), the KPIs (inverter-energy share) and the
+> finale exam are all implemented and MEASURED, but the milestones are not
+> ★-passable *as balanced* on the realistic coal-free world — one open
+> balancing question (inertia + ramp + dispatch-mix), tracked in
+> **CLAUDE.md §7-Q8**. The closing screen exists as a functional star roll-up
+> across all seven milestones (C10); the replay-driven cinematic backdrop is a
+> later look pass, and a *passing* finale replay is reached once §7-Q8 closes.
+
 ### 5.3 Failure states
 
 - **Insolvency**: treasury < −2 B€ for 90 days (a loan line exists — use it).
@@ -582,7 +595,7 @@ mandatory in `model/`.
 | Market agents / competitors / bidding AI | single company, regulated tariff; wholesale price is a computed teaching signal |
 | Real NWP weather | seeded stochastic model (PARAMETERS §3) + `force_*` windows |
 | Black-start / island EMS gameplay | v1: scripted restoration sequence; grid-forming island survival gameplay = later phase |
-| > 150 buses | hard builder cap; Europe stays coarse by design |
+| > 180 buses | hard builder cap (ledger 55; was 150); Europe stays coarse by design |
 
 ---
 
@@ -600,6 +613,7 @@ mandatory in `model/`.
    failure limits.
 6. `tools/balancing/economy.md` — constants + rationale + regenerating smoke.
 
-Performance guardrails (bind the implementation): ≤ 150 buses / 300 branches;
+Performance guardrails (bind the implementation): ≤ 180 buses / 360 branches
+(ledger 55; was 150/300);
 PHYSICS §3 budget table; one-step lag, skip-never-stall; trajectory ≤ 512
 samples per frame.
