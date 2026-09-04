@@ -151,6 +151,7 @@ class Integrator:
         protection_seed: int = 0,
         fwindow=None,  # FWindowConfig | None — catalog frequency_protection
     ) -> None:
+        from .angles import AngleObserver
         from .protection import DefensePlan, FrequencyWindowRelays
 
         self.fleet = fleet
@@ -160,6 +161,11 @@ class Integrator:
         self.trajectory_max_samples = trajectory_max_samples
         self.relays = FrequencyWindowRelays(fleet, fwindow)
         self.defense = DefensePlan(islands.n, protection_seed)
+        # phasor observer (ledger 56): per-machine (delta, omega), integrated
+        # DOWNSTREAM of the COI swing and read-only on its f — a no-op until the
+        # simulator hands it reduced networks (set_islands), so a bare engine
+        # (the analytic-pin fixtures) is byte-identical.
+        self.angles = AngleObserver()
         # sim-layer topology callback: line_trip/line_close events land here
         # (the integrator knows nothing about pandapower); returns follow-up
         # (kind, element, data) events — island_split/island_merge
@@ -219,6 +225,11 @@ class Integrator:
         self.energy_in_mj = 0.0
         self.energy_load_mj = 0.0
         self.defense.remap(parent_of_new)
+        # the observer's reduced networks are keyed on the OLD island indices —
+        # invalidate; the next PF rebuild re-reduces per the new topology. The
+        # per-machine (delta, omega) live on the fleet and follow rows through
+        # the reshape (a split island inherits its parent's angles).
+        self.angles.set_islands([])
         self.refresh_e_k()
 
     @property
@@ -297,6 +308,10 @@ class Integrator:
         f_prev = self.islands.f
         f_new = self.islands.swing_update(dt_us, p_inj)
         self._rocof_inst = (f_new - f_prev) / (dt_us / US)
+        # phasor observer: per-machine (delta, omega) ride the SAME tick grid,
+        # reading the just-computed COI f READ-ONLY and never feeding back —
+        # so f_new and every §6 pin are untouched (ledger 56).
+        self.angles.step(dt_us, self.fleet, self.islands.f)
         # Energy meters (damping term at f⁺ — the semi-implicit exact pairing).
         p_load = self.islands.p_load(f_new)
         dt_s = dt_us / US

@@ -172,6 +172,16 @@ class Fleet:
     hy_g: np.ndarray
     hy_xh: np.ndarray
     y: np.ndarray
+    # phasor observer (ledger 56): the per-machine rotor angle/speed the
+    # COI-anchored classical swing integrates. xd_prime/d_damp are PARAMS —
+    # derivable from the catalog, so they stay OUT of the model hash (the
+    # sync_aux_mw precedent); delta/omega/e_prime are STATE, snapshot-restored
+    # tolerantly (a pre-arc save re-inits them from steady state).
+    xd_prime: np.ndarray  # transient reactance [pu on S_n], E' sits behind
+    d_damp: np.ndarray     # damping torque [pu] (visual only — never feeds COI)
+    delta: np.ndarray      # rotor angle in the island COI frame [rad]
+    omega: np.ndarray      # speed deviation [Hz], COI-projected each tick
+    e_prime: np.ndarray    # internal EMF magnitude [pu on S_n]
     hy_soc_mwh: np.ndarray
     hy_pump_set: np.ndarray  # commanded pumping draw [MW, >= 0]
     hy_pump_p: np.ndarray  # actual pumping draw (slewed)
@@ -713,6 +723,10 @@ class Fleet:
             "x_g": rf(self.x_g), "x_1": rf(self.x_1), "x_2": rf(self.x_2),
             "hy_xc": rf(self.hy_xc), "hy_g": rf(self.hy_g), "hy_xh": rf(self.hy_xh),
             "y": rf(self.y),
+            # phasor observer state (ledger 56); xd_prime/d_damp are params,
+            # not state — rebuilt from the catalog, out of the model hash.
+            "delta": rf(self.delta), "omega": rf(self.omega),
+            "e_prime": rf(self.e_prime),
             "hy_soc_mwh": rf(self.hy_soc_mwh),
             "hy_pump_set": rf(self.hy_pump_set), "hy_pump_p": rf(self.hy_pump_p),
             "pump_energy_mwh": rf(self.pump_energy_mwh),
@@ -747,7 +761,11 @@ class Fleet:
         self.inv_avail_eff[:] = parse_floats(
             state.get("inv_avail_eff", state["inv_avail"]))
         self.black_start_rows = set(state.get("black_start_rows", []))
-        for name in ("hy_soc_mwh", "hy_pump_set", "hy_pump_p", "pump_energy_mwh"):
+        # phasor observer state + PHS: a pre-arc snapshot lacks these; keep the
+        # steady-state make_fleet defaults (delta/omega 0, e_prime 1) — the
+        # first PF re-anchors E' and δ (tolerant restore, ledger 56).
+        for name in ("hy_soc_mwh", "hy_pump_set", "hy_pump_p", "pump_energy_mwh",
+                     "delta", "omega", "e_prime"):
             if name in state:
                 getattr(self, name)[:] = parse_floats(state[name])
 
@@ -882,6 +900,9 @@ def make_fleet(
         p_set=col("p_set", lambda s: 0.0),
         p_disp=np.zeros(n), x_g=np.zeros(n), x_1=np.zeros(n), x_2=np.zeros(n),
         hy_xc=np.zeros(n), hy_g=np.zeros(n), hy_xh=np.zeros(n), y=np.zeros(n),
+        xd_prime=col("xd_prime", lambda s: 0.30),
+        d_damp=col("d_damp", lambda s: 0.0),
+        delta=np.zeros(n), omega=np.zeros(n), e_prime=np.ones(n),
         hy_soc_mwh=np.array([float(s.get("soc_frac", 0.5))
                              * float(s.get("e_mwh", 0.0)) for s in sync])
         if n else np.zeros(0),

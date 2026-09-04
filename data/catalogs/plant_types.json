@@ -5,6 +5,8 @@
     "nuclear": {
       "model": "steam",
       "h_s": 6.0,
+      "xd_prime_pu": 0.3,
+      "d_damp_pu": 1.0,
       "r_pu": 0.05,
       "deadband_hz": 0.02,
       "fcr_band_frac_pn": 0.02,
@@ -23,12 +25,14 @@
       "eta_full": 0.33,
       "eta_min": 0.32,
       "fuel": "uranium",
-      "rationale": "PARAMETERS §1.1 large PWR: H 6 s (big rotor), 8 s reheat lag = why steam cannot arrest a fast dip; FCR band ±2% P_n (French practice; game default participation OFF); xenon lockout 48 h after a trip.",
+      "rationale": "PARAMETERS §1.1 large PWR: H 6 s (big rotor), 8 s reheat lag = why steam cannot arrest a fast dip; FCR band ±2% P_n (French practice; game default participation OFF); xenon lockout 48 h after a trip. Xd' 0.3 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "afrr_band_frac_pn": 0.0
     },
     "coal": {
       "model": "steam",
       "h_s": 4.0,
+      "xd_prime_pu": 0.3,
+      "d_damp_pu": 1.0,
       "r_pu": 0.05,
       "deadband_hz": 0.01,
       "fcr_band_frac_pn": 0.05,
@@ -47,12 +51,14 @@
       "eta_full": 0.45,
       "eta_min": 0.41,
       "fuel": "coal",
-      "rationale": "PARAMETERS §1.2 supercritical hard coal: classic sluggish reheat (T_RH 10 s, F_HP 0.30); boiler-storage limits folded into the ±5% FCR band + 3%/min ramp.",
+      "rationale": "PARAMETERS §1.2 supercritical hard coal: classic sluggish reheat (T_RH 10 s, F_HP 0.30); boiler-storage limits folded into the ±5% FCR band + 3%/min ramp. Xd' 0.3 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "afrr_band_frac_pn": 0.05
     },
     "lignite": {
       "model": "steam",
       "h_s": 4.0,
+      "xd_prime_pu": 0.3,
+      "d_damp_pu": 1.0,
       "r_pu": 0.05,
       "deadband_hz": 0.01,
       "fcr_band_frac_pn": 0.05,
@@ -71,12 +77,14 @@
       "eta_full": 0.43,
       "eta_min": 0.39,
       "fuel": "lignite",
-      "rationale": "PARAMETERS §1.3: as coal but stiffer (P_min 40%, 2%/min) — mine-mouth baseload character.",
+      "rationale": "PARAMETERS §1.3: as coal but stiffer (P_min 40%, 2%/min) — mine-mouth baseload character. Xd' 0.3 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "afrr_band_frac_pn": 0.05
     },
     "gas_ccgt": {
       "model": "ccgt",
       "h_s": 4.5,
+      "xd_prime_pu": 0.3,
+      "d_damp_pu": 1.0,
       "r_pu": 0.04,
       "deadband_hz": 0.01,
       "fcr_band_frac_pn": 0.05,
@@ -94,12 +102,14 @@
       "eta_full": 0.59,
       "eta_min": 0.5,
       "fuel": "ng",
-      "rationale": "PARAMETERS §1.4 H-class single shaft: GT delivers 2/3 fast (~1-2 s), the HRSG steam tail (1/3) breathes over 2 min — 'fast, then breathes'.",
+      "rationale": "PARAMETERS §1.4 H-class single shaft: GT delivers 2/3 fast (~1-2 s), the HRSG steam tail (1/3) breathes over 2 min — 'fast, then breathes'. Xd' 0.3 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "afrr_band_frac_pn": 0.1
     },
     "gas_ocgt": {
       "model": "ocgt",
       "h_s": 3.0,
+      "xd_prime_pu": 0.25,
+      "d_damp_pu": 1.0,
       "r_pu": 0.04,
       "deadband_hz": 0.01,
       "fcr_band_frac_pn": 0.1,
@@ -116,12 +126,14 @@
       "eta_full": 0.4,
       "eta_min": 0.29,
       "fuel": "ng",
-      "rationale": "PARAMETERS §1.5: the fastest thermal responder (GAST T1 0.3/T2 0.8, ±10% FCR band, 15%/min, 15-min start any state); expensive fuel is the game-side counterweight.",
+      "rationale": "PARAMETERS §1.5: the fastest thermal responder (GAST T1 0.3/T2 0.8, ±10% FCR band, 15%/min, 15-min start any state); expensive fuel is the game-side counterweight. Xd' 0.25 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "afrr_band_frac_pn": 0.15
     },
     "hydro_ps": {
       "model": "hydro",
       "h_s": 3.5,
+      "xd_prime_pu": 0.25,
+      "d_damp_pu": 1.0,
       "r_pu": 0.04,
       "deadband_hz": 0.01,
       "fcr_band_frac_pn": 0.1,
@@ -141,7 +153,7 @@
       "eta_full": 0.88,
       "eta_min": 0.88,
       "fuel": null,
-      "rationale": "PARAMETERS §1.10: transient-droop governor (T_r 6 s, r_t 0.4 → 60 s sustained lag) + non-minimum-phase water column (T_w 1.5 s) — the wrong-way kick is real physics the player sees; 30-100% generating range, 2-min start.",
+      "rationale": "PARAMETERS §1.10: transient-droop governor (T_r 6 s, r_t 0.4 → 60 s sustained lag) + non-minimum-phase water column (T_w 1.5 s) — the wrong-way kick is real physics the player sees; 30-100% generating range, 2-min start. Xd' 0.25 pu / D 1.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing).",
       "e_hours": 8.0,
       "eta_pump": 0.88,
       "eta_turbine": 0.9,
@@ -152,11 +164,13 @@
     "syncon": {
       "model": "syncon",
       "h_s": 3.0,
+      "xd_prime_pu": 0.2,
+      "d_damp_pu": 0.0,
       "aux_frac_sn": 0.01,
       "start_hot_s": 900,
       "start_warm_s": 900,
       "start_cold_s": 900,
-      "rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser — spinning mass and voltage support with no prime mover. H 3.0 s on the EXPLICIT S_n rating (sn_mva on the plant row; p_max is 0, so the historic p_max/0.9 derivation would zero the machine), Q ±0.40·S_n at any operating point, 1 % S_n station service while online (a PF load row + the frequency ledger, one catalog fraction). No governor: fcr_band 0 is the droop clamp's off switch, the chain idles at u = 0. Starts like a fast machine (15 min any state — a motor start)."
+      "rationale": "C6/D4, PARAMETERS §1.15: a synchronous condenser — spinning mass and voltage support with no prime mover. H 3.0 s on the EXPLICIT S_n rating (sn_mva on the plant row; p_max is 0, so the historic p_max/0.9 derivation would zero the machine), Q ±0.40·S_n at any operating point, 1 % S_n station service while online (a PF load row + the frequency ledger, one catalog fraction). No governor: fcr_band 0 is the droop clamp's off switch, the chain idles at u = 0. Starts like a fast machine (15 min any state — a motor start). Xd' 0.2 pu / D 0.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing)."
     },
     "wind_onshore": {
       "model": "inverter",
@@ -216,7 +230,9 @@
       "recharge_frac_pn": 0.1,
       "recharge_quiet_hz": 0.05,
       "h_v_s": 4.0,
-      "rationale": "PARAMETERS §1.12 grid-forming VSM: virtual H_v 4 s COUNTS INTO the island inertia pool (the only converter that lowers RoCoF); 2% droop with no deadband (gain P_n/Hz = full at 1 Hz), 0.05 s lag; inertial energy debits SoC."
+      "xd_prime_pu": 0.05,
+      "d_damp_pu": 0.0,
+      "rationale": "PARAMETERS §1.12 grid-forming VSM: virtual H_v 4 s COUNTS INTO the island inertia pool (the only converter that lowers RoCoF); 2% droop with no deadband (gain P_n/Hz = full at 1 Hz), 0.05 s lag; inertial energy debits SoC. Xd' 0.05 pu / D 0.0 (classical transient reactance + damping torque for the per-machine phasor observer, ledger 56; D is pin-neutral — the observer never feeds the COI swing)."
     },
     "electrolyzer": {
       "model": "electrolyzer",

@@ -2471,6 +2471,52 @@ swing, with EVERY existing frequency pin held bit-exact (any drift is a RED
 FLAG, not a re-baseline) plus the new angle pins (mode / COI-identity /
 slicing / snapshot / pole-slip-bounded / GFM-holds-reference).
 
+### Phasor arc — P1a: the observer engine core (2026-09-04)
+
+**Built:** Phase 1's engine-side observer (ledger 56) — the per-machine
+angle model as a self-contained, unit-validated core, wired into the tick but
+INERT until the P1b simulator coupling feeds it networks (so nothing on the
+real grid changes yet, and every frequency pin stays bit-exact). The pieces:
+- **Catalog + loader**: `xd_prime_pu`/`d_damp_pu` per synchronous kind
+  (+ battery_gfm's virtual reactance) in `plant_types.json`, threaded through
+  `sync_spec`. Values are the recommended classical defaults (Xd' 0.20–0.30,
+  D 0–1 — an owner call, ledger 56); each carries a rationale clause.
+- **Fleet**: `delta`/`omega`/`e_prime` STATE + `xd_prime`/`d_damp` PARAMS as
+  new sync arrays (`make_fleet` via `col()`, pin-neutral defaults). The state
+  round-trips through the snapshot (tolerant — a pre-arc save re-inits from
+  steady state); the params stay OUT of `model_hash` (the `sync_aux_mw`
+  precedent), so every existing bundle restores byte-identical.
+- **`dynamics/angles.py` (`AngleObserver`)**: pure NumPy — the classical
+  multi-machine swing `2H_i·S_n dω_i/dt = P_mi − P_ei(δ) − D_i(ω_i−ω_COI)`
+  over a fixed reduced-Y-bus (E' behind Xd', handed in by the simulator),
+  with the COI projection each tick (ω_i's inertia-weighted mean forced to the
+  Tier-1 island f) and pole-slip bounding (δ wrapped, ω clamped — never an
+  unbounded float or NaN). No pandapower call, no solve in the tick.
+- **Integrator**: `self.angles.step(dt_us, fleet, islands.f)` in `_tick`
+  DOWNSTREAM of the untouched COI `swing_update`, reading its f read-only;
+  invalidated on split/merge (rebuilt at the next PF).
+
+**Tests/acceptance:** `test_angles.py` ×4 — the inter-machine mode matches the
+closed form to < 2 %, the COI-projection identity holds each tick to < 1e-12
+(unequal inertias), a pole slip stays finite/wrapped/clamped, and a disabled
+observer is a byte-exact no-op. EVERY existing frequency pin bit-exact
+(analytic RoCoF/QSS, nadir, exact-lag, slicing, snapshot bit-replay, energy
+balance, known-answer, worked example, three-fleet comparative — the observer
+is inert with no networks set, and never feeds the COI regardless).
+
+**Deviations (deliberate):** P1a is the engine CORE — the observer is wired
+but produces nothing on the live grid until P1b (the simulator builds the
+reduced networks from the live pandapower Ybus at PF instants, inits E' from
+the operating point, and re-anchors). No wire change yet (P2). The classical
+reduced-Y machinery was proven on `case9` in P0; P1b applies it to the real
+topology.
+
+**Next:** Phasor P1b — the simulator coupling: `build_island_nets` (per-island
+Kron reduction from the live net, E' init, the p_bias offset + CALM re-anchor)
+feeding `AngleObserver.set_islands` at PF instants, so the observer produces
+real per-machine angles on the game grid; then the integration pins
+(COI-identity on a real world, slicing/snapshot of δ/ω, GFM-holds-reference).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a

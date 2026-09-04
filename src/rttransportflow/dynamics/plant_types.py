@@ -88,6 +88,9 @@ def sync_spec(kind: str, params: dict, *, device_id: str, island: int,
             "eta_full": 0.0, "eta_min": 0.0, "offline": offline,
             "t_g": 1.0, "t_ch": 1.0, "t_rh": 10.0, "f_hp": 0.3,
             "aux_mw": params["aux_frac_sn"] * float(sn_mva),
+            # classical machine params for the phasor observer (ledger 56)
+            "xd_prime": params.get("xd_prime_pu", 0.20),
+            "d_damp": params.get("d_damp_pu", 0.0),
         }
     spec = {
         "id": device_id, "island": island, "model": model,
@@ -107,6 +110,11 @@ def sync_spec(kind: str, params: dict, *, device_id: str, island: int,
         "eta_full": params.get("eta_full", 0.0),
         "eta_min": params.get("eta_min", 0.0),
         "offline": offline,
+        # classical machine params for the phasor observer (ledger 56): the
+        # transient reactance E' sits behind, and a damping torque. Both are
+        # pin-neutral to the frequency core (the observer never feeds the COI).
+        "xd_prime": params.get("xd_prime_pu", 0.30),
+        "d_damp": params.get("d_damp_pu", 0.0),
     }
     if model == "steam":
         spec.update(t_g=params["t_servo_s"], t_ch=params["t_chest_s"],
