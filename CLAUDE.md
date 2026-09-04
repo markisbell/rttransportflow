@@ -2217,6 +2217,97 @@ finale, smoke campaign_inverter_grid (8050). §7 Q8 (coal-free viability, now
 spanning M5+M6 with one unified finding — the inertia/ramp wall, not energy)
 awaits the owner.
 
+### C9 — Slice M7: The Inverter Grid (campaign finale, 2026-09-04)
+
+**Built:** the campaign FINALE, mechanic-complete and measured. Recon's
+headline: most of M7 was ALREADY wired — the milestone rubric, the scripted
+`double_contingency` handler (largest hub + largest online unit, two trips
+10 s apart, per-component `dc_hub_fired`/`dc_unit_fired`, ledger 52), the
+grandfather-on-load, and the 8050 port reservation all shipped in C1/earlier.
+C9 landed the ONE real hole plus the reference play. THE ACCUMULATOR: the
+`inverter_share_at_least` criterion was a literal `pass` no-op (its §5.2.7
+70 % gate vacuous); C9 makes it MEASURED — `INVERTER_GEN_KINDS`/`SYNC_GEN_KINDS`
+classify each step-result device by `World.plants` kind, `_accumulate` sums
+`max(p_mw,0)·dt_h` per interface type over the window (delivered power, engine
+curtailment already applied — ledger 44; charging/pumping/electrolysis loads
+drop by the sign filter, and electrolyzer/h2_cavern/hvdc_converter/syncon are
+in neither list so a transfer never inflates the share — ledger 28), a public
+`inverter_share()` reads the ratio, and `_first_unmet` compares it. The two
+acc keys ride the existing `acc.duplicate` save path and grandfather to 0.0 on
+a pre-C9 save (from_dict resets first). THE WORLD/RECIPE: `inverter_grid_2037`
+reuses `author_era("hydrogen")` — the finale world IS the coal-free,
+inverter-heavy, GFM+FFR+syncon+hub world M5/M6 leave behind (a new era author
+would only re-tune quotas the hydrogen era already sets); day 174.4, milestone
+6, 14 B€. THE SMOKE: `campaign_inverter_grid` (8050), a MECHANIC GATE.
+
+**The measured finale — survives the exam, but misses its rubric (the same
+wall, one dimension richer):** the smoke settles the coal-free world to just
+before the scripted double contingency at day 174.5, fires it through the
+campaign's own auto-path, and measures the aftermath. The results (16/16
+checks green, first full run):
+- **The exam is REAL and SURVIVED — barely.** Both components fire
+  (`dc_hub_fired` ∧ `dc_unit_fired` — no Potemkin degradation to a single
+  trip), and the coal-free inverter grid takes the paired ~3.6 GW infeed loss
+  WITHOUT total blackout (`double_contingency_survived` met). But it survives
+  only through its FULL UFLS defense and a **45.90 Hz nadir** (one exam UFLS
+  incident) — a near-death ride, not a clean one (C6 pinned the same portfolio
+  at 49.48 Hz for a SINGLE loss; the paired loss is a different animal).
+- **The world misses its own §5.2.7 targets in the measured slice:** inverter
+  energy share **12.1 %** (vs the ≥ 70 % gate), **122 g/kWh** (vs < 50), **7
+  final-year UFLS** (vs 0). At this coal-free moment the dispatch leans on
+  must-run nuclear + gas (hence the CO2 and the low inverter share); the 9 GW
+  of grid-forming sits in reserve (FFR armed, not discharging → correctly ~0
+  energy), and the RE fleet's delivered share is weather- and dispatch-bound,
+  not capacity-bound. Fully graded, M7 would PASS `double_contingency_survived`
+  yet FAIL inverter_share, gCO2 and final-year UFLS — 3 of 5 pass criteria.
+
+So M7 ships as a MECHANIC GATE, like M5 and M6: the accumulator, the exam and
+the toolkit are real and green, the milestone as authored is not cleanly
+passable on this world. The gate HARD-asserts what is structurally true (the
+build, MEASURED registration — the hub is a live `offshore_hub` device, GFM
+registers, syncons register as native rows, node budget 161/307 inside
+180/360 — the accumulator is live, and the exam fires both components) and
+REPORTS the §5.2.7 measurements as owner data. The ★-pin is deferred to the
+full-year traversal (a multi-hour ALERT-slow run) AND the balancing that would
+let the coal-free grid actually clear 70 % inverter share, < 50 gCO2 and zero
+final-year UFLS — the §7-Q8 wall, now with a dispatch-mix dimension on top of
+the inertia/ramp one.
+
+**Tests/acceptance:** GdUnit 108 (test_c9 ×9: the accumulator math, the kind
+taxonomy, charging/transfer exclusion, the window guard, the criterion is now
+a REAL gate, the empty-denominator default, save round-trip + pre-C9
+grandfather, the recipe shape, the finale unlock year). The double-contingency
+two-component truth stays pinned by test_campaign's existing
+`test_hubless_double_contingency_is_unmet`. An adversarial 3-lens review
+confirmed 4 findings (2 distinct, 0 refuted), both fixed before the gate: a
+BLOCKING smoke stepping-budget bug — the fine 2 s band opened 72 sim-minutes
+(2160 steps) before the exam, so the loop exhausted its 900-call budget at day
+174.463 and NEVER reached the day-174.5 contingency (the whole gate would have
+measured nothing while reading green on the structural checks) — fixed by
+narrowing the fine band to bracket only the exam (start_day 174.4, FINE_FROM
+174.498, the run now reaches 174.505 in 448 calls); and a minor
+factually-wrong comment about why HVDC is excluded (the terminal IS in
+World.plants under the converter pid — the taxonomy drops it, not
+key-absence). Regression triad: campaign ★★★ / save_load bit-identical /
+dispatch prices 53.83/63.12 (the accumulator is inert for M1–M6, which never
+read inverter_share; the two new acc keys are invisible to a rebuild-free
+grade).
+
+**Deviations (deliberate):** M7's smoke is a MECHANIC GATE, not a ★-pin — the
+third slice (with M5/M6) whose milestone the coal-free wall makes unpinnable
+on this world; the gate proves the accumulator + exam + toolkit and measures
+the §5.2.7 survival/share/CO2 the milestone grades, rather than asserting
+thresholds a bounded slice cannot clear. The finale world reuses the hydrogen
+era rather than a bespoke `author_era("inverter")` (the recon's call — the
+portfolio is identical; a dedicated author would only re-tune quotas, deferred
+until the balancing that a real ★-pin needs). The nadir/share/gCO2 are a
+2.5-hour weather-moment snapshot, not the full-year integral.
+
+**Next:** C10 — the arc wrap: the full §8 smoke sweep against the campaign
+world, the campaign-completion/closing-screen path (M7's passed replay,
+§5.2.7), the docs/ROADMAP reconciliation, and the §7-Q8 decision writeup
+(now spanning M5/M6/M7 — inertia + ramp + dispatch-mix, one owner call).
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
@@ -2238,8 +2329,8 @@ ledger entry:
 7. **Synthetic-inertia & PHS variants** — wind synthetic inertia ships as a
    2035 unlock (chosen); ternary/var-speed PHS and PHS syncon mode are
    backlog flags.
-8. **M5 + M6 coal-free playability — BLOCKED, needs a decision (C7 2026-09-03,
-   confirmed + widened by C8 2026-09-04).**
+8. **M5 + M6 + M7 coal-free playability — BLOCKED, needs a decision
+   (C7 2026-09-03, confirmed by C8 + widened by C9 2026-09-04).**
    The retire toolkit ships and works, but the milestone as balanced is not
    passable: retiring 47 GW of coal on the realistic world sheds > 2
    UFLS/final-year, from two independent causes measured across five
@@ -2282,6 +2373,28 @@ ledger entry:
    stress rather than every ramp — hydrogen ENERGY alone does NOT close it.
    Both toolkits are proven; the pins await the ramp/inertia decision (and a
    faster coal-free traversal). C9 (the M7 finale) is next.
+   **C9 update (the finale confirms it a third time, + a dispatch-mix
+   dimension):** M7 (The Inverter Grid) grades the coal-free inverter grid
+   M5/M6 leave behind, and its measured first run splits cleanly: the
+   scripted double contingency (largest hub + largest unit, ~3.6 GW paired
+   loss) is SURVIVED without total blackout — but only through the full UFLS
+   defense and a 45.90 Hz nadir (a near-death ride; C6 pinned the SAME
+   portfolio at 49.48 for a single loss). And the world misses its own
+   §5.2.7 rubric in the measured slice: inverter share 12.1 % (vs ≥ 70 %),
+   122 gCO2/kWh (vs < 50), 7 final-year UFLS (vs 0) — because a coal-free
+   moment leans on must-run nuclear + gas, the GFM fleet sits in reserve
+   (energy ~0), and delivered RE share is weather/dispatch-bound not
+   capacity-bound. So the finale adds a THIRD axis to the wall: on top of
+   inertia (M5/M6) and ramp-power, the coal-free world's DISPATCH MIX must
+   change to clear 70 % inverter share and < 50 gCO2 — which points at more
+   RE-committing dispatch / storage cycling / less residual gas, alongside
+   the ramp/inertia fixes. All three milestones (M5/M6/M7) ship as MECHANIC
+   GATES; the ★-pins await ONE owner decision — some combination of a
+   backend net/patch remove_device, firmer grid-forming FFR / self-committing
+   firm low-carbon capacity, a dispatch/rubric revisit (grade on stress
+   episodes + the exam, not every ramp and every hour) — and a faster
+   coal-free traversal. The toolkits and the measurements for all three are
+   proven and green.
 
 ## 8. Release checklist (ROADMAP P10)
 

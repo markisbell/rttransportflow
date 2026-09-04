@@ -30,6 +30,7 @@ const SMOKES := {
 	"black_start": "res://smokes/black_start.gd",
 	"campaign_coal_exit": "res://smokes/campaign_coal_exit.gd",
 	"campaign_hydrogen_loop": "res://smokes/campaign_hydrogen_loop.gd",
+	"campaign_inverter_grid": "res://smokes/campaign_inverter_grid.gd",
 	"syncon_inertia": "res://smokes/syncon_inertia.gd",
 	"save_load_replay": "res://smokes/save_load_replay.gd",
 	"model_gallery": "res://smokes/model_gallery.gd",

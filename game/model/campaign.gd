@@ -54,6 +54,18 @@ static func build_inherited_world(world: Node) -> bool:
 	return GridPlan.author_start(world)
 const BLOCK_DAYS := 1.0 / 96.0
 
+## §5.2.7 inverter energy share: interface taxonomy for the M7 KPI. Inverter-
+## interfaced (non-synchronous) SOURCES vs synchronous machines, classified
+## by World.plants kind (mirrors zone_history.GROUP_OF_KIND / world_model
+## SYNC_KINDS). Excluded from BOTH terms — electrolyzer/h2_cavern (loads),
+## hvdc_converter (a transfer, not a source — ledger 28), syncon (p_max 0:
+## inertia, not energy). The share is MEASURED from delivered power, never
+## nameplate (ledger 44).
+const INVERTER_GEN_KINDS := ["wind_onshore", "wind_offshore", "solar_pv",
+	"offshore_platform", "battery", "grid_forming"]
+const SYNC_GEN_KINDS := ["nuclear", "coal", "lignite", "gas_ccgt",
+	"gas_ocgt", "hydro_ps"]
+
 ## §5.3/D7: the retry point — saved when a milestone window opens. ONE
 ## FILE PER MILESTONE (autosave_file): the windows are contiguous, so the
 ## next milestone's window-open save lands one block after a failure and
@@ -339,6 +351,7 @@ func _reset_acc() -> void:
 		"scripted_trip_seen": false, "double_contingency_fired": false,
 		"dc_hub_fired": false, "dc_unit_fired": false,
 		"double_contingency_blackout": false,
+		"inv_energy_mwh": 0.0, "gen_energy_mwh": 0.0,
 		"cost_window_start": {}, "redispatch_window_start_eur": -1.0,
 	}
 
@@ -407,6 +420,31 @@ func _accumulate(result: Dictionary, day: float) -> void:
 		if _in_span(day, milestone.get("episode_days", [])):
 			acc["episode_saidi_min"] = float(acc["episode_saidi_min"]) \
 				+ unserved * minutes
+	# inverter energy share (§5.2.7): tally DELIVERED generation by interface
+	# type from the measured wire (ledger 44 — p_mw is actual output, engine
+	# curtailment already applied). max(p_mw,0) drops charging/pumping/
+	# electrolysis loads from both terms; the share ratio is robust to the
+	# p_mw end-of-step sample because numerator and denominator integrate the
+	# one way. The excluded kinds (electrolyzer/h2_cavern/hvdc_converter/
+	# syncon) are in NEITHER list, so they touch neither term — an HVDC
+	# terminal's wire device is keyed by its converter pid (kind
+	# hvdc_converter), so it is dropped by the taxonomy (ledger 28: a transfer,
+	# not a source), not by absence from World.plants; a device pid genuinely
+	# absent (should one arise) is skipped by the is_empty guard anyway.
+	var dt_h := float(result.get("dt_done_s", 0.0)) / 3600.0
+	if dt_h > 0.0:
+		var devices: Dictionary = result.get("devices", {})
+		for pid: String in devices:
+			var plant: Dictionary = World.plants.get(pid, {})
+			if plant.is_empty():
+				continue
+			var kind := str(plant.get("kind", ""))
+			var e := maxf(Wire.numf(devices[pid], "p_mw", 0.0), 0.0) * dt_h
+			if kind in INVERTER_GEN_KINDS:
+				acc["inv_energy_mwh"] = float(acc["inv_energy_mwh"]) + e
+				acc["gen_energy_mwh"] = float(acc["gen_energy_mwh"]) + e
+			elif kind in SYNC_GEN_KINDS:
+				acc["gen_energy_mwh"] = float(acc["gen_energy_mwh"]) + e
 	# cost window: capture the books at window entry, evaluate on deltas
 	var cost_span: Array = milestone.get("cost_window_days",
 		milestone.get("window_days", []))
@@ -525,6 +563,16 @@ func h2_converted_mw() -> float:
 	return total
 
 
+## Measured inverter energy share over the milestone window (§5.2.7): the
+## fraction of DELIVERED generation from inverter-interfaced sources
+## (wind/PV/offshore hubs/batteries/grid-forming) vs synchronous machines,
+## accumulated in _accumulate. 0.0 on an unmeasured/dead window — which fails
+## the ≥ 0.7 finale gate, the correct default (mirrors _window_avg_cost()).
+func inverter_share() -> float:
+	var g: float = acc.get("gen_energy_mwh", 0.0)
+	return float(acc.get("inv_energy_mwh", 0.0)) / g if g > 0.0 else 0.0
+
+
 # ---------------------------------------------------------------- milestones
 
 func current_milestone() -> Dictionary:
@@ -613,7 +661,8 @@ func _first_unmet(criteria: Dictionary) -> String:
 				if h2_converted_mw() < float(v):
 					return key
 			"inverter_share_at_least":
-				pass  # C9 lands the measured energy-share accumulator
+				if inverter_share() < float(v):
+					return key
 			"gco2_per_kwh_below":
 				if Economy.g_co2_per_kwh() >= float(v):
 					return key

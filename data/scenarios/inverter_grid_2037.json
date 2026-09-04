@@ -1,0 +1,19 @@
+{
+  "id": "inverter_grid_2037",
+  "title": "The Inverter Grid (2037-40, finale)",
+  "description": "The campaign finale. Run the coal-free inverter grid Coal Exit + The Hydrogen Loop produced: >=70% of energy from inverter-interfaced sources (wind, PV, offshore hubs, batteries, grid-forming), <50 gCO2/kWh, zero final-year UFLS. The final exam is a scripted double contingency at day 174.5 - the largest offshore hub and the largest online unit trip within 10 s, both genuine infeed losses - survivable only with a properly sized grid-forming + FFR + syncon portfolio. The passed replay is the campaign's closing screen.",
+  "seed": 42,
+  "sandbox": false,
+  "difficulty": "normal",
+  "author_era": "hydrogen",
+  "start_day": 174.4,
+  "campaign": {
+    "milestone_index": 6
+  },
+  "economy": {
+    "treasury_eur": 14000000000.0,
+    "_rationale": "C9 fixture: the post-M6 player has spent through the green build-out, the flex fleet, the inertia portfolio and the H2 chain. 14 B€ leaves operating headroom through the endgame's 250 EUR/t CO2 exposure without trivializing the -2 B€ insolvency line. Pre-built era assets carry no booked capex (inherited, per C2)."
+  },
+  "_why_start_day": "174.4 gives a ~0.1-day ungraded cold-start settle (the hydrogen_loop pattern) just before the scripted double contingency at day 174.5 (the milestone window is [144,180], final-year [168,180], so 174.4 is inside both). The world reuses author_era(\"hydrogen\") - the finale world IS the coal-free, inverter-heavy, GFM+FFR+syncon+hub world The Hydrogen Loop leaves behind, one milestone on (a new era author would only re-tune quotas the hydrogen era already sets). Starting near the exam keeps the coal-free ALERT-slow traversal bounded (the C7/C8 wall); the inverter-share and gCO2 axes therefore accumulate over a short measured slice, not the full year - a mechanic-gate measurement, not a full-year star pin.",
+  "forces": []
+}
