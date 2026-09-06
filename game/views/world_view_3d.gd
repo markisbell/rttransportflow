@@ -155,6 +155,11 @@ var _tod_cache := -1.0  # time-of-day fraction the lighting was last set for
 ## at build time). Model-band models are few, so per-frame rotation is
 ## cheap; a freed chunk's rotors drop out via is_instance_valid.
 var _rotors := {}
+## phasor overlay (arc P3, ledger 56): resident sync-plant phasor gizmos
+## (pid -> pivot Node3D), off by default. Freed with their chunk (guarded).
+const PhasorGizmo := preload("res://views/rendering/phasor_gizmo.gd")
+var _phasors := {}
+var _phasors_shown := false
 
 
 func _ready() -> void:
@@ -475,6 +480,7 @@ func _process(delta: float) -> void:
 			rotor.rotate_z(float(_rotors[rotor]) * delta)
 		else:
 			_rotors.erase(rotor)
+	_update_phasors()
 	var tod := fmod(GameClock.t_sim, GameClock.SECONDS_PER_DAY) \
 		/ GameClock.SECONDS_PER_DAY
 	if absf(tod - _tod_cache) > 0.0003:  # ~26 sim-seconds; cheap either way
@@ -574,6 +580,48 @@ func _collect_rotors(model: Node3D, tile: Vector2i) -> void:
 						World.terrain_at(tile) in ["s", "S"])
 			# 4 m/s barely turns, 12+ m/s is a busy 2 rad/s
 			_rotors[rotor] = clampf((wind - 3.0) * 0.22, 0.05, 2.2)
+
+
+# ─── phasor overlay (arc P3) ──────────────────────────────────────────
+
+## Attach a rotor-angle phasor gizmo above a SYNCHRONOUS plant (only sync
+## machines swing; inverters/batteries are current sources). Off until toggled.
+func _attach_phasor(pid: String, model: Node3D) -> void:
+	if str(World.plants.get(pid, {}).get("kind", "")) not in World.SYNC_KINDS:
+		return
+	var pivot: Node3D = PhasorGizmo.make()
+	pivot.visible = _phasors_shown
+	model.add_child(pivot)
+	_phasors[pid] = pivot
+
+
+## Per-frame: point each resident phasor at its machine's latest wire angle,
+## coloured by the slip. UNTYPED loop var (the freed-node lesson, freeze #3).
+func _update_phasors() -> void:
+	if not _phasors_shown:
+		return
+	var devices: Dictionary = Orchestrator.latest().get("devices", {})
+	for pid in _phasors.keys():
+		var pivot = _phasors[pid]
+		if not is_instance_valid(pivot):
+			_phasors.erase(pid)
+			continue
+		var d: Dictionary = devices.get(pid, {})
+		if d.is_empty():
+			continue
+		PhasorGizmo.apply(pivot, Wire.numf(d, "delta_rad", 0.0),
+			Wire.numf(d, "slip_hz", 0.0))
+
+
+## Toggle the overlay (HUD key). Shows/hides every resident hand at once.
+func toggle_phasors() -> void:
+	_phasors_shown = not _phasors_shown
+	for pid in _phasors.keys():
+		var pivot = _phasors[pid]
+		if is_instance_valid(pivot):
+			pivot.visible = _phasors_shown
+		else:
+			_phasors.erase(pid)
 
 
 # ─── coarse backdrop + water ──────────────────────────────────────────
@@ -795,6 +843,7 @@ func _populate_chunk(key: Vector2i) -> void:
 					root.add_child(model)
 					plants[pid] = model
 					_collect_rotors(model, tile)
+					_attach_phasor(pid, model)
 			if World.corridors.has(tile):
 				_build_corridor(key, tile)
 			var lc_id := World.load_center_at(tile)
@@ -1380,6 +1429,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_RIGHT: _pan(Vector3(step, 0, 0))
 			KEY_UP: _pan(Vector3(0, 0, -step))
 			KEY_DOWN: _pan(Vector3(0, 0, step))
+			KEY_P: toggle_phasors()  # phasor overlay (arc P3)
 
 
 func _pan(delta: Vector3) -> void:

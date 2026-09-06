@@ -2597,6 +2597,50 @@ trip-contrast visual (high-inertia synchronous machines fan slowly and
 coherently vs a low-inertia inverter grid's violent spread vs the
 storage-damped case) — the arc's visual payoff.
 
+### Phasor arc — P3: the Godot phasor overlay — ARC COMPLETE (2026-09-04)
+
+**Built:** the visual payoff (ledger 56) — the per-machine rotor angles the
+engine now computes are drawn as rotating phasors on the map. A per-plant
+CLOCK HAND floats above every SYNCHRONOUS plant model, its heading = the
+machine's `delta_rad` (rotor angle in the island COI frame from the wire), its
+colour = the `slip_hz` (green when synced with the grid, hot while slipping).
+When the grid is STEADY every hand sits still at its equilibrium angle; on a
+trip the hands swing AGAINST each other — and THAT is the contrast the arc
+exists to show: high-inertia synchronous machines fan slowly and coherently, a
+low-inertia inverter grid's few sync machines snap and oscillate wildly, and
+storage-backed inertia damps the spread. `views/rendering/phasor_gizmo.gd` (a
+pure, tested render helper: `make`/`color_for_slip`/`apply`, NaN/null-safe);
+`world_view_3d.gd` attaches a gizmo when a sync plant streams in (mirrors the
+`_collect_rotors` hook), updates every resident hand per frame from
+`Orchestrator.latest().devices` (the untyped-loop + `is_instance_valid` guard —
+the freeze-#3 freed-node lesson), and a **KEY_P toggle** (off by default).
+
+**Tests/acceptance:** GdUnit 113 → **117** (`test_phasor` ×4: the hand carries
+a mesh, the colour ramps synced→slipping and is |slip|-symmetric, `apply`
+points the hand at −delta_rad and recolours, and NaN angle/slip are safe).
+`ui_boot` green — the HUD + world view construct cleanly with the overlay
+wired. The visual itself is not headless-verifiable (a rendered swing needs a
+headed run); the LOGIC and the wired data path (P2's wire fields → the gizmos)
+are pinned.
+
+**Deviations (deliberate):** only the MODEL-BAND per-plant gizmos ship — the
+STRATEGIC-band `angle_spread_rad` ribbon shimmer (a flow-shader channel) and
+the GFM battery's explicit virtual-angle phasor (the "GFM holds reference"
+contrast) are deferred polish; the GFM contrast already reads indirectly as
+reduced sync spread in a GFM-heavy island. The hands snap to the latest
+per-step wire angle each frame (no game-side interpolation) — smooth during
+ALERT where steps are sub-second, static in CALM where the angle is anyway.
+
+**THE PHASOR ARC IS COMPLETE (P0–P3).** The owner's request — watch machines
+swing against each other after a trip, and see classical-inertia vs
+low-storage-inverter vs high-storage-inverter — is delivered end to end: P0
+proved the physics, P1a/P1b put the per-machine COI-anchored observer in the
+engine (every frequency pin bit-exact, COI identity at machine epsilon), P2
+carried the angles on the wire, and P3 draws them. Reopened ledger 1 as a
+COI-anchored observer, not a replacement — the founding model is untouched and
+the arc rode alongside it. Deferred polish (strategic ribbon, GFM virtual
+phasor, headed visual tuning) is captured above and in session memory.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
