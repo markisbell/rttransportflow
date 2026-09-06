@@ -82,3 +82,33 @@ def test_loss_feedback_settles(dyn) -> None:
     slack = abs(r.summary["slack_mw"])
     load = r.summary["load_mw"]
     assert slack < 0.001 * load, f"slack {slack:.1f} MW vs load {load:.0f} MW"
+
+
+def test_angle_observer_coupled_coi_identity() -> None:
+    """Phasor observer (ledger 56, P1b) on the real europe_mini grid: after
+    coupled steps the observer is LIVE (the simulator reduced the classical
+    network from the PF and fed it in), and — the load-bearing pin — its
+    per-island inertia-weighted mean speed EQUALS the Tier-1 COI f to machine
+    epsilon, so the wire f stays exact. The steady angle spread is physical
+    (a few tenths of a rad, not a diverged 2·pi wrap), and every delta/omega
+    is finite (never-crash)."""
+    import numpy as np
+
+    from rttransportflow.dynamics import F0
+    from rttransportflow.simulator import build_dyn_simulator
+
+    sim = build_dyn_simulator(str(BUNDLE_DIR), 96)
+    sim.warmup()
+    for step in range(4):
+        assert sim.run_step(step, 0).converged
+    fleet = sim.fleet
+    obs = sim.integrator.angles
+    assert obs.enabled and obs.nets, "observer never engaged on the live grid"
+    f_isl = sim.integrator.islands.f
+    for net in obs.nets:
+        w = net.weight
+        mean = float(np.sum(w * fleet.omega[net.rows]) / np.sum(w))
+        assert abs(mean - (float(f_isl[net.island]) - F0)) < 1e-9  # COI identity
+    d = fleet.delta[obs.nets[0].rows]
+    assert 0.0 < float(d.max() - d.min()) < np.pi  # physical spread, not diverged
+    assert np.all(np.isfinite(fleet.delta)) and np.all(np.isfinite(fleet.omega))

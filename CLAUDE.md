@@ -2517,6 +2517,55 @@ feeding `AngleObserver.set_islands` at PF instants, so the observer produces
 real per-machine angles on the game grid; then the integration pins
 (COI-identity on a real world, slicing/snapshot of δ/ω, GFM-holds-reference).
 
+### Phasor arc — P1b: the live simulator coupling (2026-09-04)
+
+**Built:** the observer's live coupling (ledger 56) — the simulator now feeds
+`AngleObserver` real reduced networks from the running grid, so the per-machine
+angles are physical, not inert. `DynSimulator._rebuild_angle_nets` (called from
+`_run_pf` after every converged solve): pulls the pandapower `Ybus` +
+pd2ppc bus lookup, folds loads AND non-synchronous injections
+(inverters/hubs/batteries/HVDC/aux) as constant-impedance shunts, augments each
+online sync machine as E' behind Xd' (Xd' converted machine-base→system-base,
+E' from the operating-point V∠θ and res_gen P/Q), and Kron-reduces to the
+generator internal nodes; then assembles one `IslandNet` per island (COI-centred
+equilibrium δ0, the p_bias offset so the observer rests exactly at the PF
+operating point, the swing constants from H/S_n/D). Wrapped never-crash (any
+pandapower-internal or singular-solve failure keeps the last networks). The
+whole reduction runs at PF cadence (1 s/30 s), never per tick.
+
+**The re-anchor discovery (the load-bearing correctness fix):** letting δ drift
+freely across a steady grid's dispatch/PF changes accumulated a SPURIOUS swing
+that diverged to the ω clamp (the observer manufactured motion on a grid whose
+COI f sat flat at 50.000). The fix is also the right pedagogy: **re-anchor δ/ω
+to the PF equilibrium whenever the grid is CALM** (a steady grid shows STATIC
+angles), and let δ swing freely ONLY during ALERT (a real disturbance — the
+transient the overlay exists to show), settling on the next CALM. First
+build / post-topology-split always re-anchors. A fixed-operating-point probe
+confirmed the equilibrium itself is perfectly stable (0 drift over 5000 ticks);
+the divergence was purely the un-anchored steady-state drift.
+
+**Tests/acceptance:** `test_pf_sanity.test_angle_observer_coupled_coi_identity`
+— on the real europe_mini grid, after coupled steps the observer is LIVE and
+its per-island inertia-weighted mean speed EQUALS the Tier-1 COI f to **< 1e-9**
+(measured 4e-25 — machine epsilon), the steady angle spread is physical
+(~0.74 rad, not a diverged 2·π wrap), and every δ/ω is finite. Every existing
+pin still bit-exact (the observer never feeds the COI, and the analytic
+fixtures run a bare engine with no networks).
+
+**Deviations (deliberate):** non-synchronous devices (GFL wind/PV, batteries,
+GFM, HVDC, hubs) are folded as constant-impedance shunts — only SYNC machines
+carry a swing phasor in P1b (the core inter-machine pedagogy). A GFM battery's
+explicit virtual-angle phasor (the "GFM holds reference" contrast) is a
+refinement deferred to P2/P3; the GFM contrast already shows indirectly as
+reduced sync spread in a GFM-heavy island (more E_k → lower RoCoF → less
+swing). The reduction's O(n_bus³) solve at PF cadence is bounded (≈ ms at 145
+buses); the per-tick cost is the P0-measured 337 µs matvec at 180 machines.
+
+**Next:** Phasor P2 — the wire: additive per-machine `delta_rad`/`slip_hz` on
+the device rows + `angle_spread_rad` per island (the game reads them
+null-tolerantly, old bundles byte-identical); then P3 — the Godot phasor
+overlay + the trip-contrast visual.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a

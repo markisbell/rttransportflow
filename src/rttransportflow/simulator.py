@@ -452,6 +452,9 @@ class DynSimulator(TopologyMixin, CommandsMixin, ReportingMixin):
             if self._np.isfinite(pl):
                 loss[self._bus_island[int(net.line.from_bus.at[idx])]] += pl
         island.p_loss = loss
+        # phasor observer (ledger 56): re-reduce the classical network from the
+        # fresh operating point and re-init E'/δ — the observer's live coupling.
+        self._rebuild_angle_nets(net)
         self._latest_pf = {
             "buses": {
                 name: {"vm_pu": float(net.res_bus.vm_pu.at[idx]),
@@ -473,6 +476,111 @@ class DynSimulator(TopologyMixin, CommandsMixin, ReportingMixin):
             "min_vm_pu": float(net.res_bus.vm_pu.min()),
             "max_vm_pu": float(net.res_bus.vm_pu.max()),
         }
+
+    def _rebuild_angle_nets(self, net) -> None:
+        """Rebuild the phasor observer's per-island classical reduced networks
+        from the fresh PF operating point (ledger 56, P1b): machines E' behind
+        Xd', loads + non-synchronous injections folded as constant-impedance
+        shunts, Kron-reduced to the online generator internal nodes. Runs at PF
+        cadence (never per tick). NEVER crashes the loop — on any failure keep
+        the last networks (sample-and-hold)."""
+        from .dynamics.angles import IslandNet
+
+        np = self._np
+        fleet = self.fleet
+        obs = self.integrator.angles
+        online = fleet.online
+        if fleet.n_sync == 0 or not bool(online.any()):
+            obs.set_islands([])
+            return
+        try:
+            Y = np.asarray(net._ppc["internal"]["Ybus"].todense()).astype(complex)
+            b_lookup = net._pd2ppc_lookups["bus"]
+            base = float(net.sn_mva)
+            vm = net.res_bus.vm_pu
+            va = net.res_bus.va_degree
+
+            def _v(bus: int) -> complex:
+                return complex(vm.at[bus] * np.exp(1j * np.deg2rad(va.at[bus])))
+
+            # loads + non-sync injections (inverters/hubs/batteries/HVDC/aux) as
+            # constant-impedance shunts on the network diagonal (classical model)
+            for li in net.load.index:
+                bus = int(net.load.bus.at[li])
+                s = (net.load.p_mw.at[li] + 1j * net.load.q_mvar.at[li]) / base
+                Y[b_lookup[bus], b_lookup[bus]] += np.conj(s) / (abs(_v(bus)) ** 2)
+            for si in net.sgen.index:
+                p = float(net.sgen.p_mw.at[si]); q = float(net.sgen.q_mvar.at[si])
+                if p == 0.0 and q == 0.0:
+                    continue
+                bus = int(net.sgen.bus.at[si])
+                s = -(p + 1j * q) / base  # injection = negative load
+                Y[b_lookup[bus], b_lookup[bus]] += np.conj(s) / (abs(_v(bus)) ** 2)
+
+            rows = np.where(online)[0]
+            gbus = [self._gen_bus[i] for i in rows]
+            ppc_b = np.array([b_lookup[bus] for bus in gbus], dtype=int)
+            gidx = [self.built.gen_idx[i] for i in rows]
+            Vg = np.array([_v(bus) for bus in gbus])
+            Pg = np.array([float(net.res_gen.p_mw.at[g]) for g in gidx]) / base
+            Qg = np.array([float(net.res_gen.q_mvar.at[g]) for g in gidx]) / base
+            # Xd' machine-base -> system base; internal EMF from the operating point
+            xdp = fleet.xd_prime[rows] * base / np.maximum(fleet.s_n[rows], 1e-9)
+            e_int = Vg + 1j * xdp * np.conj((Pg + 1j * Qg) / Vg)
+            e_mag = np.abs(e_int); d0_abs = np.angle(e_int)
+
+            ng, nb = len(rows), Y.shape[0]
+            yaug = np.zeros((ng + nb, ng + nb), complex)
+            yaug[ng:, ng:] = Y
+            yg = 1.0 / (1j * xdp)
+            for k in range(ng):
+                yaug[k, k] += yg[k]
+                yaug[k, ng + ppc_b[k]] -= yg[k]
+                yaug[ng + ppc_b[k], k] -= yg[k]
+                yaug[ng + ppc_b[k], ng + ppc_b[k]] += yg[k]
+            a, bm = yaug[:ng, :ng], yaug[:ng, ng:]
+            c, d = yaug[ng:, :ng], yaug[ng:, ng:]
+            y_red = a - bm @ np.linalg.solve(d, c)
+            g_mw = y_red.real * base
+            b_mw = y_red.imag * base
+        except Exception:
+            return  # never crash the loop; keep the last nets
+
+        # per-island assembly. Re-anchor δ/ω to the PF equilibrium whenever the
+        # grid is CALM (steady): a steady grid shows static angles, and letting
+        # δ drift freely across dispatch/PF changes would accumulate a spurious
+        # swing. During ALERT (a real disturbance) DON'T re-anchor — the
+        # observer swings freely and shows the transient, settling on the next
+        # CALM. First build / post-topology (obs disabled) always re-anchors.
+        reanchor = (not obs.enabled) or (self.integrator.mode == "calm")
+        f_island = self.integrator.islands.f
+        isl_of = fleet.island_of[rows]
+        h = fleet.h[rows]; sn = fleet.s_n[rows]; dmp = fleet.d_damp[rows]
+        y_mech = fleet.y[rows]
+        nets = []
+        for isl in range(self.integrator.islands.n):
+            sel = np.where(isl_of == isl)[0]
+            if sel.size == 0:
+                continue
+            g = np.ascontiguousarray(g_mw[np.ix_(sel, sel)])
+            bmat = np.ascontiguousarray(b_mw[np.ix_(sel, sel)])
+            e = e_mag[sel]
+            weight = 2.0 * h[sel] * sn[sel]
+            w_sum = float(weight.sum())
+            if w_sum <= 0.0:
+                continue
+            d0 = d0_abs[sel] - float(np.sum(weight * d0_abs[sel]) / w_sum)  # COI-centered
+            dij = d0[:, None] - d0[None, :]
+            pe0 = e * ((g * np.cos(dij) + bmat * np.sin(dij)) @ e)
+            mrows = rows[sel]
+            nets.append(IslandNet(
+                island=isl, rows=mrows, g_mw=g, b_mw=bmat, e_prime=e,
+                p_bias=pe0 - y_mech[sel], inv_m=self._f0 / weight,
+                weight=weight, d_coeff=dmp[sel] * sn[sel] / self._f0))
+            if reanchor:
+                fleet.delta[mrows] = d0
+                fleet.omega[mrows] = f_island[isl] - self._f0
+        obs.set_islands(nets)
 
     # -- standalone step ---------------------------------------------------
 
