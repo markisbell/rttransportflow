@@ -44,6 +44,24 @@ def test_model_hash_covers_devices(client) -> None:
     assert bare != with_devices
 
 
+def test_phasor_fields_on_wire(client) -> None:
+    """Phasor observer (ledger 56, P2): every SYNC device row carries a
+    COI-frame delta_rad + a slip_hz, and each island carries angle_spread_rad —
+    additive to contract 2.0, present and finite on a real step."""
+    import math
+
+    _reset(client, reset_with_devices())
+    r = _step(client, 0, dt_s=30.0)
+    sync = [d for d in r["devices"].values() if "delta_rad" in d]
+    assert sync, "no sync device carried delta_rad"
+    for d in sync:
+        assert d["delta_rad"] is None or (
+            math.isfinite(d["delta_rad"]) and abs(d["delta_rad"]) <= math.pi + 1e-6)
+        assert d["slip_hz"] is None or math.isfinite(d["slip_hz"])
+    isl = r["islands"]["0"]
+    assert "angle_spread_rad" in isl and float(isl["angle_spread_rad"]) >= 0.0
+
+
 def test_unknown_kind_rejected(client) -> None:
     doc = reset_with_devices([{"id": "x", "kind": "flux_capacitor", "node": "paris",
                                "params": {}}])

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .dynamics import F0
+
 
 class ReportingMixin:
     def begin_step(self) -> dict[str, Any]:
@@ -51,12 +53,20 @@ class ReportingMixin:
             if state == "online" and self.fleet.h2_starved is not None \
                     and bool(self.fleet.h2_starved[row]):
                 state = "starved"
+            # phasor observer (ledger 56): the rotor angle in the island COI
+            # frame + the speed slip from that COI (0 when steady, non-zero
+            # while swinging). Present on every sync machine (a syncon reads
+            # as a reference-holder); the game reads them null-tolerantly.
+            isl = int(self.fleet.island_of[row])
+            f_coi = float(self.integrator.islands.f[isl]) - F0
             devices[pid] = {
                 "p_mw": float(self.fleet.y[row] - self.fleet.hy_pump_p[row]),
                 "state": state,
                 "headroom_mw": max(0.0, float(self.fleet.p_max[row] - self.fleet.y[row])),
                 "energy_mwh_step": float(self.fleet.energy_mwh[row] - e_before[row]),
                 "fuel_mwh_th_step": float(self.fleet.fuel_mwh_th[row] - fuel_before[row]),
+                "delta_rad": float(self.fleet.delta[row]),
+                "slip_hz": float(self.fleet.omega[row]) - f_coi,
             }
             if bool(self.fleet.is_hydro[row]) and float(self.fleet.hy_e_mwh[row]) > 0:
                 devices[pid]["soc"] = float(self.fleet.hy_soc_mwh[row]
@@ -111,6 +121,18 @@ class ReportingMixin:
         s_online_arr = self.fleet.s_online_per_island(n_islands)
         agc_up, _agc_dn = self.fleet.agc_headroom(n_islands)
         fcr_arr = self.fleet.fcr_used  # a declared field since Stage 6
+        # phasor observer (ledger 56): the island's rotor-angle spread over its
+        # ONLINE sync machines — one number for "how hard is it swinging" (near
+        # 0 when steady; a split pocket losing sync spreads toward pi).
+        spread = self._np.zeros(n_islands)
+        if self.fleet.n_sync:
+            iof = self.fleet.island_of
+            on = self.fleet.online
+            for i in range(n_islands):
+                m = (iof == i) & on
+                if bool(m.any()):
+                    d = self.fleet.delta[m]
+                    spread[i] = float(d.max() - d.min())
         return {str(i): {
             "f_hz": float(res.f_end[i]) if i < len(res.f_end) else float(island.f[i]),
             "rocof_hz_s": float(self.integrator.rings[i].rocof_window(self.integrator.t_us)),
@@ -127,6 +149,7 @@ class ReportingMixin:
                              if i < len(self.integrator.agc_mw) else 0.0),
             "afrr_headroom_up_mw": float(agc_up[i]) if i < len(agc_up) else 0.0,
             "w": float(island.w[i]),
+            "angle_spread_rad": float(spread[i]),
         } for i in range(n_islands)}
 
     def zone_report(self) -> dict[str, Any]:

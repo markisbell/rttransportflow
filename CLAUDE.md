@@ -2566,6 +2566,37 @@ the device rows + `angle_spread_rad` per island (the game reads them
 null-tolerantly, old bundles byte-identical); then P3 — the Godot phasor
 overlay + the trip-contrast visual.
 
+### Phasor arc — P2: the wire (2026-09-04)
+
+**Built:** the additive wire surface that carries the observer's per-machine
+angles to the game (ledger 56). `simulator_report.device_report` now puts
+`delta_rad` (the rotor angle in the island COI frame) and `slip_hz` (the
+machine's speed slip from that COI — 0 when steady, non-zero while swinging)
+on EVERY synchronous device row (a syncon reads as a reference-holder);
+`islands_report` adds `angle_spread_rad` per island — the one-number
+"how hard is it swinging" readout (max−min δ over the island's online sync
+machines, ~0 steady, growing toward π as a pocket loses synchronism).
+`docs/contract/v2.md` documents all three as additive to contract 2.0.
+
+**Tests/acceptance:** `test_wire_devices.test_phasor_fields_on_wire` — the
+fields are present and finite on a real step (δ wrapped in (−π,π], slip finite,
+spread ≥ 0). The whole wire + contract suite passes UNCHANGED (31 tests) —
+**purely additive, no golden re-baseline needed**: the schema admits the new
+keys and no existing frame value moved. Every frequency pin still bit-exact.
+
+**Deviations (deliberate):** the fields are additive optional (the game reads
+them null-tolerantly; a pre-arc bundle simply lacks them). The per-machine
+δ/ω TRACE over time is left to the game to accumulate per block (as it does
+for the frequency trace / ZoneHistory) rather than riding the engine's
+trajectory buffer — keeps P2 minimal and the engine untouched.
+
+**Next:** Phasor P3 — the Godot phasor overlay: a per-plant rotating gizmo
+driven by `delta_rad` (colored by `slip_hz`) at the model band, the
+`angle_spread_rad` ribbon shimmer at the strategic band, a toggle, and the
+trip-contrast visual (high-inertia synchronous machines fan slowly and
+coherently vs a low-inertia inverter grid's violent spread vs the
+storage-damped case) — the arc's visual payoff.
+
 ## 7. Open questions for the project owner
 
 Recommended defaults are in force until overridden; each override gets a
