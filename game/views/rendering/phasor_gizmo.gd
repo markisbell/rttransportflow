@@ -10,8 +10,12 @@ extends Object
 ## inertia damps the spread. That contrast is the whole point of the arc.
 ## No class_name (the headless-cache lesson).
 
-const HAND_LEN := 1100.0    # world units (5 km tiles) — a visible needle
-const HEIGHT := 2600.0       # float above the plant model
+# Plant models fit a ~0.9-unit footprint (plant_models.gd), so the gizmo is
+# sized in the SAME units — a ~1.2-unit hand floating ~1.6 units above the
+# plant. (The first cut used 1100/2600 world units — ~1000x too big, off the
+# camera entirely; the P3 "un-eyeballed sizing" caveat, corrected here.)
+const HAND_LEN := 1.2        # a visible needle, comparable to the plant width
+const HEIGHT := 1.6          # float just above the plant model's top
 const SLIP_HOT_HZ := 0.4     # |slip| Hz at which the hand reads fully "slipping"
 const SYNCED := Color(0.25, 0.9, 0.45)
 const SLIPPING := Color(1.0, 0.3, 0.15)

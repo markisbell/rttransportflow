@@ -613,7 +613,11 @@ func _update_phasors() -> void:
 			Wire.numf(d, "slip_hz", 0.0))
 
 
-## Toggle the overlay (HUD key). Shows/hides every resident hand at once.
+## Toggle the overlay (KEY_P). Shows/hides every resident hand at once. Prints
+## a one-line diagnostic (the render is not headless-verifiable, so this is how
+## a remote report confirms the key fired + whether any hands are resident: if
+## it says "0 hands", zoom IN past the model band — the hands ride the 3D
+## plant models, which only stream below ortho size 34).
 func toggle_phasors() -> void:
 	_phasors_shown = not _phasors_shown
 	for pid in _phasors.keys():
@@ -622,6 +626,9 @@ func toggle_phasors() -> void:
 			pivot.visible = _phasors_shown
 		else:
 			_phasors.erase(pid)
+	print("[phasor] overlay %s — %d resident sync hands (zoom %.0f, models %s)"
+		% ["ON" if _phasors_shown else "OFF", _phasors.size(), _zoom,
+		"shown" if _models_shown else "HIDDEN (zoom in below 34)"])
 
 
 # ─── coarse backdrop + water ──────────────────────────────────────────
