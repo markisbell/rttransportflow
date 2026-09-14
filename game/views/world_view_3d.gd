@@ -626,8 +626,20 @@ func toggle_phasors() -> void:
 			pivot.visible = _phasors_shown
 		else:
 			_phasors.erase(pid)
-	print("[phasor] overlay %s — %d resident sync hands (zoom %.0f, models %s)"
-		% ["ON" if _phasors_shown else "OFF", _phasors.size(), _zoom,
+	# plant models live in PER-CHUNK dicts (chunk["plants"]) — count across all
+	# resident chunks to distinguish "no plants in view" from "no sync plants"
+	# from a real attach bug.
+	var resident := 0
+	var sync_resident := 0
+	for key in _chunks:
+		var cp: Dictionary = (_chunks[key] as Dictionary).get("plants", {})
+		for pid in cp:
+			resident += 1
+			if str(World.plants.get(pid, {}).get("kind", "")) in World.SYNC_KINDS:
+				sync_resident += 1
+	print("[phasor] overlay %s — %d hands / %d plant models resident (%d sync) — zoom %.0f, models %s"
+		% ["ON" if _phasors_shown else "OFF", _phasors.size(), resident,
+		sync_resident, _zoom,
 		"shown" if _models_shown else "HIDDEN (zoom in below 34)"])
 
 
